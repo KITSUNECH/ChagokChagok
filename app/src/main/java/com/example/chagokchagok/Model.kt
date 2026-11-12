@@ -108,16 +108,18 @@ class Store(ctx: Context) {
     fun shares(name: String) = prefs.getBoolean("share_$name", false)
     fun setShares(name: String, on: Boolean) = prefs.edit().putBoolean("share_$name", on).apply()
 
-    /**
-     * 성장의 세 원. ① 운전초보 연습 → ② 아는 길 → ③ 새로운 길.
-     * ①은 차와 친해지기를 마치고 두 번 달리면, ②는 받은 길 하나를 졸업하면, ③은 새 곳 세 군데를 다녀오면 마친다.
-     */
-    fun stage(name: String): Int {
-        val ds = diariesOf(name)
-        if (!prepDone(name) || ds.size < 2) return 1
-        if (guidesFor(name).none { it.kind == "길" && graduated(name, it.id) }) return 2
-        return if (places(name).size >= 3) 4 else 3
-    }
+    /** 함께 차곡에 올린 일기와 그때 남긴 한 줄. */
+    fun posted(diaryId: String): String? = prefs.getString("post_$diaryId", null)
+    fun post(diaryId: String, caption: String) = prefs.edit().putString("post_$diaryId", caption).apply()
+    /** 응원(하트)을 누른 사람들. 숫자로 줄 세우지 않고 누가 응원했는지만 보여 준다. */
+    fun hearts(id: String): Set<String> = prefs.getStringSet("heart_$id", emptySet()) ?: emptySet()
+    fun toggleHeart(id: String, name: String) { val h = hearts(id).toMutableSet(); if (!h.remove(name)) h.add(name); prefs.edit().putStringSet("heart_$id", h).apply() }
+    /** 일기에 내가 남긴 한 줄 (기분). */
+    fun feeling(diaryId: String): String? = prefs.getString("feel_$diaryId", null)
+    fun setFeeling(diaryId: String, f: String) = prefs.edit().putString("feel_$diaryId", f).apply()
+    /** 처음 탈 때 운전자 유형을 물어봤는지. */
+    fun asked(name: String) = prefs.contains("type_$name")
+
 
     /** 이 운전자의 운전석 앞뒤 위치. 다른 사람이 탄 뒤에 의자가 옮겨졌는지 본다. */
     fun seat(name: String): Int? = if (prefs.contains("seat_$name")) prefs.getInt("seat_$name", 0) else null
@@ -237,18 +239,19 @@ class Store(ctx: Context) {
 
     /** 시연용 예시 친구와 그 친구의 초보 시절 연습. 화면에 "예시"라고 표시된다. */
     fun addSampleFriend() {
-        addDriver("민지"); setRelation("민지", "친구"); setType("민지", "익숙")
+        addDriver("민수"); setRelation("민수", "친구"); setType("민수", "익숙")
         val evs = listOf(Ev(.30f, Evt.SIGNAL, "LEFT"), Ev(.35f, Evt.BRAKE, "on"), Ev(.62f, Evt.BRAKE, "on"), Ev(.80f, Evt.BRAKE, "on"))
-        val drive = Drive("민지", System.currentTimeMillis() - 200 * 86400000L, 0.6f, 9, 540, evs, 1, 3, false, false, 4, 0, 3)
-        addGuide(Guide("sample_friend", "민지", "주차장에서 후진 주차", null, null, drive,
+        val drive = Drive("민수", System.currentTimeMillis() - 200 * 86400000L, 0.6f, 9, 540, evs, 1, 3, false, false, 4, 0, 3)
+        addGuide(Guide("sample_friend", "민수", "주차장에서 후진 주차", null, null, drive,
             listOf(Tip(.2f, "나도 처음엔 네 번 넘게 오갔어. 천천히 해도 돼."), Tip(.7f, "뒷바퀴가 주차선에 닿을 때 핸들을 풀면 편해.")),
             12, sample = true, kind = "연습"))
-        // 친구도 자기가 다니는 길을 남길 수 있다
-        val road = Drive("민지", System.currentTimeMillis() - 5 * 86400000L, 5.4f, 17, 1020,
-            listOf(Ev(.25f, Evt.SIGNAL, "LEFT"), Ev(.28f, Evt.BRAKE, "on"), Ev(.6f, Evt.SIGNAL, "RIGHT"), Ev(.88f, Evt.BRAKE, "on")), 2, 2, false, false, 1, 0, 5)
-        addGuide(Guide("sample_friend_road", "민지", "학교 가는 길", 37.4979, 127.0276, road,
-            listOf(Tip(.3f, "여기 좌회전 신호 짧아. 앞차 따라 바로 가."), Tip(.85f, "학교 앞은 어린이 보호구역이야. 30 아래로.")), 30, sample = true))
-        if (news("나").none { it.startsWith("민지\t") }) addNews("나", "민지\t민지의 응원: “면허 축하해! 처음엔 다 무서워. 주차장부터 같이 하자.”")
+        // 친구의 주말 드라이브: 다녀온 곳을 함께 차곡에 올렸다. 나도 가보기를 누르면 내 도전이 된다.
+        val trip = Drive("민수", System.currentTimeMillis() - 2 * 86400000L, 38.5f, 62, 3720,
+            listOf(Ev(.2f, Evt.SIGNAL, "RIGHT"), Ev(.55f, Evt.BRAKE, "on"), Ev(.9f, Evt.SIGNAL, "LEFT"), Ev(.95f, Evt.BRAKE, "on")), 2, 2, false, false, 1, 0, 4,
+            place = "바닷가 카페")
+        addGuide(Guide("sample_friend_trip", "민수", "민수의 주말 드라이브", 37.4473, 126.3729, trip,
+            listOf(Tip(.95f, "주차장이 넓고 풍경도 좋았어.")), 1, sample = true, kind = "추천"))
+        if (news("나").none { it.startsWith("민수\t") }) addNews("나", "민수\t민수의 응원: “면허 축하해! 처음엔 다 무서워. 주차장부터 같이 하자.”")
     }
 
     /** 시연용 예시 교본. 화면에 "예시"라고 표시된다. 좌표는 Pleos 문서의 목적지 예시 값이다. */

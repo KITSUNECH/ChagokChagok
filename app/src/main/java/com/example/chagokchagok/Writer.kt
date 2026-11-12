@@ -193,7 +193,7 @@ object Writer {
 
         if (tone == "다정하게") sb.append(if (n == 1) "시작한 것만으로 충분한 날이다. " else "오늘도 무사히 다녀와 줘서 고맙다. ")
 
-        val title = if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else "${ordinal(n)} 운전"
+        val title = if (guide != null && guide.kind == "추천") "${poss(guide.owner)} 추천 따라" else if (guide != null && guide.kind == "연습") "${poss(guide.owner)} 연습 따라" else if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else "${ordinal(n)} 운전"
         return Diary("d${drive.date}", drive.driver, drive.date, title, sb.toString().trim(), highlight, stamp, drive, guide?.id)
     }
 }

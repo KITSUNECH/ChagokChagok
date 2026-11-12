@@ -38,7 +38,7 @@ class GleoReceiver : BroadcastReceiver() {
                 if (parks.size < 2) reply(context, "CHECK_DRIVING_PROGRESS", "success", "There are not enough drives to compare yet.")
                 else reply(
                     context, "CHECK_DRIVING_PROGRESS", "success", "Parking maneuver counts of the first and latest drives were found.",
-                    JSONArray().put(JSONObject().put("firstDriveParkingMoves", parks.first()).put("latestDriveParkingMoves", parks.last()).put("totalDiaries", store.diariesOf(driver).size).put("growthStage", store.stage(driver)).put("newPlaces", store.places(driver).size))
+                    JSONArray().put(JSONObject().put("firstDriveParkingMoves", parks.first()).put("latestDriveParkingMoves", parks.last()).put("totalDiaries", store.diariesOf(driver).size).put("stamps", store.diariesOf(driver).count { it.stamp != null }).put("newPlaces", store.places(driver).size))
                 )
             }
         }
