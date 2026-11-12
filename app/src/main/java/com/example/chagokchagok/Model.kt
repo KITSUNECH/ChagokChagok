@@ -32,7 +32,9 @@ data class Drive(
     val passenger: Boolean = false, // 운전석 말고 다른 자리에 누가 탔는지
     val turns: Int = 0,           // 내비가 안내한 좌·우회전 횟수
     val turnsSignaled: Int = 0,   // 그중 돌기 전에 깜빡이를 켠 횟수
-    val calm: Int = 0             // 숨 고르기를 누른 횟수
+    val calm: Int = 0,            // 숨 고르기를 누른 횟수
+    val place: String? = null,    // 내비 목적지 이름 (교본 없이 간 길)
+    val lamps: List<String> = emptyList() // 달리는 동안 켜진 표시등 종류
 )
 
 /** 교본: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -45,7 +47,9 @@ data class Guide(
     val drive: Drive,
     val tips: List<Tip>,
     val times: Int,
-    val sample: Boolean = false
+    val sample: Boolean = false,
+    /** "길": 어디까지 가는 길. "연습": 주차장·동네에서 기본기 (먼저 면허 딴 친구의 초보 시절 같은 것) */
+    val kind: String = "길"
 )
 
 /** 차를 넘겨받는 사람에게 전하는 것. fuel 은 남은 연료나 배터리(%). */
@@ -78,6 +82,8 @@ object Evt {
     const val SEAT = "seat"       // 동승자 탑승
     const val TURN = "turn"       // 내비가 안내한 회전을 지남 (값: signaled / missed)
     const val CALM = "calm"       // 숨 고르기
+    const val SAY = "say"         // 옆자리 한마디 (값: 그 말)
+    const val LAMP = "lamp"       // 표시등 (값: 종류:on/off)
     const val NAVI = "navi"       // 내비 안내가 바뀜 (기록하지 않고 화면만 고친다)
 }
 
@@ -93,6 +99,32 @@ class Store(ctx: Context) {
     /** 운전자가 어떤 사람인지: 초보, 오랜만, 새 차, 익숙. 고른 것에 따라 인사와 권하는 순서가 달라진다. */
     fun typeOf(name: String) = prefs.getString("type_$name", if (name == "나") "초보" else "익숙") ?: "익숙"
     fun setType(name: String, type: String) = prefs.edit().putString("type_$name", type).apply()
+
+    /** 가족인지 친구인지. 친구의 교본은 주로 연습용이다. */
+    fun relation(name: String) = prefs.getString("rel_$name", if (name == "나" || name in listOf("아빠", "엄마")) "가족" else "친구") ?: "친구"
+    fun setRelation(name: String, rel: String) = prefs.edit().putString("rel_$name", rel).apply()
+
+    /** 내 기록을 다른 사람에게 보여 줄지. 기본은 보여 주지 않는다. */
+    fun shares(name: String) = prefs.getBoolean("share_$name", false)
+    fun setShares(name: String, on: Boolean) = prefs.edit().putBoolean("share_$name", on).apply()
+
+    /**
+     * 성장의 세 원. ① 운전초보 연습 → ② 아는 길 → ③ 새로운 길.
+     * ①은 차와 친해지기를 마치고 두 번 달리면, ②는 받은 길 하나를 졸업하면, ③은 새 곳 세 군데를 다녀오면 마친다.
+     */
+    fun stage(name: String): Int {
+        val ds = diariesOf(name)
+        if (!prepDone(name) || ds.size < 2) return 1
+        if (guidesFor(name).none { it.kind == "길" && graduated(name, it.id) }) return 2
+        return if (places(name).size >= 3) 4 else 3
+    }
+
+    /** 이 운전자의 운전석 앞뒤 위치. 다른 사람이 탄 뒤에 의자가 옮겨졌는지 본다. */
+    fun seat(name: String): Int? = if (prefs.contains("seat_$name")) prefs.getInt("seat_$name", 0) else null
+    fun setSeat(name: String, pos: Int) = prefs.edit().putInt("seat_$name", pos).apply()
+
+    /** 이 운전자가 교본 없이 다녀온 곳들. */
+    fun places(name: String) = diariesOf(name).mapNotNull { if (it.guideId == null) it.drive.place else null }.distinct()
 
     /** 일기 말투: 담백하게, 다정하게. */
     fun tone(name: String) = prefs.getString("tone_$name", "담백하게") ?: "담백하게"
@@ -155,7 +187,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm)
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|"))
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -170,14 +202,14 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0)
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }
         )
     }
 
     private fun json(g: Guide) = JSONObject().apply {
         put("id", g.id); put("owner", g.owner); put("title", g.title)
         if (g.lat != null && g.lng != null) { put("lat", g.lat); put("lng", g.lng) }
-        put("drive", json(g.drive)); put("times", g.times); put("sample", g.sample)
+        put("drive", json(g.drive)); put("times", g.times); put("sample", g.sample); put("kind", g.kind)
         put("tips", JSONArray().apply { g.tips.forEach { put(JSONObject().put("p", it.p.toDouble()).put("text", it.text)) } })
     }
 
@@ -187,7 +219,7 @@ class Store(ctx: Context) {
         return Guide(
             o.getString("id"), o.getString("owner"), o.getString("title"),
             if (o.has("lat")) o.getDouble("lat") else null, if (o.has("lng")) o.getDouble("lng") else null,
-            driveOf(o.getJSONObject("drive")), tips, o.optInt("times", 1), o.optBoolean("sample", false)
+            driveOf(o.getJSONObject("drive")), tips, o.optInt("times", 1), o.optBoolean("sample", false), o.optString("kind", "길")
         )
     }
 
@@ -202,6 +234,22 @@ class Store(ctx: Context) {
         o.optString("highlight", ""), if (o.has("stamp")) o.getString("stamp") else null,
         driveOf(o.getJSONObject("drive")), if (o.has("guideId")) o.getString("guideId") else null, o.optBoolean("ai", false)
     )
+
+    /** 시연용 예시 친구와 그 친구의 초보 시절 연습. 화면에 "예시"라고 표시된다. */
+    fun addSampleFriend() {
+        addDriver("민지"); setRelation("민지", "친구"); setType("민지", "익숙")
+        val evs = listOf(Ev(.30f, Evt.SIGNAL, "LEFT"), Ev(.35f, Evt.BRAKE, "on"), Ev(.62f, Evt.BRAKE, "on"), Ev(.80f, Evt.BRAKE, "on"))
+        val drive = Drive("민지", System.currentTimeMillis() - 200 * 86400000L, 0.6f, 9, 540, evs, 1, 3, false, false, 4, 0, 3)
+        addGuide(Guide("sample_friend", "민지", "주차장에서 후진 주차", null, null, drive,
+            listOf(Tip(.2f, "나도 처음엔 네 번 넘게 오갔어. 천천히 해도 돼."), Tip(.7f, "뒷바퀴가 주차선에 닿을 때 핸들을 풀면 편해.")),
+            12, sample = true, kind = "연습"))
+        // 친구도 자기가 다니는 길을 남길 수 있다
+        val road = Drive("민지", System.currentTimeMillis() - 5 * 86400000L, 5.4f, 17, 1020,
+            listOf(Ev(.25f, Evt.SIGNAL, "LEFT"), Ev(.28f, Evt.BRAKE, "on"), Ev(.6f, Evt.SIGNAL, "RIGHT"), Ev(.88f, Evt.BRAKE, "on")), 2, 2, false, false, 1, 0, 5)
+        addGuide(Guide("sample_friend_road", "민지", "학교 가는 길", 37.4979, 127.0276, road,
+            listOf(Tip(.3f, "여기 좌회전 신호 짧아. 앞차 따라 바로 가."), Tip(.85f, "학교 앞은 어린이 보호구역이야. 30 아래로.")), 30, sample = true))
+        if (news("나").none { it.startsWith("민지\t") }) addNews("나", "민지\t민지의 응원: “면허 축하해! 처음엔 다 무서워. 주차장부터 같이 하자.”")
+    }
 
     /** 시연용 예시 교본. 화면에 "예시"라고 표시된다. 좌표는 Pleos 문서의 목적지 예시 값이다. */
     fun addSampleGuide() {

@@ -78,17 +78,66 @@ class MainActivity : Activity(), Car.Listener {
 
     // ───────────── 차에서 온 소식 ─────────────
 
-    private val coach = TurnCoach().apply { onPassed = { ok -> recorder.add(Evt.TURN, if (ok) "signaled" else "missed") } }
+    private val coach = TurnCoach().apply { onPassed = { ok -> recorder.add(Evt.TURN, if (ok) "signaled" else "missed"); if (ok) praise() } }
+
+    // ── 세 원에 따라 달라지는 서포트의 양 ──
+    // ① 연습: 코치처럼 자주 / ② 아는 길: 조언자처럼 필요한 곳에서만 / ③ 새로운 길: 동반자처럼 안전에 관한 것만
+    private val support get() = store.stage(store.driver).coerceAtMost(3)
+    private var withPassenger = false
+    private var praised = 0
+    private val spokenLaws = mutableSetOf<String>()
+    private val brakeTimes = ArrayDeque<Long>()
+    private var lastTension = 0L
+
+    /** 칭찬은 그 자리에서. 소리 하나와 짧은 말. 실수는 말하지 않고 일기에만 남긴다. */
+    private fun praise() {
+        chime?.play(chimeId, 1f, 1f, 1, 0, 1f)
+        if (support <= 2 && praised < 2) { praised++; speak(if (praised == 1) "미리 켰어요. 좋아요." else "이번에도 미리 켰어요.") }
+    }
+
+    /** 지나는 자리에 맞는 규칙 한 줄. 같은 말은 한 번만. 긴장한 기색이 보이면 쉬어 가자고 한다. */
+    private fun roadside(type: String, value: String) {
+        fun once(key: String, line: String) { if (spokenLaws.add(key)) say(line) }
+        if (type == Evt.WIPER && value == "on" && support <= 2) once("rain", "비가 와요. 젖은 길에서는 제한속도보다 20% 줄여 달려요.")
+        if (type == Evt.NAVI && car.schoolZone && car.cameraMeters in 1..300) once("school", "곧 어린이 보호구역이에요. 시속 30 아래로 가요.")
+        if (type == Evt.NAVI && value == "limit" && car.speedLimit in 1..30 && support <= 2) once("limit30", "여기는 제한속도 ${car.speedLimit}이에요.")
+        if (type == Evt.BRAKE && value == "on") {
+            val now = System.currentTimeMillis()
+            brakeTimes.addLast(now); while (brakeTimes.isNotEmpty() && now - brakeTimes.first() > 60_000) brakeTimes.removeFirst()
+            if (brakeTimes.size >= 6 && now - lastTension > 300_000) {
+                lastTension = now
+                recorder.add(Evt.CALM, "auto")
+                if (car.comfortable()) say("브레이크를 자주 밟았어요. 편안한 길로 바꿨어요. 천천히 가요.")
+                else say("브레이크를 자주 밟았어요. 괜찮아요. 안전한 곳이 보이면 잠깐 쉬어 가요.")
+            }
+        }
+    }
+
+    /** 표시등이 켜지면: 경고는 뜻을 알려 주고, 처음 써 보는 기능은 확인해 준다. */
+    private fun onLamp(value: String) {
+        val type = value.substringBefore(":"); val on = value.endsWith(":on")
+        val lamp = Lamps.all[type] ?: return
+        if (!on) { if (screen == HOME) show(HOME); return }
+        when {
+            lamp.level == "빨강" -> say("${lamp.name} 경고등이 켜졌어요. " + if (recorder.active) "안전한 곳에 세워요." else "출발 전에 확인해요.")
+            lamp.level == "노랑" && !recorder.active -> toast("${lamp.name} 표시등이 켜졌어요. 홈에서 뜻을 볼 수 있어요.")
+            type in Lamps.firstUse && store.diariesOf(store.driver).none { type in it.drive.lamps } -> { chime?.play(chimeId, 1f, 1f, 1, 0, 1f); if (support <= 2) speak("${lamp.name}, 켜졌어요.") }
+        }
+        if (screen == HOME) show(HOME)
+    }
     private var prompt: String? = null   // 지금 해야 할 한 가지 (예: 오른쪽 깜빡이)
 
     override fun onCarEvent(type: String, value: String) {
         if (type != Evt.NAVI) recorder.add(type, value)
         if (recorder.active && (type == Evt.NAVI || type == Evt.SIGNAL)) {
             val side = coach.update(car.turn, car.turnMeters, if (type == Evt.SIGNAL) value else car.signal)
-            if (side != null) { prompt = if (side == "LEFT") "지금 왼쪽 깜빡이" else "지금 오른쪽 깜빡이"; speak(prompt!!) }
+            if (side != null && support <= 2) { prompt = if (side == "LEFT") "지금 왼쪽 깜빡이" else "지금 오른쪽 깜빡이"; speak(prompt!!) }
             else if (prompt != null && (type == Evt.SIGNAL && value != "OFF" || car.turn == null)) { if (type == Evt.SIGNAL) chime?.play(chimeId, 1f, 1f, 1, 0, 1f); prompt = null }
         }
         if (type == Evt.LOST && recorder.active) say("길을 놓쳐도 괜찮아요. 내비가 새 길을 찾았어요.")
+        if (type == Evt.SEAT && value == "on") withPassenger = true
+        if (type == Evt.LAMP) onLamp(value)
+        if (recorder.active) roadside(type, value)
         if (screen == PREP) { onPrep(type, value); return } // 연습 중의 기어 조작은 주행으로 치지 않는다
         if (type == Evt.GEAR) {
             if ((value == "D" || value == "R") && !recorder.active) startTrip()
@@ -141,6 +190,10 @@ class MainActivity : Activity(), Car.Listener {
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         shownTips = mutableSetOf(); currentTip = null; coach.reset(); prompt = null
+        praised = 0; spokenLaws.clear(); brakeTimes.clear(); withPassenger = car.passenger
+        car.seatPos?.let { store.setSeat(store.driver, it) }
+        // 받은 응원이 있으면 출발할 때 차가 대신 말해 준다
+        store.news(store.driver).lastOrNull { it.contains("응원") }?.let { cheer -> root.postDelayed({ speak(cheer.substringAfter("\t").replace("“", "").replace("”", "")) }, 4500) }
         show(DRIVING)
         val g = activeGuide
         say(if (g != null) "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 그 자리에 가면 알려 드릴게요." else "출발합니다. 조용히 적고 있을게요.")
@@ -154,7 +207,7 @@ class MainActivity : Activity(), Car.Listener {
         if (sim) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0) }
         ticker.removeCallbacksAndMessages(null)
         val driver = store.driver
-        val drive = recorder.finish(driver)
+        val drive = recorder.finish(driver).let { d -> if (activeGuide == null && !car.destName.isNullOrBlank()) d.copy(place = car.destName) else d }
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")
         ticker.postDelayed({ saveHandover(driver, store.handover()?.takeIf { it.from == driver }?.note ?: "") }, 1500) // 차 상태 값이 조금 늦게 온다
@@ -320,7 +373,7 @@ class MainActivity : Activity(), Car.Listener {
             if (guide != null) {
                 val followed = store.timesFollowed(driver, guide.id)
                 addView(row().apply {
-                    addView(ui.text("${Writer.subj(guide.owner)} 남긴 길" + (if (guide.sample) " (예시)" else "") +
+                    addView(ui.text("${if (store.relation(guide.owner) == "친구") "친구 " else ""}${Writer.subj(guide.owner)} 남긴 ${if (guide.kind == "연습") "연습" else "길"}" + (if (guide.sample) " (예시)" else "") +
                         (if (store.graduated(driver, guide.id)) "   졸업한 길" else if (followed > 0) "   ${followed}/$GRADUATE" else ""), 19f, Ink.dim))
                     if (guides.size > 1) { addView(View(this@MainActivity), lp(0, 1, 1f)); addView(ui.text("받은 길 ${guides.size}개 ›", 19f, Ink.center).apply { setOnClickListener { pickGuide(guides) } }) }
                 })
@@ -346,7 +399,7 @@ class MainActivity : Activity(), Car.Listener {
                 addView(gap(18))
                 addView(buttons(
                     ui.button("지금 기록 시작", true) { activeGuide = null; startTrip() },
-                    ui.button("예시 길 넣어 보기", false) { store.addSampleGuide(); show(HOME) }
+                    ui.button("예시 길 넣어 보기", false) { store.addSampleGuide(); store.addSampleFriend(); show(HOME) }
                 ))
             }
         }
@@ -375,6 +428,17 @@ class MainActivity : Activity(), Car.Listener {
                 })
                 addView(gap(16))
             }
+            car.lampsOn.mapNotNull { t -> Lamps.warn(t)?.let { t to it } }.takeIf { it.isNotEmpty() }?.let { warns ->
+                addView(col().apply {
+                    setPadding(ui.dp(18), ui.dp(14), ui.dp(18), ui.dp(14))
+                    background = GradientDrawable().apply { setColor(Color.parseColor("#3A2420")); cornerRadius = ui.dp(12).toFloat() }
+                    addView(ui.text("지금 켜진 경고등", 17f, Ink.brake))
+                    addView(ui.text(warns.joinToString("   ") { "${it.second.name}(${it.second.level})" }, 22f, Ink.paint))
+                    addView(ui.text("누르면 뜻을 알려 줘요", 15f, Ink.dim))
+                    setOnClickListener { notes("지금 켜진 경고등", warns.map { Note(it.second.name + " · " + it.second.level, it.second.what) }) }
+                })
+                addView(gap(16))
+            }
             store.handover()?.takeIf { it.from != driver }?.let { h ->
                 val parts = mutableListOf<String>()
                 h.fuel?.let { parts.add("남은 연료 ${it}%") }
@@ -385,6 +449,8 @@ class MainActivity : Activity(), Car.Listener {
                     addView(ui.text("${Writer.subj(h.from)} 마지막으로 탔어요", 17f, Ink.dim))
                     if (parts.isNotEmpty()) addView(ui.text(parts.joinToString("   "), 22f, if (h.washerLow || (h.fuel ?: 100) < 20) Ink.center else Ink.paint))
                     if (h.note.isNotEmpty()) addView(ui.text("“${h.note}”", 20f, Ink.paint, ui.batang))
+                    val mine = store.seat(driver); val now = car.seatPos
+                    if (mine != null && now != null && mine != now) addView(ui.text("의자가 지난번 내 자리에서 옮겨졌어요. 맞추고 출발해요.", 18f, Ink.center))
                 })
                 addView(gap(16))
             }
@@ -406,16 +472,25 @@ class MainActivity : Activity(), Car.Listener {
                     }, lp(WRAP, ui.dp(64)).apply { rightMargin = ui.dp(10) })
                 }
                 addView(ui.text("＋", 28f, Ink.dim).apply { gravity = Gravity.CENTER; setPadding(ui.dp(16), 0, ui.dp(16), 0)
-                    setOnClickListener { typeIn("함께 쓰는 사람 (예: 엄마, 친구 이름)") { name -> store.addDriver(name); store.driver = name; pickType(name) } } }, lp(WRAP, ui.dp(64)))
+                    setOnClickListener { typeIn("함께 쓰는 사람 (예: 엄마, 친구 이름)") { name ->
+                        store.addDriver(name)
+                        AlertDialog.Builder(this@MainActivity).setTitle("${name}은(는)")
+                            .setItems(arrayOf("가족", "친구")) { _, i -> store.setRelation(name, if (i == 0) "가족" else "친구"); store.driver = name; pickType(name) }.show()
+                    } } }, lp(WRAP, ui.dp(64)))
             }) })
-            addView(ui.text("${store.typeOf(driver)}   이름을 길게 누르면 바꿀 수 있어요", 15f, Ink.dim))
+            addView(ui.text("${store.relation(driver)} · ${store.typeOf(driver)}   이름을 길게 누르면 바꿀 수 있어요", 15f, Ink.dim))
             addView(gap(22)); addView(rule())
-            addView(step("차와 친해지기", if (store.prepDone(driver)) "마쳤어요" else "아직", store.prepDone(driver)))
+            val stage = store.stage(driver)
+            val role = when (stage) { 1 -> "차곡이는 코치예요. 자주, 구체적으로 알려 줘요."; 2 -> "차곡이는 조언자예요. 필요한 곳에서만 말해요."; 3 -> "차곡이는 동반자예요. 안전에 관한 것만 말해요."; else -> "세 원을 모두 마쳤어요. 이제 내 기록이 누군가의 교본이 돼요." }
+            addView(ui.text(role, 17f, Ink.center))
+            addView(step("① 운전초보 연습", if (stage > 1) "졸업" else (if (store.prepDone(driver)) "차와 친해지기 마침, " else "") + "주행 ${diaries.size}/2", stage > 1))
             addView(rule())
             val grads = store.guidesFor(driver).count { store.graduated(driver, it.id) }
-            addView(step("아는 길", if (grads > 0) "졸업한 길 ${grads}개" else "일기 ${diaries.count { it.guideId != null }}편", grads > 0))
+            addView(step("② 아는 길", if (stage < 2) "①을 마치면 열려요" else if (grads > 0) "졸업한 길 ${grads}개" else "받은 길 하나를 세 번 달리면 졸업", stage > 2))
             addView(rule())
-            addView(step("새로운 길", "일기 ${diaries.count { it.guideId == null }}편", false))
+            val places = store.places(driver)
+            addView(step("③ 새로운 길", if (stage < 3) "②를 마치면 열려요" else "혼자 가 본 곳 ${places.size}/3", stage > 3))
+            if (stage == 3) addView(ui.text("내비에 가 보고 싶은 곳을 넣고 출발하면 새로운 길로 기록돼요.", 16f, Ink.dim))
             addView(rule())
             addView(fill()); addView(gap(18))
             addView(ui.button("출발 준비", false) {
@@ -491,11 +566,25 @@ class MainActivity : Activity(), Car.Listener {
     private fun depart(g: Guide) {
         activeGuide = g
         car.refreshCondition()
+        forecast = null
+        if (g.lat != null && g.lng != null) Weather.at(g.lat, g.lng) { f -> forecast = f; if (screen == READY && f != null) show(READY) }
         routeSet = car.requestRoute(g.title, g.lat, g.lng, comfortable = store.typeOf(store.driver) in listOf("초보", "오랜만"))
         show(READY)
     }
 
     private var routeSet = false
+    private var forecast: Forecast? = null
+
+    /** 교본을 준 사람에게 출발 소식을 남기고, 메시지 앱이 있으면 지금 위치도 보낼 수 있게 한다. */
+    private fun tellDeparture(g: Guide) {
+        val me = store.driver
+        store.addNews(g.owner, "$me\t${Writer.subj(me)} “${g.title}”로 출발했어요.")
+        val lat = car.lat; val lng = car.lng
+        val text = "${me}: “${g.title}”로 출발했어요." + if (lat != null && lng != null) " 지금 여기예요 https://map.kakao.com/link/map/출발,$lat,$lng" else ""
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text)
+        if (send.resolveActivity(packageManager) != null) startActivity(android.content.Intent.createChooser(send, "출발 알리기"))
+        else toast("${g.owner}의 홈에 출발 소식을 남겼어요. (이 차에는 메시지 앱이 없어 밖으로는 보내지 않았어요)")
+    }
     private var aiStatus = if (AiDiary.enabled) "대기 중" else "키 없음 (규칙으로 씀)"
 
     /** 출발을 누른 뒤: 무엇이 됐는지 보여 주고, 기어 D 또는 버튼으로 기록을 시작한다. */
@@ -509,8 +598,9 @@ class MainActivity : Activity(), Car.Listener {
             addView(ui.text(g.title, if (wide) 58f else 44f, Ink.paint, ui.sign))
             addView(gap(10))
             addView(ui.text(
-                if (routeSet) "●  내비게이션에 목적지를 넣었어요." else "○  내비게이션에 목적지를 넣지 못했어요. 길 안내 없이 기록만 합니다.",
-                22f, if (routeSet) Ink.go else Ink.dim
+                if (g.kind == "연습") "●  연습이라 내비 없이 기록만 합니다. 주차장이나 동네에서 해 보세요."
+                else if (routeSet) "●  내비게이션에 목적지를 넣었어요." else "○  내비게이션에 목적지를 넣지 못했어요. 길 안내 없이 기록만 합니다.",
+                22f, if (routeSet || g.kind == "연습") Ink.go else Ink.dim
             ))
             addView(gap(6))
             addView(ui.text("●  ${Writer.poss(g.owner)} 한마디 ${g.tips.size}개가 그 자리에서 나옵니다.", 22f, Ink.go))
@@ -523,6 +613,10 @@ class MainActivity : Activity(), Car.Listener {
             check(car.energy?.let { it >= 20 }, "연료 ${car.energy}%", "연료가 ${car.energy}%예요. 가는 길에 넣어요.", "연료는 계기판에서 확인해 주세요")
             check(if (car.washerKnown) !car.washerLow else null, "워셔액 충분", "워셔액이 부족해요", "워셔액은 읽지 못했어요")
             check(car.belt, "안전벨트 맸어요", "안전벨트를 매 주세요", "")
+            check(if ("TPMS" in car.lampsOn) false else if (car.tires.isNotEmpty()) true else null, "타이어 공기압 경고 없음", "공기압이 낮은 타이어가 있어요", "타이어는 읽지 못했어요")
+            store.seat(store.driver)?.let { mine -> car.seatPos?.let { now -> check(now == mine, "의자가 지난번 내 자리 그대로예요", "의자가 지난번 내 자리와 달라요", "") } }
+            car.lampsOn.mapNotNull { Lamps.warn(it) }.forEach { check(false, "", "${it.name} 표시등이 켜져 있어요", "") }
+            forecast?.let { f -> check(f.rainChance < 50, "도착지 ${f.sky} ${f.tempC}°", "도착지 ${f.sky} ${f.tempC}°, 3시간 안 비 올 확률 ${f.rainChance}%. 와이퍼 위치를 한 번 더 봐 둬요", "") }
             if (car.passenger) check(true, "함께 타는 사람이 있어요", "", "")
             addView(gap(20))
             addView(ui.text("기어를 D에 놓으면 기록을 시작합니다.", 30f, Ink.paint, ui.sign))
@@ -530,6 +624,7 @@ class MainActivity : Activity(), Car.Listener {
             addView(buttons(
                 ui.button("지금 기록 시작", true) { startTrip() },
                 ui.button("모의 주행 (시연용)", false) { startSim() },
+                ui.button("출발 알리기", false) { tellDeparture(g) },
                 ui.button("그만두기", false) { activeGuide = null; show(HOME) }
             ))
         })
@@ -545,6 +640,8 @@ class MainActivity : Activity(), Car.Listener {
             "크루즈 켜기" to { onCarEvent(Evt.CRUISE, "on") }, "동승자 탑승" to { onCarEvent(Evt.SEAT, "on") },
             "내비: 150m 앞 우회전" to { car.setTurn("TURN_RIGHT", 150, "우회전") }, "내비: 80m 앞 우회전" to { car.setTurn("TURN_RIGHT", 80, "우회전") },
             "내비: 회전 지남" to { car.setTurn(null, 0, "") },
+            "표시등: 오토 홀드" to { car.setLamps(car.lampsOn + "AUTO_HOLD") }, "표시등: 타이어 공기압" to { car.setLamps(car.lampsOn + "TPMS") },
+            "표시등 모두 끄기" to { car.setLamps(emptySet()) },
             "기어 D" to { onCarEvent(Evt.GEAR, "D") }, "기어 R" to { onCarEvent(Evt.GEAR, "R") }, "기어 P" to { onCarEvent(Evt.GEAR, "P") }
         )
         AlertDialog.Builder(this).setTitle("시험용 신호 (실제 차량 신호 아님)")
@@ -558,12 +655,15 @@ class MainActivity : Activity(), Car.Listener {
             "\n창 크기: ${resources.configuration.screenWidthDp}×${resources.configuration.screenHeightDp}dp, " + (if (wide) "넓게" else "좁게") +
             "\nAI 일기: $aiStatus" +
             "\n내비 안내: " + (car.turn?.let { "$it ${car.turnMeters}m" } ?: "없음") + ", 제한 ${car.speedLimit}" +
+            "\n표시등: " + (car.lampsOn.joinToString().ifEmpty { "없음" }) +
+            "\n타이어: " + (car.tires.entries.joinToString { "${it.key} ${it.value}" }.ifEmpty { "읽지 못함" }) + ", 의자 위치: ${car.seatPos ?: "읽지 못함"}" +
+            "\n세 원: ${store.stage(store.driver)}" +
             "\n연료/배터리: " + (car.energy?.let { "$it%" } ?: "아직 없음") +
             "\n주행거리 신호: " + (car.odometerKm?.let { "${it}km" } ?: "아직 없음") +
             (if (car.failures.isEmpty()) "\n실패한 신호 없음" else "\n\n실패: " + car.failures.entries.joinToString("\n") { "${it.key}: ${it.value}" })
         AlertDialog.Builder(this).setTitle("점검").setMessage(status)
             .setPositiveButton("시험용 신호") { _, _ -> testSignals() }
-            .setNeutralButton("예시 길 넣기") { _, _ -> store.addSampleGuide(); show(HOME) }
+            .setNeutralButton("예시 넣기") { _, _ -> store.addSampleGuide(); store.addSampleFriend(); show(HOME) }
             .setNegativeButton("기록 모두 지우기") { _, _ -> store.clearAll(); show(HOME) }
             .show()
     }
@@ -672,10 +772,20 @@ class MainActivity : Activity(), Car.Listener {
             addView(buttons(
                 ui.button("숨 고르기", false) {
                     recorder.add(Evt.CALM, "on")
-                    say("괜찮아요. 천천히 가도 돼요. 길을 놓치면 내비가 다시 찾아 줘요.")
+                    if (car.comfortable()) say("괜찮아요. 편안한 길로 바꿨어요. 천천히 가도 돼요.")
+                    else say("괜찮아요. 천천히 가도 돼요. 길을 놓치면 내비가 다시 찾아 줘요.")
                 },
                 ui.button("주행 끝내고 일기 쓰기", false) { if (recorder.active) endTrip() }
             ))
+            if (withPassenger) {
+                addView(gap(10))
+                addView(ui.button("옆자리 한마디 (동승자가 눌러요)", false) {
+                    val lines = listOf("잘하고 있어.", "여기서 미리 차선 바꿔 두면 편해.", "여기는 천천히 가도 돼.", "주차장 입구 조심해.")
+                    AlertDialog.Builder(this@MainActivity).setTitle("옆자리 한마디")
+                        .setItems(lines.toTypedArray()) { _, i -> recorder.add(Evt.SAY, lines[i]); chime?.play(chimeId, 1f, 1f, 1, 0, 1f); toast("이 자리에 남겼어요. 교본을 만들 때 그대로 들어가요.") }
+                        .setNegativeButton("닫기", null).show()
+                }, lp(MATCH, WRAP))
+            }
             refreshDriving()
         })
     }
@@ -763,7 +873,7 @@ class MainActivity : Activity(), Car.Listener {
                 }, lp(MATCH, WRAP))
             }
             addView(gap(10))
-            addView(ui.button("이 길을 교본으로 주기", guide == null) { giveTitle = ""; giveTips.clear(); show(GIVE) }, lp(MATCH, WRAP))
+            addView(ui.button("이 길을 교본으로 주기", guide == null) { giveTitle = ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = "길"; show(GIVE) }, lp(MATCH, WRAP))
             addView(gap(10))
             addView(ui.button("다음 사람에게 한마디", false) {
                 val notes = listOf("기름 넣어야 해요.", "워셔액 채워 주세요.", "뒷자리에 짐 있어요.", "주차는 평소 자리에 했어요.")
@@ -798,7 +908,8 @@ class MainActivity : Activity(), Car.Listener {
 
     // ───────────── 길 남기기: 방금 달린 길을 교본으로 ─────────────
 
-    private val titlePresets = listOf("할머니 댁 가는 길", "마트 가는 길", "학교 가는 길")
+    private var giveKind = "길"
+    private val titlePresets get() = if (giveKind == "연습") listOf("주차장에서 후진 주차", "동네 한 바퀴", "좁은 골목 지나기") else listOf("할머니 댁 가는 길", "마트 가는 길", "학교 가는 길")
     private val tipPresets = listOf(
         "미리 오른쪽 차로로 가 있어.", "여기는 속도를 줄이는 게 좋아.",
         "주차장 입구가 좁아. 천천히 들어가.", "여기서 차선을 바꾸면 편해."
@@ -814,6 +925,13 @@ class MainActivity : Activity(), Car.Listener {
             addView(gap(6))
             addView(ui.text("평소처럼 달린 길이면 됩니다. 이름과 한마디만 얹어 주세요.", 20f, Color.parseColor("#CFCBC2")))
             addView(TraceView(this@MainActivity, ui).apply { lanes = listOf(Lane("", d.drive, giveTips)) }, lp(MATCH, ui.dp(120)))
+            addView(row().apply {
+                listOf("길" to "어디까지 가는 길", "연습" to "주차장·동네 연습").forEach { (k, label) ->
+                    addView(ui.text(label, 19f, if (giveKind == k) Ink.center else Ink.dim).apply {
+                        setPadding(0, ui.dp(8), ui.dp(22), ui.dp(8)); setOnClickListener { giveKind = k; giveTitle = ""; show(GIVE) }
+                    })
+                }
+            })
             addView(ui.text("길 이름", 18f, Ink.dim))
             addView(gap(6))
             addView(android.widget.HorizontalScrollView(this@MainActivity).apply { isHorizontalScrollBarEnabled = false; addView(row().apply {
@@ -872,11 +990,11 @@ class MainActivity : Activity(), Car.Listener {
         store.addGuide(
             Guide(
                 id = same?.id ?: "g${d.date}", owner = d.driver, title = giveTitle,
-                lat = car.destLat ?: car.lat, lng = car.destLng ?: car.lng,
-                drive = d.drive, tips = giveTips.toList(), times = (same?.times ?: 0) + 1
+                lat = if (giveKind == "연습") null else car.destLat ?: car.lat, lng = if (giveKind == "연습") null else car.destLng ?: car.lng,
+                drive = d.drive, tips = giveTips.toList(), times = (same?.times ?: 0) + 1, kind = giveKind
             )
         )
-        toast("“$giveTitle”을 교본으로 남겼어요. 가족의 홈 화면에 나타납니다.")
+        toast("“$giveTitle”을 ${if (giveKind == "연습") "연습 교본" else "교본"}으로 남겼어요. 함께 쓰는 사람의 홈에 나타납니다.")
         show(HOME)
     }
 
@@ -895,6 +1013,33 @@ class MainActivity : Activity(), Car.Listener {
                     addView(ui.text("주차하며 오간 횟수", 20f, Ink.dim))
                     addView(ui.text("${Writer.times(parks.first())}에서 ${Writer.times(parks.last())}으로", 34f, Ink.paint, ui.sign))
                     addView(ParkChart(this@MainActivity, ui, parks.takeLast(8)), lp(MATCH, ui.dp(190)))
+                }
+                val mine = store.diariesOf(store.driver)
+                if (mine.isNotEmpty()) {
+                    addView(gap(16))
+                    addView(ui.text("쌓인 것", 20f, Ink.dim))
+                    val km = mine.sumOf { it.drive.distKm.toDouble() }
+                    val turnsFirst = mine.firstOrNull { it.drive.turns > 0 }; val turnsLast = mine.lastOrNull { it.drive.turns > 0 }
+                    val lines = mutableListOf("${mine.size}번 달렸고 모두 ${String.format(Locale.KOREA, "%.1f", km)}km", "도장 ${mine.count { it.stamp != null }}개, 혼자 가 본 곳 ${store.places(store.driver).size}곳")
+                    if (turnsFirst != null && turnsLast != null && turnsFirst !== turnsLast)
+                        lines.add("돌기 전 깜빡이: 처음 ${turnsFirst.drive.turnsSignaled}/${turnsFirst.drive.turns} → 요즘 ${turnsLast.drive.turnsSignaled}/${turnsLast.drive.turns}")
+                    lines.forEach { addView(ui.text(it, 22f, Ink.paint)) }
+                }
+                addView(gap(12))
+                addView(ui.text(if (store.shares(store.driver)) "●  내 기록을 함께 쓰는 사람에게 보여 주는 중 (누르면 끔)" else "○  내 기록은 나만 봐요 (누르면 보여 주기)", 18f, Ink.dim).apply {
+                    setOnClickListener { store.setShares(store.driver, !store.shares(store.driver)); show(BOOK) }
+                })
+                // 물려받고 돌려드리기: 보여 주기로 한 가족의 요즘 운전 (점수 없이 사실만, 순위 없이)
+                store.drivers.filter { it != store.driver && store.shares(it) && store.relation(it) == "가족" }.forEach { other ->
+                    val od = store.diariesOf(other)
+                    if (od.size >= 2) {
+                        addView(gap(14))
+                        addView(ui.text("${Writer.poss(other)} 요즘", 20f, Ink.dim))
+                        val recent = od.takeLast(3); val earlier = od.dropLast(3).takeLast(3)
+                        fun perKm(l: List<Diary>) = l.sumOf { it.drive.brakes }.toFloat() / l.sumOf { it.drive.distKm.toDouble() }.toFloat().coerceAtLeast(0.1f)
+                        addView(ui.text("최근 ${recent.size}번: 밤길 ${recent.count { it.drive.night }}번, 숨 고르기 ${recent.sumOf { it.drive.calm }}번", 22f, Ink.paint))
+                        if (earlier.isNotEmpty()) addView(ui.text("1km당 브레이크 ${String.format(Locale.KOREA, "%.1f", perKm(earlier))}번 → ${String.format(Locale.KOREA, "%.1f", perKm(recent))}번", 22f, Ink.paint))
+                    }
                 }
                 addView(gap(16)); addView(rule())
                 if (list.isEmpty()) addView(ui.text("아직 일기가 없어요. 한 번 달리고 오면 첫 장이 생깁니다.", 22f, Ink.dim).apply { setPadding(0, ui.dp(20), 0, 0) })

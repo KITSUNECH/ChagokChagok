@@ -81,7 +81,7 @@ class Recorder {
         // 그림에 쓸 표시만 남긴다: 켠 깜빡이, 밟은 브레이크, 와이퍼가 켜지고 꺼진 때.
         val events = raw.filter {
             (it.type == Evt.SIGNAL && it.value != "OFF") || (it.type == Evt.BRAKE && it.value == "on") ||
-                it.type == Evt.WIPER || it.type == Evt.LOST
+                it.type == Evt.WIPER || it.type == Evt.LOST || it.type == Evt.SAY
         }.map { Ev(p(it), it.type, it.value) }
 
         return Drive(
@@ -97,7 +97,8 @@ class Recorder {
             passenger = raw.any { it.type == Evt.SEAT },
             turns = raw.count { it.type == Evt.TURN },
             turnsSignaled = raw.count { it.type == Evt.TURN && it.value == "signaled" },
-            calm = raw.count { it.type == Evt.CALM }
+            calm = raw.count { it.type == Evt.CALM },
+            lamps = raw.filter { it.type == Evt.LAMP && it.value.endsWith(":on") }.map { it.value.substringBefore(":") }.distinct()
         )
     }
 }
@@ -145,6 +146,18 @@ object Writer {
             sb.append("함께 달린 길이 ${mark}km를 넘었다. "); if (stamp == null) stamp = "${mark}\nkm"; break
         }
 
+        if (guide == null && drive.place != null) {
+            if (before.none { it.guideId == null && it.drive.place == drive.place }) { sb.append("처음으로 ${drive.place}까지 내 힘으로 가 봤다. "); if (stamp == null) stamp = "첫\n새 길" }
+            else sb.append("${drive.place}에 또 다녀왔다. ")
+        }
+        drive.events.firstOrNull { it.type == Evt.SAY }?.let { sb.append("옆자리에서 “${it.value}”라고 해 줬다. ") }
+        for (lamp in drive.lamps) {
+            val name = Lamps.firstUse[lamp] ?: continue
+            if (before.none { lamp in it.drive.lamps }) { sb.append("처음으로 ${name}을 써 봤다. "); if (stamp == null) stamp = "첫\n" + name.take(4); break }
+        }
+        // 연습 교본을 준 사람의 초보 시절과 나란히 놓는다. 순위가 아니라 "누구나 처음엔"을 보여 주려는 것이다.
+        if (guide != null && guide.kind == "연습" && guide.drive.parkMoves > 0 && drive.parkMoves > 0)
+            sb.append("${guide.owner}도 처음엔 ${times(guide.drive.parkMoves)} 오갔다고 했다. 나는 ${times(drive.parkMoves)}이었다. ")
         if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
         if (drive.signals > 0) sb.append("깜빡이는 ${times(drive.signals)} 켰다. ")
         if (drive.turns > 0) sb.append(
@@ -180,7 +193,7 @@ object Writer {
 
         if (tone == "다정하게") sb.append(if (n == 1) "시작한 것만으로 충분한 날이다. " else "오늘도 무사히 다녀와 줘서 고맙다. ")
 
-        val title = if (guide != null) "같은 길, 다른 자리" else "${ordinal(n)} 운전"
+        val title = if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else "${ordinal(n)} 운전"
         return Diary("d${drive.date}", drive.driver, drive.date, title, sb.toString().trim(), highlight, stamp, drive, guide?.id)
     }
 }
