@@ -98,6 +98,7 @@ class MainActivity : Activity(), Car.Listener {
         recorder.add(Evt.GEAR, car.gear)
         if (car.wiper) recorder.add(Evt.WIPER, "on")
         if (car.lowBeam) recorder.add(Evt.LIGHT, "on")
+        if (car.cruise) recorder.add(Evt.CRUISE, "on")
         shownTips = mutableSetOf(); currentTip = null
         show(DRIVING)
         val g = activeGuide
@@ -341,6 +342,7 @@ class MainActivity : Activity(), Car.Listener {
             "깜빡이 끄기" to { onCarEvent(Evt.SIGNAL, "OFF") }, "브레이크 밟기" to { onCarEvent(Evt.BRAKE, "on") },
             "와이퍼 켜기" to { onCarEvent(Evt.WIPER, "on") }, "와이퍼 끄기" to { onCarEvent(Evt.WIPER, "off") },
             "전조등 켜기" to { onCarEvent(Evt.LIGHT, "on") }, "안전벨트 매기" to { onCarEvent("belt", "on") },
+            "크루즈 켜기" to { onCarEvent(Evt.CRUISE, "on") },
             "기어 D" to { onCarEvent(Evt.GEAR, "D") }, "기어 R" to { onCarEvent(Evt.GEAR, "R") }, "기어 P" to { onCarEvent(Evt.GEAR, "P") }
         )
         AlertDialog.Builder(this).setTitle("시험용 신호 (실제 차량 신호 아님)")
@@ -502,10 +504,12 @@ class MainActivity : Activity(), Car.Listener {
             addView(gap(10)); addView(rule())
             material("와이퍼", if (d.drive.rained) "켰음" else "안 켬").let { addView(it); addView(rule()) }
             material("깜빡이", "${d.drive.signals}번").let { addView(it); addView(rule()) }
+            if (d.drive.cruise) material("크루즈", "켜고 달림").let { addView(it); addView(rule()) }
             material("주차하며 오간 횟수", if (d.drive.parkMoves > 0) "${d.drive.parkMoves}번" else "없음").let { addView(it); addView(rule()) }
             if (guide != null) material("${Writer.subj(guide.owner)} 다닌 횟수", "${guide.times}번").let { addView(it); addView(rule()) }
             addView(fill()); addView(gap(14))
             addView(ui.button("일기 읽어 주기", false) { readAloud(d.title, d.text) }, lp(MATCH, WRAP))
+            Quizzes.pick(d.drive)?.let { q -> addView(gap(10)); addView(ui.button("오늘 길 퀴즈", false) { quiz(q) }, lp(MATCH, WRAP)) }
             if (guide != null) {
                 addView(gap(10))
                 val sent = store.newsSent(d.id)
@@ -524,6 +528,17 @@ class MainActivity : Activity(), Car.Listener {
             addView(ui.button("홈으로", false) { show(HOME) }, lp(MATCH, WRAP))
         }
         return split(left, right, 1.7f)
+    }
+
+    /** 주차 상태에서만 여는 법규 문제. 답을 고르면 설명과 출처를 보여 준다. */
+    private fun quiz(q: Quiz) {
+        AlertDialog.Builder(this).setTitle(q.question)
+            .setItems(q.choices.toTypedArray()) { _, i ->
+                AlertDialog.Builder(this)
+                    .setTitle(if (i == q.answer) "맞아요" else "정답은 “${q.choices[q.answer]}”")
+                    .setMessage(q.explain + "\n\n출처: " + q.source)
+                    .setPositiveButton("닫기", null).show()
+            }.show()
     }
 
     private fun material(name: String, value: String) = row().apply {
@@ -625,6 +640,13 @@ class MainActivity : Activity(), Car.Listener {
             addView(col().apply {
                 setPadding(pad, pad, pad, pad)
                 addView(header("${store.driver}의 일기장"))
+                val parks = store.diariesOf(store.driver).map { it.drive.parkMoves }.filter { it > 0 }
+                if (parks.size >= 2) {
+                    addView(gap(16))
+                    addView(ui.text("주차하며 오간 횟수", 20f, Ink.dim))
+                    addView(ui.text("${Writer.times(parks.first())}에서 ${Writer.times(parks.last())}으로", 34f, Ink.paint, ui.sign))
+                    addView(ParkChart(this@MainActivity, ui, parks.takeLast(8)), lp(MATCH, ui.dp(190)))
+                }
                 addView(gap(16)); addView(rule())
                 if (list.isEmpty()) addView(ui.text("아직 일기가 없어요. 한 번 달리고 오면 첫 장이 생깁니다.", 22f, Ink.dim).apply { setPadding(0, ui.dp(20), 0, 0) })
                 list.forEach { d ->

@@ -20,10 +20,12 @@ import ai.pleos.playground.vehicle.api.model.area.WindowArea
 import ai.pleos.playground.vehicle.constant.area.SeatValue
 import ai.pleos.playground.vehicle.constant.area.TurnSignalValue
 import ai.pleos.playground.vehicle.constant.area.WindowValue
+import ai.pleos.playground.vehicle.constant.control.CruiseControl
 import ai.pleos.playground.vehicle.constant.control.LightState
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import ai.pleos.playground.vehicle.constant.control.WiperState
 import ai.pleos.playground.vehicle.listener.BrakePedalStatusListener
+import ai.pleos.playground.vehicle.listener.CruiseControlStateListener
 import ai.pleos.playground.vehicle.listener.DistanceDrivenListener
 import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import ai.pleos.playground.vehicle.listener.LightStateListener
@@ -50,6 +52,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var wiper = false; private set
     var lowBeam = false; private set
     var belt = false; private set
+    var cruise = false; private set
     var steering = 0f; private set
     var odometerKm: Float? = null; private set
     var naviConnected = false; private set
@@ -114,6 +117,13 @@ class Car(private val ctx: Context, private val listener: Listener) {
         }
         override fun onFailed(e: Exception) { failures["belt"] = e.message ?: "실패" }
     }
+    private val cruiseL = object : CruiseControlStateListener {
+        override fun onCruiseControlStateUpdated(state: CruiseControl?) = ui {
+            val on = state == CruiseControl.ACTIVATED
+            if (on != cruise) { cruise = on; listener.onCarEvent(Evt.CRUISE, if (on) "on" else "off") }
+        }
+        override fun onFailed(e: Exception) { failures[Evt.CRUISE] = e.message ?: "실패" }
+    }
     private val distanceL = object : DistanceDrivenListener {
         override fun onDistanceDrivenUpdated(distance: Float?) = ui {
             if (distance != null) { odometerKm = distance; listener.onDistance(distance) }
@@ -146,6 +156,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt(Evt.LIGHT) { vehicle.getLight().registerLowBeamLightState(lightL) }
         attempt("belt") { vehicle.getSeat().registerSeatBeltBuckledState(driverSeat, beltL) }
         attempt("distance") { vehicle.getOdometer().registerDistanceDriven(distanceL) }
+        attempt(Evt.CRUISE) { vehicle.getDrivingMode().registerCruiseControlState(cruiseL) }
 
         navi = NaviHelper(ctx.applicationContext)
         navi.initialize(
@@ -163,6 +174,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt("") { vehicle.getLight().unregisterLowBeamLightState(lightL) }
         attempt("") { vehicle.getSeat().unregisterSeatBeltBuckledState(driverSeat, beltL) }
         attempt("") { vehicle.getOdometer().unregisterDistanceDriven(distanceL) }
+        attempt("") { vehicle.getDrivingMode().unregisterCruiseControlState(cruiseL) }
         attempt("") { vehicle.release() }
         attempt("") { navi.removeListener(naviL); navi.release() }
     }

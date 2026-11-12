@@ -27,7 +27,8 @@ data class Drive(
     val night: Boolean,
     val parkMoves: Int,
     val lostWay: Int,
-    val longestSignalSec: Int
+    val longestSignalSec: Int,
+    val cruise: Boolean = false   // 주행 보조(크루즈)를 켜고 달렸는지
 )
 
 /** 교본: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -63,6 +64,7 @@ object Evt {
     const val GEAR = "gear"       // 기어
     const val LIGHT = "light"     // 전조등
     const val LOST = "lost"       // 경로 재탐색
+    const val CRUISE = "cruise"   // 주행 보조(크루즈)
 }
 
 /** 앱의 모든 기록을 읽고 쓰는 곳. */
@@ -114,7 +116,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec)
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise)
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -129,7 +131,7 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec")
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false)
         )
     }
 

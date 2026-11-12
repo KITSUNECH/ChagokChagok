@@ -60,7 +60,8 @@ class Recorder {
             night = raw.any { it.type == Evt.LIGHT && it.value == "on" },
             parkMoves = if (firstR < 0) 0 else gears.size - firstR,
             lostWay = raw.count { it.type == Evt.LOST },
-            longestSignalSec = (longest / 1000).toInt()
+            longestSignalSec = (longest / 1000).toInt(),
+            cruise = raw.any { it.type == Evt.CRUISE && it.value == "on" }
         )
     }
 }
@@ -94,6 +95,10 @@ object Writer {
         if (firstRain) { highlight = "와이퍼를 처음 켰다."; sb.append("$highlight "); stamp = "첫\n빗길" }
         else if (drive.rained) sb.append("비가 와서 와이퍼를 켰다. ")
         if (firstNight) { sb.append("전조등을 켜고 달린 것도 처음이다. "); if (stamp == null) stamp = "첫\n밤길" }
+
+        val firstCruise = drive.cruise && before.none { it.drive.cruise }
+        if (firstCruise) { sb.append("처음으로 차에게 속도를 맡겨 봤다. "); if (stamp == null) stamp = "첫\n크루즈" }
+        else if (drive.cruise) sb.append("오늘도 크루즈를 켜고 달렸다. ")
 
         if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
         if (drive.signals > 0) sb.append("깜빡이는 ${times(drive.signals)} 켰다. ")
