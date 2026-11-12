@@ -1,0 +1,8 @@
+# 빌드 결과물과 내 컴퓨터 전용 설정은 올리지 않는다
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/

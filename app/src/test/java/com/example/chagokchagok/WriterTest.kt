@@ -1,0 +1,39 @@
+package com.example.chagokchagok
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class WriterTest {
+    private fun drive(driver: String, park: Int, rain: Boolean, sig: Int = 3, longest: Int = 5) = Drive(
+        driver, 1_000_000L * (park + 1), 8.5f, 31, 1860,
+        listOf(Ev(.2f, Evt.SIGNAL, "LEFT"), Ev(.3f, Evt.WIPER, "on"), Ev(.7f, Evt.WIPER, "off"), Ev(.5f, Evt.BRAKE, "on")),
+        sig, 9, rain, false, park, 0, longest
+    )
+
+    @Test fun recorderCountsParkingAndSignals() {
+        val r = Recorder(); r.start(100f)
+        r.add(Evt.GEAR, "D"); r.add(Evt.SIGNAL, "LEFT"); r.add(Evt.SIGNAL, "OFF"); r.add(Evt.BRAKE, "on"); r.add(Evt.BRAKE, "off")
+        r.add(Evt.WIPER, "on"); r.distance(104.2f)
+        r.add(Evt.GEAR, "R"); r.add(Evt.GEAR, "D"); r.add(Evt.GEAR, "R")
+        val d = r.finish("나")
+        assertEquals(1, d.signals); assertEquals(1, d.brakes); assertEquals(3, d.parkMoves); assertTrue(d.rained)
+        assertEquals(4.2f, d.distKm, 0.01f)
+        println("DRIVE " + d)
+    }
+
+    @Test fun diaryReadsNaturally() {
+        val dad = drive("아빠", 0, false)
+        val guide = Guide("g", "아빠", "할머니 댁 가는 길", null, null, dad, listOf(Tip(.5f, "미리 오른쪽 차로로.")), 7)
+        val first = Writer.write(drive("나", 5, false), emptyList(), null, 0)
+        println("1> " + first.title + " | " + first.text + " | stamp=" + first.stamp?.replace("\n", ""))
+        val second = Writer.write(drive("나", 3, true), listOf(first), guide, 1)
+        println("2> " + second.title + " | " + second.text + " | hl=" + second.highlight + " | stamp=" + second.stamp?.replace("\n", ""))
+        val third = Writer.write(drive("나", 2, true, longest = 30), listOf(first, second), guide, 2)
+        println("3> " + third.title + " | " + third.text + " | hl=" + third.highlight)
+        val reverse = Writer.write(drive("아빠", 1, false), emptyList(), guide.copy(owner = "나"), 0)
+        println("4> " + reverse.text)
+        assertTrue(second.text.contains(second.highlight))
+        assertEquals("같은 길, 다른 자리", second.title)
+    }
+}

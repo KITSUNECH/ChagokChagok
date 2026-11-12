@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 차량 신호 읽기 -->
+    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <!-- 내비 연동 -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_chagok"
+        android:label="차곡車곡"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
+            <!-- 주행 중에도 화면을 유지하겠다는 선언. 주행 중 화면은 한 줄만 보여 준다. -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 글레오가 호출하는 기능 세 가지 (assets/schema.json 과 이름이 같아야 한다) -->
+        <receiver android:name=".GleoReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="READ_LATEST_DIARY" />
+                <action android:name="GET_NEXT_ROUTE" />
+                <action android:name="CHECK_DRIVING_PROGRESS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

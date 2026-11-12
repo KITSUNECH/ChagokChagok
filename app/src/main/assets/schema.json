@@ -1,0 +1,35 @@
+{
+  "packageName": "com.example.chagokchagok",
+  "appDescription": "A driving diary app for new drivers that records each drive from vehicle signals, writes a diary entry after parking, and keeps routes shared by family members for practice.",
+  "invokeWord": "차곡차곡",
+  "version": "0.1.0",
+  "actionCalls": [
+    {
+      "type": "function",
+      "function": {
+        "name": "READ_LATEST_DIARY",
+        "description": "Returns the most recent driving diary entry written from the driver's last drive.",
+        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "component": "service"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "GET_NEXT_ROUTE",
+        "description": "Returns the next practice route shared by a family member, including the advice left on that route.",
+        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "component": "service"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "CHECK_DRIVING_PROGRESS",
+        "description": "Returns how the driver's recent drives changed compared with earlier drives, such as the number of parking maneuvers.",
+        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "component": "service"
+      }
+    }
+  ]
+}
