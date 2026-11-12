@@ -39,7 +39,7 @@ class MainActivity : Activity(), Car.Listener {
     private var ttsReady = false
 
     private var screen = HOME
-    private var activeGuide: Guide? = null      // 지금 따라 달리는 교본
+    private var activeGuide: Guide? = null      // 지금 따라 달리는 건네준 길
     private var shownTips = mutableSetOf<Int>() // 이번 주행에서 이미 보여 준 한마디
     private var currentTip: String? = null
     private var diary: Diary? = null            // 지금 펼쳐 놓은 일기
@@ -210,7 +210,7 @@ class MainActivity : Activity(), Car.Listener {
         if (sim) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0) }
         ticker.removeCallbacksAndMessages(null)
         val driver = store.driver
-        // 보관함의 "다시 가기"는 남의 교본이 아니라 내가 다녀온 곳이다. 교본 없이 간 길로 적는다.
+        // 보관함의 "다시 가기"는 남이 건네준 길이 아니라 내가 다녀온 곳이다. 혼자 간 길로 적는다.
         val again = activeGuide?.takeIf { it.kind == "다시" }
         if (again != null) activeGuide = null
         val drive = recorder.finish(driver).let { d ->
@@ -246,7 +246,7 @@ class MainActivity : Activity(), Car.Listener {
     private fun saveHandover(driver: String, note: String) =
         store.setHandover(Handover(driver, System.currentTimeMillis(), car.energy, car.washerLow, note))
 
-    /** 교본의 그 자리에 이르렀으면 한마디를 보여 주고 읽어 준다. 거리 신호가 없으면 시간으로 잰다. */
+    /** 건네준 길의 그 자리에 이르렀으면 한마디를 보여 주고 읽어 준다. 거리 신호가 없으면 시간으로 잰다. */
     private fun checkTips() {
         val g = activeGuide ?: return
         val km = recorder.kmNow()
@@ -616,7 +616,7 @@ class MainActivity : Activity(), Car.Listener {
     private var routeSet = false
     private var forecast: Forecast? = null
 
-    /** 교본을 준 사람에게 출발 소식을 남기고, 메시지 앱이 있으면 지금 위치도 보낼 수 있게 한다. */
+    /** 길을 건네준 사람에게 출발 소식을 남기고, 메시지 앱이 있으면 지금 위치도 보낼 수 있게 한다. */
     private fun tellDeparture(g: Guide) {
         val me = store.driver
         store.addNews(g.owner, "$me\t${Writer.subj(me)} “${g.title}”로 출발했어요.")
@@ -822,7 +822,7 @@ class MainActivity : Activity(), Car.Listener {
                 addView(ui.button("옆자리 한마디 (동승자가 눌러요)", false) {
                     val lines = listOf("잘하고 있어.", "여기서 미리 차선 바꿔 두면 편해.", "여기는 천천히 가도 돼.", "주차장 입구 조심해.")
                     AlertDialog.Builder(this@MainActivity).setTitle("옆자리 한마디")
-                        .setItems(lines.toTypedArray()) { _, i -> recorder.add(Evt.SAY, lines[i]); chime?.play(chimeId, 1f, 1f, 1, 0, 1f); toast("이 자리에 남겼어요. 교본을 만들 때 그대로 들어가요.") }
+                        .setItems(lines.toTypedArray()) { _, i -> recorder.add(Evt.SAY, lines[i]); chime?.play(chimeId, 1f, 1f, 1, 0, 1f); toast("이 자리에 남겼어요. 이 길을 건네줄 때 그대로 들어가요.") }
                         .setNegativeButton("닫기", null).show()
                 }, lp(MATCH, WRAP))
             }
@@ -864,7 +864,7 @@ class MainActivity : Activity(), Car.Listener {
                     addView(ui.text(store.weather(d.id)?.let { if (d.drive.rained && !it.contains("비")) "$it · 와이퍼 켬" else it } ?: if (d.drive.rained) "○ 맑음   ● 비" else "● 맑음   ○ 비", 18f, Ink.ink))
                 })
                 addView(gap(8))
-                // 그림 칸: 오늘의 주행. 교본이 있으면 그 주행을 흐리게 함께 그린다.
+                // 그림 칸: 오늘의 주행. 건네준 길이 있으면 그 주행을 흐리게 함께 그린다.
                 val lanes = mutableListOf<Lane>()
                 if (guide != null) lanes.add(Lane(guide.owner, guide.drive, guide.tips, faded = true))
                 lanes.add(Lane(d.driver, d.drive))
@@ -930,7 +930,7 @@ class MainActivity : Activity(), Car.Listener {
                 toast("함께 차곡에 올렸어요. 함께 쓰는 사람이 보고 나도 가볼 수 있어요."); show(FEED)
             }, lp(MATCH, WRAP))
             addView(gap(10))
-            addView(ui.button("이 길을 교본으로 주기", guide == null) { giveTitle = ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = "길"; show(GIVE) }, lp(MATCH, WRAP))
+            addView(ui.button("이 길 건네주기", guide == null) { giveTitle = ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = "길"; show(GIVE) }, lp(MATCH, WRAP))
             addView(gap(10))
             addView(ui.button("다음 사람에게 한마디", false) {
                 val notes = listOf("기름 넣어야 해요.", "워셔액 채워 주세요.", "뒷자리에 짐 있어요.", "주차는 평소 자리에 했어요.")
@@ -963,7 +963,7 @@ class MainActivity : Activity(), Car.Listener {
         addView(ui.text(value, 26f, Ink.paint, ui.sign))
     }
 
-    // ───────────── 길 남기기: 방금 달린 길을 교본으로 ─────────────
+    // ───────────── 길 남기기: 방금 달린 길을 건네주기 ─────────────
 
     private var giveKind = "길"
     private val titlePresets get() = if (giveKind == "추천") listOf("주말 드라이브", "바닷가 카페", "맛집 가는 길") else if (giveKind == "연습") listOf("주차장에서 후진 주차", "동네 한 바퀴", "좁은 골목 지나기") else listOf("할머니 댁 가는 길", "마트 가는 길", "학교 가는 길")
@@ -978,7 +978,7 @@ class MainActivity : Activity(), Car.Listener {
         val left = col().apply {
             addView(header("길을 남기기"))
             addView(gap(8))
-            addView(ui.text("이 길을 교본으로 남길까요?", if (wide) 42f else 32f, Ink.paint, ui.sign))
+            addView(ui.text("이 길을 건네줄까요?", if (wide) 42f else 32f, Ink.paint, ui.sign))
             addView(gap(6))
             addView(ui.text("평소처럼 달린 길이면 됩니다. 이름과 한마디만 얹어 주세요.", 20f, Color.parseColor("#CFCBC2")))
             addView(TraceView(this@MainActivity, ui).apply { lanes = listOf(Lane("", d.drive, giveTips)) }, lp(MATCH, ui.dp(120)))
@@ -1015,9 +1015,9 @@ class MainActivity : Activity(), Car.Listener {
             addView(gap(12))
             addView(ui.button("한마디 더하기", false) { addTip() }, lp(MATCH, WRAP))
             addView(gap(14))
-            addView(ui.text("출발한 곳은 교본에 담지 않습니다. 목적지와 주행 요약, 한마디만 갑니다.", 17f, Ink.dim).apply { setLineSpacing(0f, 1.3f) })
+            addView(ui.text("출발한 곳은 담지 않습니다. 목적지와 주행 요약, 한마디만 갑니다.", 17f, Ink.dim).apply { setLineSpacing(0f, 1.3f) })
             addView(fill()); addView(gap(14))
-            addView(ui.button("교본으로 남기기", true) { saveGuide(d) }, lp(MATCH, WRAP))
+            addView(ui.button("건네주기", true) { saveGuide(d) }, lp(MATCH, WRAP))
         }
         return split(left, right)
     }
@@ -1051,12 +1051,12 @@ class MainActivity : Activity(), Car.Listener {
                 drive = d.drive, tips = giveTips.toList(), times = (same?.times ?: 0) + 1, kind = giveKind
             )
         )
-        toast("“$giveTitle”을 ${if (giveKind == "연습") "연습 교본" else "교본"}으로 남겼어요. 함께 쓰는 사람의 홈에 나타납니다.")
+        toast("“$giveTitle”을 ${if (giveKind == "연습") "연습" else if (giveKind == "추천") "추천 장소" else "길"}로 건네줬어요. 함께 쓰는 사람의 홈에 나타납니다.")
         show(HOME)
     }
 
     // ───────────── 함께 차곡: 함께 쓰는 사람들의 길과 일기 ─────────────
-    // 교본·연습·추천 장소와, 함께 차곡에 올린 일기가 시간순으로 쌓인다. 순위나 숫자 경쟁은 없다.
+    // 건네준 길·연습·추천 장소와, 함께 차곡에 올린 일기가 시간순으로 쌓인다. 순위나 숫자 경쟁은 없다.
     // "나도 가보기"를 누르면 그 길이 내 도전이 되어 내비에 들어간다. 정차 중에만 연다.
 
     private data class Card(val id: String, val author: String, val date: Long, val tag: String, val title: String, val text: String, val drive: Drive, val guide: Guide?, val diary: Diary?)
@@ -1065,7 +1065,7 @@ class MainActivity : Activity(), Car.Listener {
         val me = store.driver
         val cards = mutableListOf<Card>()
         store.guides().forEach { g ->
-            val tag = when (g.kind) { "연습" -> "연습"; "추천" -> "추천 장소"; else -> "교본" }
+            val tag = when (g.kind) { "연습" -> "연습"; "추천" -> "추천 장소"; else -> "건네준 길" }
             cards.add(Card("g_${g.id}", g.owner, g.drive.date, tag, g.title, g.tips.firstOrNull()?.text ?: "", g.drive, g, null))
         }
         store.diaries().forEach { d ->
@@ -1129,7 +1129,7 @@ class MainActivity : Activity(), Car.Listener {
                 addView(header("나의 길 보관함"))
                 addView(ui.text("내가 남긴 길 ${mine.size}개 · 다녀온 곳 ${trips.size}곳", 18f, Ink.dim))
                 addView(gap(16)); addView(ui.text("내가 남긴 길", 20f, Ink.dim)); addView(rule())
-                if (mine.isEmpty()) addView(ui.text("일기에서 \"이 길을 교본으로 주기\"를 누르면 여기에 쌓여요.", 19f, Ink.dim).apply { setPadding(0, ui.dp(12), 0, ui.dp(12)) })
+                if (mine.isEmpty()) addView(ui.text("일기에서 \"이 길 건네주기\"를 누르면 여기에 쌓여요.", 19f, Ink.dim).apply { setPadding(0, ui.dp(12), 0, ui.dp(12)) })
                 mine.forEach { g ->
                     addView(row().apply {
                         setPadding(0, ui.dp(12), 0, ui.dp(12))

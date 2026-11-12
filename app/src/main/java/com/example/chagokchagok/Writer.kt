@@ -116,7 +116,7 @@ object Writer {
     /**
      * 일기를 쓴다. 잘한 것과 나아진 것을 먼저, 다음에 챙길 것은 하나만.
      * @param before 이 운전자가 전에 쓴 일기들 (처음인지, 나아졌는지 보려고)
-     * @param guide  따라 달린 교본이 있으면 그것
+     * @param guide  따라 달린 건네준 길이 있으면 그것
      */
     fun write(drive: Drive, before: List<Diary>, guide: Guide?, heardTips: Int, tone: String = "담백하게", seasoned: Boolean = false): Diary {
         val n = before.size + 1
@@ -155,7 +155,7 @@ object Writer {
             val name = Lamps.firstUse[lamp] ?: continue
             if (before.none { lamp in it.drive.lamps }) { sb.append("처음으로 ${name}을 써 봤다. "); if (stamp == null) stamp = "첫\n" + name.take(4); break }
         }
-        // 연습 교본을 준 사람의 초보 시절과 나란히 놓는다. 순위가 아니라 "누구나 처음엔"을 보여 주려는 것이다.
+        // 연습을 건네준 사람의 초보 시절과 나란히 놓는다. 순위가 아니라 "누구나 처음엔"을 보여 주려는 것이다.
         if (guide != null && guide.kind == "연습" && guide.drive.parkMoves > 0 && drive.parkMoves > 0)
             sb.append("${guide.owner}도 처음엔 ${times(guide.drive.parkMoves)} 오갔다고 했다. 나는 ${times(drive.parkMoves)}이었다. ")
         if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")

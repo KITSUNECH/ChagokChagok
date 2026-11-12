@@ -1,5 +1,5 @@
 // 차곡車곡 – 데이터 모델과 저장소
-// 주행 한 번(Drive), 그 주행에 한마디를 얹은 교본(Guide), 차가 쓴 일기(Diary)를 정의하고
+// 주행 한 번(Drive), 그 주행에 한마디를 얹은 건네준 길(Guide), 차가 쓴 일기(Diary)를 정의하고
 // 앱 안의 저장소(SharedPreferences)에 JSON으로 보관한다.
 package com.example.chagokchagok
 
@@ -13,7 +13,7 @@ data class Ev(val p: Float, val type: String, val value: String)
 /** 가족이 길 위의 한 지점에 남긴 한마디. */
 data class Tip(val p: Float, val text: String)
 
-/** 주행 한 번의 요약. 일기와 교본이 모두 이것을 재료로 쓴다. */
+/** 주행 한 번의 요약. 일기와 건네준 길이 모두 이것을 재료로 쓴다. */
 data class Drive(
     val driver: String,
     val date: Long,
@@ -33,13 +33,13 @@ data class Drive(
     val turns: Int = 0,           // 내비가 안내한 좌·우회전 횟수
     val turnsSignaled: Int = 0,   // 그중 돌기 전에 깜빡이를 켠 횟수
     val calm: Int = 0,            // 숨 고르기를 누른 횟수
-    val place: String? = null,    // 내비 목적지 이름 (교본 없이 간 길)
+    val place: String? = null,    // 내비 목적지 이름 (건네준 길 없이 간 길)
     val lamps: List<String> = emptyList(), // 달리는 동안 켜진 표시등 종류
-    val placeLat: Double? = null,  // 목적지 좌표 (다시 가기, 교본으로 남기기에 쓴다)
+    val placeLat: Double? = null,  // 목적지 좌표 (다시 가기, 건네주기에 쓴다)
     val placeLng: Double? = null
 )
 
-/** 교본: 누군가의 주행 한 번 + 목적지 + 한마디. */
+/** 건네준 길: 누군가의 주행 한 번 + 목적지 + 한마디. */
 data class Guide(
     val id: String,
     val owner: String,
@@ -59,7 +59,7 @@ data class Handover(val from: String, val date: Long, val fuel: Int?, val washer
 
 const val GRADUATE = 3
 
-/** 일기 한 편. guideId 가 있으면 누군가의 교본을 따라 달린 날이다. */
+/** 일기 한 편. guideId 가 있으면 누군가의 건네준 길을 따라 달린 날이다. */
 data class Diary(
     val id: String,
     val driver: String,
@@ -102,7 +102,7 @@ class Store(ctx: Context) {
     fun typeOf(name: String) = prefs.getString("type_$name", if (name == "나") "초보" else "익숙") ?: "익숙"
     fun setType(name: String, type: String) = prefs.edit().putString("type_$name", type).apply()
 
-    /** 가족인지 친구인지. 친구의 교본은 주로 연습용이다. */
+    /** 가족인지 친구인지. 친구의 건네준 길은 주로 연습용이다. */
     fun relation(name: String) = prefs.getString("rel_$name", if (name == "나" || name in listOf("아빠", "엄마")) "가족" else "친구") ?: "친구"
     fun setRelation(name: String, rel: String) = prefs.edit().putString("rel_$name", rel).apply()
 
@@ -131,7 +131,7 @@ class Store(ctx: Context) {
     fun seat(name: String): Int? = if (prefs.contains("seat_$name")) prefs.getInt("seat_$name", 0) else null
     fun setSeat(name: String, pos: Int) = prefs.edit().putInt("seat_$name", pos).apply()
 
-    /** 이 운전자가 교본 없이 다녀온 곳들. */
+    /** 이 운전자가 건네준 길 없이 다녀온 곳들. */
     fun places(name: String) = diariesOf(name).mapNotNull { if (it.guideId == null) it.drive.place else null }.distinct()
 
     /** 일기 말투: 담백하게, 다정하게. */
@@ -147,7 +147,7 @@ class Store(ctx: Context) {
         put("from", h.from); put("date", h.date); if (h.fuel != null) put("fuel", h.fuel); put("washerLow", h.washerLow); put("note", h.note)
     }.toString()).apply()
 
-    /** 이 운전자가 이 교본을 몇 번 따라 달렸는지. 세 번이면 졸업이다. */
+    /** 이 운전자가 이 건네준 길을 몇 번 따라 달렸는지. 세 번이면 졸업이다. */
     fun timesFollowed(driver: String, guideId: String) = diaries().count { it.driver == driver && it.guideId == guideId }
     fun graduated(driver: String, guideId: String) = timesFollowed(driver, guideId) >= GRADUATE
     fun totalKm(driver: String) = diariesOf(driver).sumOf { it.drive.distKm.toDouble() }.toFloat()
@@ -162,7 +162,7 @@ class Store(ctx: Context) {
     fun addGuide(g: Guide) = writeArray("guides", guides().filter { it.id != g.id } + g) { json(it) }
     fun addDiary(d: Diary) = writeArray("diaries", diaries().filter { it.id != d.id } + d) { json(it) }
 
-    /** 지금 운전자가 받아 볼 수 있는 교본: 다른 가족이 남긴 길. */
+    /** 지금 운전자가 받아 볼 수 있는 건네준 길: 다른 가족이 남긴 길. */
     fun guidesFor(driver: String) = guides().filter { it.owner != driver }
     fun diariesOf(driver: String) = diaries().filter { it.driver == driver }
     fun guide(id: String?) = guides().firstOrNull { it.id == id }
@@ -260,7 +260,7 @@ class Store(ctx: Context) {
         if (news("나").none { it.startsWith("민수\t") }) addNews("나", "민수\t민수의 응원: “면허 축하해! 처음엔 다 무서워. 주차장부터 같이 하자.”")
     }
 
-    /** 시연용 예시 교본. 화면에 "예시"라고 표시된다. 좌표는 Pleos 문서의 목적지 예시 값이다. */
+    /** 시연용 예시 건네준 길. 화면에 "예시"라고 표시된다. 좌표는 Pleos 문서의 목적지 예시 값이다. */
     fun addSampleGuide() {
         val evs = listOf(
             Ev(.20f, Evt.SIGNAL, "RIGHT"), Ev(.24f, Evt.BRAKE, "on"), Ev(.52f, Evt.SIGNAL, "LEFT"),

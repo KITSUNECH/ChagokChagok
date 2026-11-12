@@ -295,7 +295,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt("navi") { navi.getCurrentLocationInfo(); navi.getDestinationInfo(); navi.getTBTInfo() }
     }
 
-    /** 교본의 목적지를 내비에 넣는다. 좌표가 없거나 내비가 연결되지 않았으면 false. */
+    /** 건네준 길의 목적지를 내비에 넣는다. 좌표가 없거나 내비가 연결되지 않았으면 false. */
     fun requestRoute(name: String, lat: Double?, lng: Double?, comfortable: Boolean = false): Boolean {
         if (!naviConnected || lat == null || lng == null) return false
         return attempt("navi") {
