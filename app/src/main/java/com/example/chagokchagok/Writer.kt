@@ -61,7 +61,8 @@ class Recorder {
             parkMoves = if (firstR < 0) 0 else gears.size - firstR,
             lostWay = raw.count { it.type == Evt.LOST },
             longestSignalSec = (longest / 1000).toInt(),
-            cruise = raw.any { it.type == Evt.CRUISE && it.value == "on" }
+            cruise = raw.any { it.type == Evt.CRUISE && it.value == "on" },
+            passenger = raw.any { it.type == Evt.SEAT }
         )
     }
 }
@@ -100,6 +101,15 @@ object Writer {
         if (firstCruise) { sb.append("처음으로 차에게 속도를 맡겨 봤다. "); if (stamp == null) stamp = "첫\n크루즈" }
         else if (drive.cruise) sb.append("오늘도 크루즈를 켜고 달렸다. ")
 
+        if (drive.passenger && before.none { it.drive.passenger }) { sb.append("처음으로 누군가를 태우고 달렸다. "); if (stamp == null) stamp = "첫\n동승" }
+
+        // 함께 달린 거리가 10km, 100km를 넘는 날
+        val kmBefore = before.sumOf { it.drive.distKm.toDouble() }
+        val kmNow = kmBefore + drive.distKm
+        for (mark in listOf(100, 10)) if (kmBefore < mark && kmNow >= mark) {
+            sb.append("함께 달린 길이 ${mark}km를 넘었다. "); if (stamp == null) stamp = "${mark}\nkm"; break
+        }
+
         if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
         if (drive.signals > 0) sb.append("깜빡이는 ${times(drive.signals)} 켰다. ")
 
@@ -112,7 +122,11 @@ object Writer {
                 if (highlight.isEmpty()) highlight = s
             }
         }
-        if (guide != null) sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 네 기록이 생겼다. ")
+        if (guide != null) {
+            val followed = before.count { it.guideId == guide.id } + 1
+            if (followed == GRADUATE) { sb.append("이 길은 이제 졸업이다. "); stamp = "졸업" }
+            else sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 네 기록이 생겼다. ")
+        }
 
         // 다음에 챙길 것 하나
         sb.append(

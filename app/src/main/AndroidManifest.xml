@@ -6,6 +6,10 @@
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
     <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />
     <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <!-- 일기 문장을 생성형 AI로 다듬을 때만 쓴다. 주행 요약 글만 나간다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- 내비 연동 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />

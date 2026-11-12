@@ -30,6 +30,7 @@ import ai.pleos.playground.vehicle.listener.DistanceDrivenListener
 import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import ai.pleos.playground.vehicle.listener.LightStateListener
 import ai.pleos.playground.vehicle.listener.SeatBeltBuckledStateListener
+import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
 import ai.pleos.playground.vehicle.listener.SteeringWheelAngleListener
 import ai.pleos.playground.vehicle.listener.TurnSignalStateListener
 import ai.pleos.playground.vehicle.listener.WiperStateListener
@@ -53,6 +54,10 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var lowBeam = false; private set
     var belt = false; private set
     var cruise = false; private set
+    var passenger = false; private set
+    /** 남은 연료(%) 또는 전기차의 배터리(%). 읽히지 않으면 null. */
+    var energy: Int? = null; private set
+    var washerLow = false; private set
     var steering = 0f; private set
     var odometerKm: Float? = null; private set
     var naviConnected = false; private set
@@ -124,6 +129,13 @@ class Car(private val ctx: Context, private val listener: Listener) {
         }
         override fun onFailed(e: Exception) { failures[Evt.CRUISE] = e.message ?: "실패" }
     }
+    private val seatL = object : SeatOccupancyListener {
+        override fun onSeatOccupancyUpdated(occupied: Boolean?) = ui {
+            if (occupied == true && !passenger) { passenger = true; listener.onCarEvent(Evt.SEAT, "on") }
+        }
+        override fun onFailed(e: Exception) { failures[Evt.SEAT] = e.message ?: "실패" }
+    }
+    private val passengerSeats = listOf(SeatValue.ROW_1_RIGHT, SeatValue.ROW_2_LEFT, SeatValue.ROW_2_RIGHT).map { SeatArea(it) }
     private val distanceL = object : DistanceDrivenListener {
         override fun onDistanceDrivenUpdated(distance: Float?) = ui {
             if (distance != null) { odometerKm = distance; listener.onDistance(distance) }
@@ -157,6 +169,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt("belt") { vehicle.getSeat().registerSeatBeltBuckledState(driverSeat, beltL) }
         attempt("distance") { vehicle.getOdometer().registerDistanceDriven(distanceL) }
         attempt(Evt.CRUISE) { vehicle.getDrivingMode().registerCruiseControlState(cruiseL) }
+        passengerSeats.forEach { seat -> attempt(Evt.SEAT) { vehicle.getSeat().registerSeatOccupancy(seat, seatL) } }
+        refreshCondition()
 
         navi = NaviHelper(ctx.applicationContext)
         navi.initialize(
@@ -175,9 +189,18 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt("") { vehicle.getSeat().unregisterSeatBeltBuckledState(driverSeat, beltL) }
         attempt("") { vehicle.getOdometer().unregisterDistanceDriven(distanceL) }
         attempt("") { vehicle.getDrivingMode().unregisterCruiseControlState(cruiseL) }
+        passengerSeats.forEach { seat -> attempt("") { vehicle.getSeat().unregisterSeatOccupancy(seat, seatL) } }
         attempt("") { vehicle.release() }
         attempt("") { navi.removeListener(naviL); navi.release() }
     }
+
+    /** 다음 사람에게 전할 차 상태를 다시 읽는다. 답은 조금 뒤에 따로 온다. */
+    fun refreshCondition() {
+        attempt("fuel") { vehicle.getFuel().getFuelPercent({ v -> if (v != null) energy = v }, { e -> failures["fuel"] = e.message ?: "실패" }) }
+        attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> if (v != null && energy == null) energy = v }, { e -> failures["battery"] = e.message ?: "실패" }) }
+        attempt("washer") { vehicle.getSafety().hasLowWasherFluidWarning({ v -> washerLow = v == true }, { e -> failures["washer"] = e.message ?: "실패" }) }
+    }
+    fun resetPassenger() { passenger = false }
 
     /** 내비에 지금 위치와 목적지를 물어본다. 답은 위 리스너로 따로 온다. */
     fun refreshNavi() {

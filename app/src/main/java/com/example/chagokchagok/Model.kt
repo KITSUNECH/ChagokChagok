@@ -28,7 +28,8 @@ data class Drive(
     val parkMoves: Int,
     val lostWay: Int,
     val longestSignalSec: Int,
-    val cruise: Boolean = false   // 주행 보조(크루즈)를 켜고 달렸는지
+    val cruise: Boolean = false,  // 주행 보조(크루즈)를 켜고 달렸는지
+    val passenger: Boolean = false // 운전석 말고 다른 자리에 누가 탔는지
 )
 
 /** 교본: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -44,6 +45,11 @@ data class Guide(
     val sample: Boolean = false
 )
 
+/** 차를 넘겨받는 사람에게 전하는 것. fuel 은 남은 연료나 배터리(%). */
+data class Handover(val from: String, val date: Long, val fuel: Int?, val washerLow: Boolean, val note: String)
+
+const val GRADUATE = 3
+
 /** 일기 한 편. guideId 가 있으면 누군가의 교본을 따라 달린 날이다. */
 data class Diary(
     val id: String,
@@ -54,7 +60,8 @@ data class Diary(
     val highlight: String,
     val stamp: String?,
     val drive: Drive,
-    val guideId: String?
+    val guideId: String?,
+    val ai: Boolean = false   // 생성형 AI가 문장을 다듬었는지
 )
 
 object Evt {
@@ -65,13 +72,35 @@ object Evt {
     const val LIGHT = "light"     // 전조등
     const val LOST = "lost"       // 경로 재탐색
     const val CRUISE = "cruise"   // 주행 보조(크루즈)
+    const val SEAT = "seat"       // 동승자 탑승
 }
 
 /** 앱의 모든 기록을 읽고 쓰는 곳. */
 class Store(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("chagok", Context.MODE_PRIVATE)
 
-    val drivers = listOf("아빠", "나")
+    /** 이 차를 함께 쓰는 사람들. 가족이나 친구를 더할 수 있다. */
+    val drivers: List<String>
+        get() = (prefs.getString("drivers", null) ?: "아빠|나").split("|").filter { it.isNotBlank() }
+    fun addDriver(name: String) { if (name !in drivers) prefs.edit().putString("drivers", (drivers + name).joinToString("|")).apply() }
+
+    /** 운전자가 어떤 사람인지: 초보, 오랜만, 새 차, 익숙. 고른 것에 따라 인사와 권하는 순서가 달라진다. */
+    fun typeOf(name: String) = prefs.getString("type_$name", if (name == "나") "초보" else "익숙") ?: "익숙"
+    fun setType(name: String, type: String) = prefs.edit().putString("type_$name", type).apply()
+
+    /** 마지막에 탄 사람이 다음 사람에게 남기는 차 상태와 한마디. */
+    fun handover(): Handover? = prefs.getString("handover", null)?.let {
+        val o = JSONObject(it)
+        Handover(o.getString("from"), o.getLong("date"), if (o.has("fuel")) o.getInt("fuel") else null, o.optBoolean("washerLow", false), o.optString("note", ""))
+    }
+    fun setHandover(h: Handover) = prefs.edit().putString("handover", JSONObject().apply {
+        put("from", h.from); put("date", h.date); if (h.fuel != null) put("fuel", h.fuel); put("washerLow", h.washerLow); put("note", h.note)
+    }.toString()).apply()
+
+    /** 이 운전자가 이 교본을 몇 번 따라 달렸는지. 세 번이면 졸업이다. */
+    fun timesFollowed(driver: String, guideId: String) = diaries().count { it.driver == driver && it.guideId == guideId }
+    fun graduated(driver: String, guideId: String) = timesFollowed(driver, guideId) >= GRADUATE
+    fun totalKm(driver: String) = diariesOf(driver).sumOf { it.drive.distKm.toDouble() }.toFloat()
 
     var driver: String
         get() = prefs.getString("driver", "나") ?: "나"
@@ -81,7 +110,7 @@ class Store(ctx: Context) {
     fun diaries(): List<Diary> = readArray("diaries").map { diaryOf(it) }
 
     fun addGuide(g: Guide) = writeArray("guides", guides().filter { it.id != g.id } + g) { json(it) }
-    fun addDiary(d: Diary) = writeArray("diaries", diaries() + d) { json(it) }
+    fun addDiary(d: Diary) = writeArray("diaries", diaries().filter { it.id != d.id } + d) { json(it) }
 
     /** 지금 운전자가 받아 볼 수 있는 교본: 다른 가족이 남긴 길. */
     fun guidesFor(driver: String) = guides().filter { it.owner != driver }
@@ -116,7 +145,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise)
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger)
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -131,7 +160,7 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false)
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false)
         )
     }
 
@@ -155,13 +184,13 @@ class Store(ctx: Context) {
     private fun json(d: Diary) = JSONObject().apply {
         put("id", d.id); put("driver", d.driver); put("date", d.date); put("title", d.title); put("text", d.text)
         put("highlight", d.highlight); if (d.stamp != null) put("stamp", d.stamp)
-        put("drive", json(d.drive)); if (d.guideId != null) put("guideId", d.guideId)
+        put("drive", json(d.drive)); if (d.guideId != null) put("guideId", d.guideId); put("ai", d.ai)
     }
 
     private fun diaryOf(o: JSONObject) = Diary(
         o.getString("id"), o.getString("driver"), o.getLong("date"), o.getString("title"), o.getString("text"),
         o.optString("highlight", ""), if (o.has("stamp")) o.getString("stamp") else null,
-        driveOf(o.getJSONObject("drive")), if (o.has("guideId")) o.getString("guideId") else null
+        driveOf(o.getJSONObject("drive")), if (o.has("guideId")) o.getString("guideId") else null, o.optBoolean("ai", false)
     )
 
     /** 시연용 예시 교본. 화면에 "예시"라고 표시된다. 좌표는 Pleos 문서의 목적지 예시 값이다. */
