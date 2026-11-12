@@ -50,7 +50,7 @@ class MainActivity : Activity(), Car.Listener {
 
     companion object {
         const val HOME = "home"; const val PREP = "prep"; const val DRIVING = "driving"
-        const val DIARY = "diary"; const val GIVE = "give"; const val BOOK = "book"; const val READY = "ready"; const val FEED = "feed"
+        const val DIARY = "diary"; const val GIVE = "give"; const val BOOK = "book"; const val READY = "ready"; const val FEED = "feed"; const val SHELF = "shelf"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -210,17 +210,28 @@ class MainActivity : Activity(), Car.Listener {
         if (sim) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0) }
         ticker.removeCallbacksAndMessages(null)
         val driver = store.driver
-        val drive = recorder.finish(driver).let { d -> if (activeGuide == null && !car.destName.isNullOrBlank()) d.copy(place = car.destName) else d }
+        // 보관함의 "다시 가기"는 남의 교본이 아니라 내가 다녀온 곳이다. 교본 없이 간 길로 적는다.
+        val again = activeGuide?.takeIf { it.kind == "다시" }
+        if (again != null) activeGuide = null
+        val drive = recorder.finish(driver).let { d ->
+            when {
+                again != null -> d.copy(place = again.title, placeLat = again.lat, placeLng = again.lng)
+                activeGuide == null && !car.destName.isNullOrBlank() -> d.copy(place = car.destName, placeLat = car.destLat, placeLng = car.destLng)
+                else -> d
+            }
+        }
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")
         ticker.postDelayed({ saveHandover(driver, store.handover()?.takeIf { it.from == driver }?.note ?: "") }, 1500) // 차 상태 값이 조금 늦게 온다
-        val d = Writer.write(drive, store.diariesOf(driver), activeGuide, shownTips.size, store.tone(driver))
+        val d = Writer.write(drive, store.diariesOf(driver), activeGuide, shownTips.size, store.tone(driver), seasoned = store.typeOf(driver) == "익숙")
         store.addDiary(d)
+        // 일기 머리의 날씨는 실제 예보로 적는다. 좌표가 없거나 실패하면 와이퍼로 본 비/맑음을 쓴다.
+        (car.lat to car.lng).let { (la, ln) -> if (la != null && ln != null) Weather.at(la, ln) { f -> if (f != null) { store.setWeather(d.id, "${f.sky} ${f.tempC}°"); if (screen == DIARY && diary?.id == d.id) show(DIARY) } } }
         val guideUsed = activeGuide
         diary = d; activeGuide = null
         show(DIARY)
         // 키가 있으면 같은 사실로 문장만 다듬어 달라고 한다. 실패하면 규칙으로 쓴 글을 그대로 둔다.
-        if (AiDiary.enabled) AiDiary.polish(d, guideUsed, store.tone(driver)) { text, reason ->
+        if (AiDiary.enabled) AiDiary.polish(d, guideUsed, store.tone(driver), store.diariesOf(driver).dropLast(1), store.typeOf(driver)) { text, reason ->
             aiStatus = reason
             if (text != null) {
                 val better = d.copy(text = text, highlight = if (d.highlight.isNotEmpty() && d.highlight in text) d.highlight else "", ai = true)
@@ -311,7 +322,7 @@ class MainActivity : Activity(), Car.Listener {
         root.addView(
             when (next) {
                 PREP -> prepScreen(); DRIVING -> drivingScreen(); DIARY -> diaryScreen(); READY -> readyScreen()
-                GIVE -> giveScreen(); BOOK -> bookScreen(); FEED -> feedScreen(); else -> homeScreen()
+                GIVE -> giveScreen(); BOOK -> bookScreen(); FEED -> feedScreen(); SHELF -> shelfScreen(); else -> homeScreen()
             }
         )
     }
@@ -514,6 +525,8 @@ class MainActivity : Activity(), Car.Listener {
             }, lp(MATCH, WRAP))
             addView(gap(12))
             addView(ui.button("일기장 ${diaries.size}편", false) { show(BOOK) }, lp(MATCH, WRAP))
+            addView(gap(12))
+            addView(ui.button("나의 길 보관함", false) { show(SHELF) }, lp(MATCH, WRAP))
             addView(gap(12))
             addView(ui.button("함께 차곡", false) { if (recorder.active) toast("달리는 중에는 열지 않아요.") else show(FEED) }, lp(MATCH, WRAP))
             addView(gap(12))
@@ -848,7 +861,7 @@ class MainActivity : Activity(), Car.Listener {
                 addView(row().apply {
                     addView(ui.text(SimpleDateFormat("M월 d일 EEEE", Locale.KOREA).format(Date(d.date)), 22f, Ink.ink, ui.batang))
                     addView(View(this@MainActivity), lp(0, 1, 1f))
-                    addView(ui.text(if (d.drive.rained) "○ 맑음   ● 비" else "● 맑음   ○ 비", 18f, Ink.ink))
+                    addView(ui.text(store.weather(d.id)?.let { if (d.drive.rained && !it.contains("비")) "$it · 와이퍼 켬" else it } ?: if (d.drive.rained) "○ 맑음   ● 비" else "● 맑음   ○ 비", 18f, Ink.ink))
                 })
                 addView(gap(8))
                 // 그림 칸: 오늘의 주행. 교본이 있으면 그 주행을 흐리게 함께 그린다.
@@ -1100,6 +1113,62 @@ class MainActivity : Activity(), Car.Listener {
         addView(buttons(*buttons.toTypedArray()))
         if (hearts.isNotEmpty()) addView(ui.text(hearts.joinToString(", ") + " 응원", 16f, Ink.dim).apply { setPadding(0, ui.dp(6), 0, 0) })
         if (c.diary != null) setOnClickListener { diary = c.diary; show(DIARY) }
+    }
+
+    // ───────────── 나의 길 보관함 ─────────────
+    // 누구를 가르치지 않아도 혼자 쓸 이유: 내가 다녀온 곳과 남긴 길이 쌓이고, 다시 가거나 누군가에게 건넬 수 있다.
+
+    private fun shelfScreen(): View {
+        val me = store.driver
+        val pad = pagePad
+        val mine = store.guides().filter { it.owner == me }
+        val trips = store.diariesOf(me).filter { it.guideId == null && it.drive.place != null }.groupBy { it.drive.place!! }
+        return ScrollView(this).apply {
+            addView(col().apply {
+                setPadding(pad, pad, pad, pad)
+                addView(header("나의 길 보관함"))
+                addView(ui.text("내가 남긴 길 ${mine.size}개 · 다녀온 곳 ${trips.size}곳", 18f, Ink.dim))
+                addView(gap(16)); addView(ui.text("내가 남긴 길", 20f, Ink.dim)); addView(rule())
+                if (mine.isEmpty()) addView(ui.text("일기에서 \"이 길을 교본으로 주기\"를 누르면 여기에 쌓여요.", 19f, Ink.dim).apply { setPadding(0, ui.dp(12), 0, ui.dp(12)) })
+                mine.forEach { g ->
+                    addView(row().apply {
+                        setPadding(0, ui.dp(12), 0, ui.dp(12))
+                        addView(col().apply {
+                            addView(ui.text(g.title, 24f, Ink.paint, ui.sign))
+                            val followers = store.diaries().filter { it.guideId == g.id }.map { it.driver }.distinct()
+                            addView(ui.text("${when (g.kind) { "연습" -> "연습"; "추천" -> "추천 장소"; else -> "길" }} · 한마디 ${g.tips.size}개" + if (followers.isNotEmpty()) " · ${followers.joinToString()}이(가) 따라 달림" else "", 17f, Ink.dim))
+                        }, lp(0, WRAP, 1f))
+                        addView(ui.text("한마디 더하기", 18f, Ink.center).apply { setOnClickListener { addTipTo(g) } })
+                    })
+                    addView(rule())
+                }
+                addView(gap(18)); addView(ui.text("다녀온 곳", 20f, Ink.dim)); addView(rule())
+                if (trips.isEmpty()) addView(ui.text("내비에 목적지를 넣고 다녀오면 여기에 남아요.", 19f, Ink.dim).apply { setPadding(0, ui.dp(12), 0, ui.dp(12)) })
+                trips.forEach { (place, ds) ->
+                    val last = ds.last()
+                    addView(row().apply {
+                        setPadding(0, ui.dp(12), 0, ui.dp(12))
+                        addView(col().apply {
+                            addView(ui.text(place, 24f, Ink.paint, ui.sign))
+                            addView(ui.text("${Writer.times(ds.size)} · 마지막 " + SimpleDateFormat("M월 d일", Locale.KOREA).format(Date(last.date)) + (store.feeling(last.id)?.let { " · “$it”" } ?: ""), 17f, Ink.dim))
+                        }, lp(0, WRAP, 1f))
+                        if (last.drive.placeLat != null) addView(ui.text("다시 가기", 18f, Ink.center).apply { setPadding(0, 0, ui.dp(16), 0); setOnClickListener {
+                            depart(Guide("again_${place.hashCode()}", me, place, last.drive.placeLat, last.drive.placeLng, last.drive, emptyList(), ds.size, kind = "다시"))
+                        } })
+                        addView(ui.text("건네주기", 18f, Ink.center).apply { setOnClickListener { diary = last; giveTitle = place; giveTips.clear(); giveKind = "추천"; show(GIVE) } })
+                    })
+                    addView(rule())
+                }
+            })
+        }
+    }
+
+    /** 이미 남긴 길에 한마디를 더한다. */
+    private fun addTipTo(g: Guide) {
+        AlertDialog.Builder(this).setTitle("어디쯤에서 할 말인가요?")
+            .setItems(tipPlaces.map { it.first }.toTypedArray()) { _, where ->
+                typeIn("한마디") { t -> store.addGuide(g.copy(tips = (g.tips + Tip(tipPlaces[where].second, t)).sortedBy { it.p })); toast("“${g.title}”에 한마디를 더했어요."); show(SHELF) }
+            }.show()
     }
 
     // ───────────── 일기장 ─────────────

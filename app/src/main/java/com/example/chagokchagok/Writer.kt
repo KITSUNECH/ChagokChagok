@@ -118,7 +118,7 @@ object Writer {
      * @param before 이 운전자가 전에 쓴 일기들 (처음인지, 나아졌는지 보려고)
      * @param guide  따라 달린 교본이 있으면 그것
      */
-    fun write(drive: Drive, before: List<Diary>, guide: Guide?, heardTips: Int, tone: String = "담백하게"): Diary {
+    fun write(drive: Drive, before: List<Diary>, guide: Guide?, heardTips: Int, tone: String = "담백하게", seasoned: Boolean = false): Diary {
         val n = before.size + 1
         val sb = StringBuilder()
         var highlight = ""
@@ -184,7 +184,10 @@ object Writer {
         // 다음에 챙길 것 하나
         sb.append(
             when {
+                // 운전이 익숙한 사람에게는 고칠 것을 말하지 않고, 오늘의 드라이브를 남겨 둔다
+                seasoned -> if (drive.place != null) "${drive.place}까지 다녀온 오늘을 남겨 둔다. 누군가에게 이 길을 건네줘도 좋겠다." else "오늘의 드라이브를 남겨 둔다."
                 drive.longestSignalSec >= 20 -> "다음엔 깜빡이 끄는 것 하나만 챙기자."
+                drive.turns > drive.turnsSignaled -> "다음엔 돌기 조금 전에 깜빡이를 먼저 켜 보자."
                 drive.lostWay > 0 -> "길을 한 번 놓쳤지만 괜찮다."
                 else -> "오늘은 이대로 좋았다."
             }
@@ -193,7 +196,7 @@ object Writer {
 
         if (tone == "다정하게") sb.append(if (n == 1) "시작한 것만으로 충분한 날이다. " else "오늘도 무사히 다녀와 줘서 고맙다. ")
 
-        val title = if (guide != null && guide.kind == "추천") "${poss(guide.owner)} 추천 따라" else if (guide != null && guide.kind == "연습") "${poss(guide.owner)} 연습 따라" else if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else "${ordinal(n)} 운전"
+        val title = if (guide != null && guide.kind == "추천") "${poss(guide.owner)} 추천 따라" else if (guide != null && guide.kind == "연습") "${poss(guide.owner)} 연습 따라" else if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else if (seasoned) "드라이브 일기" else "${ordinal(n)} 운전"
         return Diary("d${drive.date}", drive.driver, drive.date, title, sb.toString().trim(), highlight, stamp, drive, guide?.id)
     }
 }

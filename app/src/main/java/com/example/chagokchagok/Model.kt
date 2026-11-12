@@ -34,7 +34,9 @@ data class Drive(
     val turnsSignaled: Int = 0,   // 그중 돌기 전에 깜빡이를 켠 횟수
     val calm: Int = 0,            // 숨 고르기를 누른 횟수
     val place: String? = null,    // 내비 목적지 이름 (교본 없이 간 길)
-    val lamps: List<String> = emptyList() // 달리는 동안 켜진 표시등 종류
+    val lamps: List<String> = emptyList(), // 달리는 동안 켜진 표시등 종류
+    val placeLat: Double? = null,  // 목적지 좌표 (다시 가기, 교본으로 남기기에 쓴다)
+    val placeLng: Double? = null
 )
 
 /** 교본: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -114,6 +116,10 @@ class Store(ctx: Context) {
     /** 응원(하트)을 누른 사람들. 숫자로 줄 세우지 않고 누가 응원했는지만 보여 준다. */
     fun hearts(id: String): Set<String> = prefs.getStringSet("heart_$id", emptySet()) ?: emptySet()
     fun toggleHeart(id: String, name: String) { val h = hearts(id).toMutableSet(); if (!h.remove(name)) h.add(name); prefs.edit().putStringSet("heart_$id", h).apply() }
+    /** 일기를 쓴 곳의 실제 날씨 (예: "맑음 12°"). */
+    fun weather(diaryId: String): String? = prefs.getString("wx_$diaryId", null)
+    fun setWeather(diaryId: String, w: String) = prefs.edit().putString("wx_$diaryId", w).apply()
+
     /** 일기에 내가 남긴 한 줄 (기분). */
     fun feeling(diaryId: String): String? = prefs.getString("feel_$diaryId", null)
     fun setFeeling(diaryId: String, f: String) = prefs.edit().putString("feel_$diaryId", f).apply()
@@ -189,7 +195,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|"))
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -204,7 +210,7 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }, if (o.has("placeLat")) o.getDouble("placeLat") else null, if (o.has("placeLng")) o.getDouble("placeLng") else null
         )
     }
 

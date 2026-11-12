@@ -40,18 +40,21 @@ object AiDiary {
      * 초안을 다듬어 돌려준다. 결과는 화면 스레드에서 전달된다.
      * @param done (다듬은 글 또는 null, 점검 창에 보여 줄 상태 문구)
      */
-    fun polish(d: Diary, guide: Guide?, tone: String, done: (String?, String) -> Unit) {
+    fun polish(d: Diary, guide: Guide?, tone: String, history: List<Diary> = emptyList(), driverType: String = "초보", done: (String?, String) -> Unit) {
         pool.execute {
             val (text, status) = try {
                 val keep = if (d.highlight.isNotEmpty()) "\n\n이 문장은 글자 그대로 넣어라: ${d.highlight}" else ""
                 val style = if (tone == "다정하게") "\n\n말투: 평소보다 조금 더 다정하게, 곁에서 지켜본 사람처럼 써라." else "\n\n말투: 꾸밈을 줄이고 담백하게 써라."
+                // 차가 운전자를 알아 갈수록 맞춰 쓰도록, 최근 일기의 핵심 문장과 운전자 유형을 함께 준다
+                val known = "\n\n운전자: " + when (driverType) { "오랜만" -> "오랜만에 다시 운전하는 사람"; "새 차" -> "운전은 하지만 이 차가 처음인 사람"; "익숙" -> "운전이 익숙한 사람. 가르치지 말고 오늘을 기억하는 드라이브 일기로 써라"; else -> "면허를 딴 지 얼마 안 된 사람" } +
+                    (if (history.isNotEmpty()) "\n최근 일기에서: " + history.takeLast(3).joinToString(" / ") { it.highlight.ifEmpty { it.title } } + "\n(나아진 점이 초안에 있으면 그와 이어서 써도 된다. 초안에 없는 사실은 만들지 않는다.)" else "")
                 val context = if (guide != null) "\n\n상황: ${Writer.subj(guide.owner)} 남긴 길 '${guide.title}'을 따라 달린 날이다." else ""
                 val params = MessageCreateParams.builder()
                     .model("claude-opus-5-5")
                     .maxTokens(16000L)
                     .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
                     .system(SYSTEM)
-                    .addUserMessage("초안:\n${d.text}$context$keep$style")
+                    .addUserMessage("초안:\n${d.text}$context$keep$style$known")
                     .build()
                 val response = client.messages().create(params)
                 // 응답이 거절이거나 비어 있으면 규칙으로 쓴 글을 그대로 쓴다.
