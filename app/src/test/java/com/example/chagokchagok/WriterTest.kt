@@ -42,4 +42,15 @@ class WriterTest {
         assertTrue(second.text.contains(second.highlight))
         assertEquals("같은 길, 다른 자리", second.title)
     }
+
+    @Test fun turnCoach() {
+        val c = TurnCoach(); val passed = mutableListOf<Boolean>(); c.onPassed = { passed.add(it) }
+        assertEquals(null, c.update("RIGHT", 150, "OFF"))
+        assertEquals("RIGHT", c.update("RIGHT", 90, "OFF"))   // 가까운데 꺼져 있으면 한 번 알려 준다
+        assertEquals(null, c.update("RIGHT", 60, "OFF"))      // 두 번 말하지 않는다
+        c.update("RIGHT", 40, "RIGHT"); c.update(null, 0, "OFF")
+        assertEquals(listOf(true), passed)
+        c.update("LEFT", 120, "OFF"); c.update("LEFT", 30, "RIGHT"); c.update("LEFT", 400, "OFF") // 반대쪽 깜빡이는 치지 않는다
+        assertEquals(listOf(true, false), passed)
+    }
 }

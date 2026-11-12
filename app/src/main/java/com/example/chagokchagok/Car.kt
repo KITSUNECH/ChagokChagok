@@ -58,6 +58,16 @@ class Car(private val ctx: Context, private val listener: Listener) {
     /** 남은 연료(%) 또는 전기차의 배터리(%). 읽히지 않으면 null. */
     var energy: Int? = null; private set
     var washerLow = false; private set
+    // 내비가 알려 준 앞길. 없으면 null 이거나 0.
+    /** 다음 회전 방향: LEFT, RIGHT, UTURN, 그 밖에는 OTHER. */
+    var turn: String? = null; private set
+    var turnMeters = 0; private set
+    var turnText = ""; private set
+    var speedLimit = 0; private set
+    var cameraMeters = 0; private set
+    var cameraLimit = 0; private set
+    var schoolZone = false; private set
+    var cautionMeters = 0; private set
     var steering = 0f; private set
     var odometerKm: Float? = null; private set
     var naviConnected = false; private set
@@ -154,6 +164,21 @@ class Car(private val ctx: Context, private val listener: Listener) {
         override fun onDestinationInfo(destinationInfo: DestinationInfo) {
             destLat = destinationInfo.latitude; destLng = destinationInfo.longitude; destName = destinationInfo.name
         }
+        override fun onTBTInfo(tbtInfo: List<ai.pleos.playground.navi.data.TBTInfo>) = ui {
+            val next = tbtInfo.firstOrNull()
+            setTurn(next?.type?.name, next?.distance?.toInt() ?: 0, next?.description ?: "")
+        }
+        override fun onCurrentRoadSpeedLimit(speedLimit: Int) = ui { this@Car.speedLimit = speedLimit; listener.onCarEvent(Evt.NAVI, "limit") }
+        override fun onCameraAlert(cameraAlerts: List<ai.pleos.playground.navi.data.CameraAlert>) = ui {
+            val c = cameraAlerts.filter { it.remainDistance > 0 }.minByOrNull { it.remainDistance }
+            cameraMeters = c?.remainDistance ?: 0; cameraLimit = c?.speedLimit ?: 0
+            schoolZone = c?.type?.name?.contains("SCHOOL_ZONE") == true
+            listener.onCarEvent(Evt.NAVI, "camera")
+        }
+        override fun onCautionPointInfo(cautionPoints: List<ai.pleos.playground.navi.data.CautionPoint>) = ui {
+            cautionMeters = cautionPoints.filter { it.remainDistance > 0 }.minOfOrNull { it.remainDistance } ?: 0
+            listener.onCarEvent(Evt.NAVI, "caution")
+        }
         override fun onError(errorCode: NaviErrorCode) { failures["navi"] = errorCode.toString() }
     }
 
@@ -202,20 +227,34 @@ class Car(private val ctx: Context, private val listener: Listener) {
     }
     fun resetPassenger() { passenger = false }
 
+    /** 내비의 회전 안내를 우리 말로 바꿔 둔다. 시험용 신호도 이 길로 들어온다. */
+    fun setTurn(type: String?, meters: Int, text: String) {
+        turn = when {
+            type == null || type == "TURN_UNKNOWN" || type == "TURN_STRAIGHT" || type == "TURN_ARRIVE" -> null
+            type == "TURN_UTURN" -> "UTURN"
+            type.endsWith("_R") || type == "TURN_RIGHT" -> "RIGHT"
+            type.endsWith("_L") || type == "TURN_LEFT" -> "LEFT"
+            else -> "OTHER"
+        }
+        turnMeters = meters; turnText = text
+        listener.onCarEvent(Evt.NAVI, "turn")
+    }
+
     /** 내비에 지금 위치와 목적지를 물어본다. 답은 위 리스너로 따로 온다. */
     fun refreshNavi() {
         if (!naviConnected) return
-        attempt("navi") { navi.getCurrentLocationInfo(); navi.getDestinationInfo() }
+        attempt("navi") { navi.getCurrentLocationInfo(); navi.getDestinationInfo(); navi.getTBTInfo() }
     }
 
     /** 교본의 목적지를 내비에 넣는다. 좌표가 없거나 내비가 연결되지 않았으면 false. */
-    fun requestRoute(name: String, lat: Double?, lng: Double?): Boolean {
+    fun requestRoute(name: String, lat: Double?, lng: Double?, comfortable: Boolean = false): Boolean {
         if (!naviConnected || lat == null || lng == null) return false
         return attempt("navi") {
             navi.requestRoute(
                 RouteInfo(
                     latitude = lat, longitude = lng, displayLongitude = null, displayLatitude = null,
-                    poiName = name, poiId = "", poiSubId = "", address = ""
+                    poiName = name, poiId = "", poiSubId = "", address = "",
+                    routeOption = if (comfortable) ai.pleos.playground.navi.constants.RouteOption.COMFORTABLE else ai.pleos.playground.navi.constants.RouteOption.RECOMMENDED
                 )
             )
         }

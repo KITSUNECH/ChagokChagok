@@ -81,8 +81,17 @@ class MainActivity : Activity(), Car.Listener {
 
     // ───────────── 차에서 온 소식 ─────────────
 
+    private val coach = TurnCoach().apply { onPassed = { ok -> recorder.add(Evt.TURN, if (ok) "signaled" else "missed") } }
+    private var prompt: String? = null   // 지금 해야 할 한 가지 (예: 오른쪽 깜빡이)
+
     override fun onCarEvent(type: String, value: String) {
-        recorder.add(type, value)
+        if (type != Evt.NAVI) recorder.add(type, value)
+        if (recorder.active && (type == Evt.NAVI || type == Evt.SIGNAL)) {
+            val side = coach.update(car.turn, car.turnMeters, if (type == Evt.SIGNAL) value else car.signal)
+            if (side != null) { prompt = if (side == "LEFT") "지금 왼쪽 깜빡이" else "지금 오른쪽 깜빡이"; speak(prompt!!) }
+            else if (prompt != null && (type == Evt.SIGNAL && value != "OFF" || car.turn == null)) { if (type == Evt.SIGNAL) chime?.play(chimeId, 1f, 1f, 1, 0, 1f); prompt = null }
+        }
+        if (type == Evt.LOST && recorder.active) say("길을 놓쳐도 괜찮아요. 내비가 새 길을 찾았어요.")
         if (screen == PREP) { onPrep(type, value); return } // 연습 중의 기어 조작은 주행으로 치지 않는다
         if (type == Evt.GEAR) {
             if ((value == "D" || value == "R") && !recorder.active) startTrip()
@@ -100,7 +109,7 @@ class MainActivity : Activity(), Car.Listener {
         if (car.lowBeam) recorder.add(Evt.LIGHT, "on")
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
-        shownTips = mutableSetOf(); currentTip = null
+        shownTips = mutableSetOf(); currentTip = null; coach.reset(); prompt = null
         show(DRIVING)
         val g = activeGuide
         say(if (g != null) "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 그 자리에 가면 알려 드릴게요." else "출발합니다. 조용히 적고 있을게요.")
@@ -370,7 +379,7 @@ class MainActivity : Activity(), Car.Listener {
 
     private fun depart(g: Guide) {
         activeGuide = g
-        routeSet = car.requestRoute(g.title, g.lat, g.lng)
+        routeSet = car.requestRoute(g.title, g.lat, g.lng, comfortable = store.typeOf(store.driver) in listOf("초보", "오랜만"))
         show(READY)
     }
 
@@ -412,6 +421,8 @@ class MainActivity : Activity(), Car.Listener {
             "와이퍼 켜기" to { onCarEvent(Evt.WIPER, "on") }, "와이퍼 끄기" to { onCarEvent(Evt.WIPER, "off") },
             "전조등 켜기" to { onCarEvent(Evt.LIGHT, "on") }, "안전벨트 매기" to { onCarEvent("belt", "on") },
             "크루즈 켜기" to { onCarEvent(Evt.CRUISE, "on") }, "동승자 탑승" to { onCarEvent(Evt.SEAT, "on") },
+            "내비: 150m 앞 우회전" to { car.setTurn("TURN_RIGHT", 150, "우회전") }, "내비: 80m 앞 우회전" to { car.setTurn("TURN_RIGHT", 80, "우회전") },
+            "내비: 회전 지남" to { car.setTurn(null, 0, "") },
             "기어 D" to { onCarEvent(Evt.GEAR, "D") }, "기어 R" to { onCarEvent(Evt.GEAR, "R") }, "기어 P" to { onCarEvent(Evt.GEAR, "P") }
         )
         AlertDialog.Builder(this).setTitle("시험용 신호 (실제 차량 신호 아님)")
@@ -422,6 +433,8 @@ class MainActivity : Activity(), Car.Listener {
     private fun settings() {
         val status = "내비: " + (if (car.naviConnected) "연결됨" else "연결 안 됨") +
             "\nAI 일기: $aiStatus" +
+            "\n내비 안내: " + (car.turn?.let { "$it ${car.turnMeters}m" } ?: "없음") + ", 제한 ${car.speedLimit}" +
+            "\n연료/배터리: " + (car.energy?.let { "$it%" } ?: "아직 없음") +
             "\n주행거리 신호: " + (car.odometerKm?.let { "${it}km" } ?: "아직 없음") +
             (if (car.failures.isEmpty()) "\n실패한 신호 없음" else "\n\n실패: " + car.failures.entries.joinToString("\n") { "${it.key}: ${it.value}" })
         AlertDialog.Builder(this).setTitle("점검").setMessage(status)
@@ -503,6 +516,8 @@ class MainActivity : Activity(), Car.Listener {
 
     private var drivingTip: TextView? = null
     private var drivingCount: TextView? = null
+    private var drivingNext: TextView? = null
+    private var drivingAhead: TextView? = null
 
     private fun drivingScreen(): View {
         val pad = ui.dp(34)
@@ -516,10 +531,24 @@ class MainActivity : Activity(), Car.Listener {
             drivingTip = ui.text("", 44f, Ink.paint, ui.batang).apply { setLineSpacing(0f, 1.25f) }
             addView(drivingTip)
             addView(fill())
+            // 앞길: 내비가 알려 준 다음 한 가지와 제한속도·단속 지점
+            drivingNext = ui.text("", 34f, Ink.center, ui.sign)
+            addView(drivingNext)
+            addView(gap(6))
+            drivingAhead = ui.text("", 22f, Ink.paint)
+            addView(drivingAhead)
+            addView(gap(18))
             drivingCount = ui.text("", 20f, Ink.dim)
             addView(drivingCount)
             addView(gap(14))
-            addView(row().apply { addView(ui.button("주행 끝내고 일기 쓰기", false) { if (recorder.active) endTrip() }) })
+            addView(row().apply {
+                addView(ui.button("숨 고르기", false) {
+                    recorder.add(Evt.CALM, "on")
+                    say("괜찮아요. 천천히 가도 돼요. 길을 놓치면 내비가 다시 찾아 줘요.")
+                })
+                addView(View(this@MainActivity), lp(ui.dp(12), 1))
+                addView(ui.button("주행 끝내고 일기 쓰기", false) { if (recorder.active) endTrip() })
+            })
             refreshDriving()
         }
     }
@@ -527,6 +556,14 @@ class MainActivity : Activity(), Car.Listener {
     private fun refreshDriving() {
         val g = activeGuide
         drivingTip?.text = currentTip ?: if (g != null) "그 자리에 가면 알려 줄게요." else "조용히 적고 있어요."
+        val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }
+        drivingNext?.text = prompt ?: if (side != null && car.turnMeters > 0) "${car.turnMeters}m 앞 $side" else ""
+        drivingNext?.setTextColor(if (prompt != null) Ink.signal else Ink.center)
+        val ahead = mutableListOf<String>()
+        if (car.speedLimit > 0) ahead.add("이 길 제한 ${car.speedLimit}")
+        if (car.cameraMeters > 0) ahead.add((if (car.schoolZone) "어린이 보호구역 " else "") + "${car.cameraMeters}m 앞 단속" + if (car.cameraLimit > 0) " ${car.cameraLimit}" else "")
+        if (car.cautionMeters > 0) ahead.add("${car.cautionMeters}m 앞 주의 구간")
+        drivingAhead?.text = ahead.joinToString("   ·   ")
         drivingCount?.text = "●  조용히 적는 중   P에 놓으면 일기를 씁니다"
     }
 
@@ -576,6 +613,7 @@ class MainActivity : Activity(), Car.Listener {
             material("와이퍼", if (d.drive.rained) "켰음" else "안 켬").let { addView(it); addView(rule()) }
             material("깜빡이", "${d.drive.signals}번").let { addView(it); addView(rule()) }
             if (d.drive.cruise) material("크루즈", "켜고 달림").let { addView(it); addView(rule()) }
+            if (d.drive.turns > 0) material("회전 전 깜빡이", "${d.drive.turnsSignaled}/${d.drive.turns}").let { addView(it); addView(rule()) }
             if (d.drive.passenger) material("함께 탄 사람", "있음").let { addView(it); addView(rule()) }
             material("주차하며 오간 횟수", if (d.drive.parkMoves > 0) "${d.drive.parkMoves}번" else "없음").let { addView(it); addView(rule()) }
             if (guide != null) material("${Writer.subj(guide.owner)} 다닌 횟수", "${guide.times}번").let { addView(it); addView(rule()) }

@@ -3,6 +3,38 @@
 // Writer 는 그 Drive 를 사실만으로 된 일기 문장으로 바꾼다. 점수는 매기지 않는다.
 package com.example.chagokchagok
 
+/**
+ * 내비가 알려 준 회전과 깜빡이를 맞춰 본다.
+ * 회전이 가까워졌는데 깜빡이가 꺼져 있으면 한 번 알려 주고, 그 회전을 지나면 미리 켰는지 적어 둔다.
+ */
+class TurnCoach {
+    private var dir: String? = null
+    private var last = 0
+    private var signaled = false
+    private var prompted = false
+
+    /** 회전을 하나 지났을 때 불린다. true 면 미리 깜빡이를 켠 것이다. */
+    var onPassed: (Boolean) -> Unit = {}
+
+    fun reset() { dir = null; last = 0; signaled = false; prompted = false }
+
+    /** 내비 안내나 깜빡이가 바뀔 때마다 부른다. 지금 깜빡이를 켜라고 알려 줄 때만 방향을 돌려준다. */
+    fun update(turn: String?, meters: Int, signal: String): String? {
+        val side = turn?.takeIf { it == "LEFT" || it == "RIGHT" }
+        val near = side != null && meters in 1..NEAR
+        // 가까이 다가왔던 회전이 사라지거나 다음 안내로 넘어갔으면 그 회전을 지난 것이다.
+        if (dir != null && (!near || side != dir || meters > last + 50)) { onPassed(signaled); reset() }
+        if (!near) return null
+        if (dir == null) { dir = side; signaled = false; prompted = false }
+        last = meters
+        if (signal == side) signaled = true
+        if (!signaled && !prompted && meters <= PROMPT) { prompted = true; return side }
+        return null
+    }
+
+    companion object { const val NEAR = 200; const val PROMPT = 100 }
+}
+
 class Recorder {
     private data class Raw(val time: Long, val km: Float, val type: String, val value: String)
 
@@ -62,7 +94,10 @@ class Recorder {
             lostWay = raw.count { it.type == Evt.LOST },
             longestSignalSec = (longest / 1000).toInt(),
             cruise = raw.any { it.type == Evt.CRUISE && it.value == "on" },
-            passenger = raw.any { it.type == Evt.SEAT }
+            passenger = raw.any { it.type == Evt.SEAT },
+            turns = raw.count { it.type == Evt.TURN },
+            turnsSignaled = raw.count { it.type == Evt.TURN && it.value == "signaled" },
+            calm = raw.count { it.type == Evt.CALM }
         )
     }
 }
@@ -112,6 +147,11 @@ object Writer {
 
         if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
         if (drive.signals > 0) sb.append("깜빡이는 ${times(drive.signals)} 켰다. ")
+        if (drive.turns > 0) sb.append(
+            if (drive.turnsSignaled == drive.turns) "돌 때마다 미리 깜빡이를 켰다. "
+            else "${times(drive.turns)} 도는 동안 ${times(drive.turnsSignaled)}은 미리 깜빡이를 켰다. "
+        )
+        if (drive.calm > 0) sb.append("${times(drive.calm)} 숨을 골랐다. ")
 
         if (drive.parkMoves > 0) {
             val last = before.lastOrNull { it.drive.parkMoves > 0 }?.drive?.parkMoves

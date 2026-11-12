@@ -29,7 +29,10 @@ data class Drive(
     val lostWay: Int,
     val longestSignalSec: Int,
     val cruise: Boolean = false,  // 주행 보조(크루즈)를 켜고 달렸는지
-    val passenger: Boolean = false // 운전석 말고 다른 자리에 누가 탔는지
+    val passenger: Boolean = false, // 운전석 말고 다른 자리에 누가 탔는지
+    val turns: Int = 0,           // 내비가 안내한 좌·우회전 횟수
+    val turnsSignaled: Int = 0,   // 그중 돌기 전에 깜빡이를 켠 횟수
+    val calm: Int = 0             // 숨 고르기를 누른 횟수
 )
 
 /** 교본: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -73,6 +76,9 @@ object Evt {
     const val LOST = "lost"       // 경로 재탐색
     const val CRUISE = "cruise"   // 주행 보조(크루즈)
     const val SEAT = "seat"       // 동승자 탑승
+    const val TURN = "turn"       // 내비가 안내한 회전을 지남 (값: signaled / missed)
+    const val CALM = "calm"       // 숨 고르기
+    const val NAVI = "navi"       // 내비 안내가 바뀜 (기록하지 않고 화면만 고친다)
 }
 
 /** 앱의 모든 기록을 읽고 쓰는 곳. */
@@ -145,7 +151,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger)
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm)
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -160,7 +166,7 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false)
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0)
         )
     }
 
