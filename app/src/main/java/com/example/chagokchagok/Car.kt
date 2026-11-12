@@ -58,6 +58,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     /** 남은 연료(%) 또는 전기차의 배터리(%). 읽히지 않으면 null. */
     var energy: Int? = null; private set
     var washerLow = false; private set
+    /** 워셔액 경고를 실제로 읽어 왔는지. */
+    var washerKnown = false; private set
     // 내비가 알려 준 앞길. 없으면 null 이거나 0.
     /** 다음 회전 방향: LEFT, RIGHT, UTURN, 그 밖에는 OTHER. */
     var turn: String? = null; private set
@@ -223,7 +225,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     fun refreshCondition() {
         attempt("fuel") { vehicle.getFuel().getFuelPercent({ v -> if (v != null) energy = v }, { e -> failures["fuel"] = e.message ?: "실패" }) }
         attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> if (v != null && energy == null) energy = v }, { e -> failures["battery"] = e.message ?: "실패" }) }
-        attempt("washer") { vehicle.getSafety().hasLowWasherFluidWarning({ v -> washerLow = v == true }, { e -> failures["washer"] = e.message ?: "실패" }) }
+        attempt("washer") { vehicle.getSafety().hasLowWasherFluidWarning({ v -> washerLow = v == true; washerKnown = true }, { e -> failures["washer"] = e.message ?: "실패" }) }
     }
     fun resetPassenger() { passenger = false }
 

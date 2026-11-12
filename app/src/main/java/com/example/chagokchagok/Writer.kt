@@ -117,7 +117,7 @@ object Writer {
      * @param before 이 운전자가 전에 쓴 일기들 (처음인지, 나아졌는지 보려고)
      * @param guide  따라 달린 교본이 있으면 그것
      */
-    fun write(drive: Drive, before: List<Diary>, guide: Guide?, heardTips: Int): Diary {
+    fun write(drive: Drive, before: List<Diary>, guide: Guide?, heardTips: Int, tone: String = "담백하게"): Diary {
         val n = before.size + 1
         val sb = StringBuilder()
         var highlight = ""
@@ -177,6 +177,8 @@ object Writer {
             }
         )
         if (stamp == null && n == 1) stamp = "첫\n운전"
+
+        if (tone == "다정하게") sb.append(if (n == 1) "시작한 것만으로 충분한 날이다. " else "오늘도 무사히 다녀와 줘서 고맙다. ")
 
         val title = if (guide != null) "같은 길, 다른 자리" else "${ordinal(n)} 운전"
         return Diary("d${drive.date}", drive.driver, drive.date, title, sb.toString().trim(), highlight, stamp, drive, guide?.id)

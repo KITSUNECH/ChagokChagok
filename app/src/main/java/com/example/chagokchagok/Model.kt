@@ -94,6 +94,10 @@ class Store(ctx: Context) {
     fun typeOf(name: String) = prefs.getString("type_$name", if (name == "나") "초보" else "익숙") ?: "익숙"
     fun setType(name: String, type: String) = prefs.edit().putString("type_$name", type).apply()
 
+    /** 일기 말투: 담백하게, 다정하게. */
+    fun tone(name: String) = prefs.getString("tone_$name", "담백하게") ?: "담백하게"
+    fun setTone(name: String, tone: String) = prefs.edit().putString("tone_$name", tone).apply()
+
     /** 마지막에 탄 사람이 다음 사람에게 남기는 차 상태와 한마디. */
     fun handover(): Handover? = prefs.getString("handover", null)?.let {
         val o = JSONObject(it)

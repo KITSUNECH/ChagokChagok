@@ -98,6 +98,7 @@ class MainActivity : Activity(), Car.Listener {
             else if (value == "P" && recorder.active) endTrip()
         }
         if (screen == DRIVING) refreshDriving()
+        if (screen == READY && (type == "belt" || type == Evt.SEAT)) show(READY)
     }
 
     override fun onDistance(km: Float) { recorder.distance(km); if (recorder.active) checkTips() }
@@ -126,13 +127,13 @@ class MainActivity : Activity(), Car.Listener {
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")
         ticker.postDelayed({ saveHandover(driver, store.handover()?.takeIf { it.from == driver }?.note ?: "") }, 1500) // 차 상태 값이 조금 늦게 온다
-        val d = Writer.write(drive, store.diariesOf(driver), activeGuide, shownTips.size)
+        val d = Writer.write(drive, store.diariesOf(driver), activeGuide, shownTips.size, store.tone(driver))
         store.addDiary(d)
         val guideUsed = activeGuide
         diary = d; activeGuide = null
         show(DIARY)
         // 키가 있으면 같은 사실로 문장만 다듬어 달라고 한다. 실패하면 규칙으로 쓴 글을 그대로 둔다.
-        if (AiDiary.enabled) AiDiary.polish(d, guideUsed) { text, reason ->
+        if (AiDiary.enabled) AiDiary.polish(d, guideUsed, store.tone(driver)) { text, reason ->
             aiStatus = reason
             if (text != null) {
                 val better = d.copy(text = text, highlight = if (d.highlight.isNotEmpty() && d.highlight in text) d.highlight else "", ai = true)
@@ -288,8 +289,20 @@ class MainActivity : Activity(), Car.Listener {
                     setPadding(ui.dp(18), ui.dp(14), ui.dp(18), ui.dp(14))
                     background = GradientDrawable().apply { setColor(Color.parseColor("#1F3A2D")); cornerRadius = ui.dp(12).toFloat() }
                     addView(ui.text("받은 소식", 17f, Ink.go))
-                    addView(ui.text(news, 21f, Ink.paint, ui.batang).apply { setLineSpacing(0f, 1.3f) })
-                    setOnClickListener { store.clearNews(driver); show(HOME) }
+                    val from = news.substringBefore("\t", "")
+                    addView(ui.text(news.substringAfter("\t"), 21f, Ink.paint, ui.batang).apply { setLineSpacing(0f, 1.3f) })
+                    addView(ui.text(if (from.isNotEmpty()) "누르면 응원을 보낼 수 있어요" else "누르면 닫혀요", 15f, Ink.dim))
+                    setOnClickListener {
+                        if (from.isEmpty()) { store.clearNews(driver); show(HOME) }
+                        else {
+                            val cheers = listOf("잘했어. 다음엔 같이 가자.", "수고했어. 조심히 다녀.", "첫 길 축하해!", "주차까지 해냈구나.")
+                            AlertDialog.Builder(this@MainActivity).setTitle("${from}에게 응원 한마디")
+                                .setItems((cheers + "직접 쓰기" + "그냥 닫기").toTypedArray()) { _, i ->
+                                    fun send(t: String) { store.addNews(from, "\t${Writer.poss(driver)} 응원: “$t”"); store.clearNews(driver); toast("응원을 남겼어요."); show(HOME) }
+                                    when (i) { cheers.size -> typeIn("응원 한마디") { send(it) }; cheers.size + 1 -> { store.clearNews(driver); show(HOME) }; else -> send(cheers[i]) }
+                                }.show()
+                        }
+                    }
                 })
                 addView(gap(16))
             }
@@ -343,11 +356,40 @@ class MainActivity : Activity(), Car.Listener {
             }, lp(MATCH, WRAP))
             addView(gap(12))
             addView(ui.button("일기장 ${diaries.size}편", false) { show(BOOK) }, lp(MATCH, WRAP))
+            addView(gap(12))
+            addView(ui.button(if (store.typeOf(driver) == "오랜만") "그동안 바뀐 법규" else "알아 두기", false) { learn() }, lp(MATCH, WRAP))
         }
         return split(left, right)
     }
 
     private var chosenGuide: String? = null
+
+    /** 세워 둔 동안 읽는 것들. 달리는 중에는 열지 않는다. */
+    private fun learn() {
+        if (recorder.active) { toast("달리는 중에는 열지 않아요. 도착해서 봐요."); return }
+        val d = store.driver
+        val menu = listOf(
+            "그동안 바뀐 법규" to { notes("그동안 바뀐 법규", Notes.laws) },
+            "경고등 색 읽는 법" to { notes("경고등 색 읽는 법", Notes.lamps) },
+            "면허시험 차와 다른 곳" to { notes("면허시험 차와 다른 곳", Notes.newCar) },
+            "일기 말투: ${store.tone(d)}" to { store.setTone(d, if (store.tone(d) == "담백하게") "다정하게" else "담백하게"); toast("다음 일기부터 ${store.tone(d)} 써요."); learn() }
+        )
+        // 오랜만인 사람은 법규가, 이 차가 처음인 사람은 달라진 조작이 맨 위에 온다.
+        val first = when (store.typeOf(d)) { "새 차" -> 2; "초보" -> 1; else -> 0 }
+        val ordered = listOf(menu[first]) + menu.filterIndexed { i, _ -> i != first }
+        AlertDialog.Builder(this).setTitle("알아 두기")
+            .setItems(ordered.map { it.first }.toTypedArray()) { _, i -> ordered[i].second() }
+            .setNegativeButton("닫기", null).show()
+    }
+
+    private fun notes(title: String, items: List<Note>, at: Int = 0) {
+        val n = items[at]
+        AlertDialog.Builder(this).setTitle("$title  ${at + 1}/${items.size}")
+            .setMessage(n.title + "\n\n" + n.body + if (n.source.isNotEmpty()) "\n\n출처: " + n.source else "")
+            .setPositiveButton(if (at + 1 < items.size) "다음" else "끝") { _, _ -> if (at + 1 < items.size) notes(title, items, at + 1) }
+            .setNeutralButton("읽어 주기") { _, _ -> speak(n.title + ". " + n.body); notes(title, items, at) }
+            .setNegativeButton("닫기", null).show()
+    }
 
     /** 받은 길이 여러 개일 때 고른다. */
     private fun pickGuide(guides: List<Guide>) {
@@ -379,6 +421,7 @@ class MainActivity : Activity(), Car.Listener {
 
     private fun depart(g: Guide) {
         activeGuide = g
+        car.refreshCondition()
         routeSet = car.requestRoute(g.title, g.lat, g.lng, comfortable = store.typeOf(store.driver) in listOf("초보", "오랜만"))
         show(READY)
     }
@@ -402,6 +445,16 @@ class MainActivity : Activity(), Car.Listener {
             ))
             addView(gap(6))
             addView(ui.text("●  ${Writer.poss(g.owner)} 한마디 ${g.tips.size}개가 그 자리에서 나옵니다.", 22f, Ink.go))
+            if (routeSet && store.typeOf(store.driver) in listOf("초보", "오랜만")) { addView(gap(6)); addView(ui.text("●  내비에는 편안한 길로 부탁했어요.", 22f, Ink.go)) }
+            addView(gap(18))
+            addView(ui.text("떠나기 전에", 18f, Ink.dim))
+            addView(gap(6))
+            fun check(ok: Boolean?, good: String, bad: String, unknown: String) =
+                addView(ui.text(when (ok) { true -> "●  $good"; false -> "▲  $bad"; null -> "○  $unknown" }, 22f, when (ok) { true -> Ink.paint; false -> Ink.center; null -> Ink.dim }))
+            check(car.energy?.let { it >= 20 }, "연료 ${car.energy}%", "연료가 ${car.energy}%예요. 가는 길에 넣어요.", "연료는 계기판에서 확인해 주세요")
+            check(if (car.washerKnown) !car.washerLow else null, "워셔액 충분", "워셔액이 부족해요", "워셔액은 읽지 못했어요")
+            check(car.belt, "안전벨트 맸어요", "안전벨트를 매 주세요", "")
+            if (car.passenger) check(true, "함께 타는 사람이 있어요", "", "")
             addView(gap(20))
             addView(ui.text("기어를 D에 놓으면 기록을 시작합니다.", 30f, Ink.paint, ui.sign))
             addView(fill()); addView(gap(18))
@@ -626,7 +679,7 @@ class MainActivity : Activity(), Car.Listener {
                 addView(ui.button(if (sent) "${guide.owner}에게 소식을 보냈어요" else "${guide.owner}에게 도착 알리기", !sent) {
                     if (store.newsSent(d.id)) toast("이미 보낸 소식이에요.")
                     else {
-                        store.addNews(guide.owner, "${Writer.subj(d.driver)} “${guide.title}”을 직접 운전해서 다녀왔어요.")
+                        store.addNews(guide.owner, "${d.driver}\t${Writer.subj(d.driver)} “${guide.title}”을 직접 운전해서 다녀왔어요.")
                         store.setNewsSent(d.id)
                         show(DIARY); toast("${guide.owner}의 홈 화면에 소식을 남겼어요.")
                     }

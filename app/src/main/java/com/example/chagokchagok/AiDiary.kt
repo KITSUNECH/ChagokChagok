@@ -40,17 +40,18 @@ object AiDiary {
      * 초안을 다듬어 돌려준다. 결과는 화면 스레드에서 전달된다.
      * @param done (다듬은 글 또는 null, 점검 창에 보여 줄 상태 문구)
      */
-    fun polish(d: Diary, guide: Guide?, done: (String?, String) -> Unit) {
+    fun polish(d: Diary, guide: Guide?, tone: String, done: (String?, String) -> Unit) {
         pool.execute {
             val (text, status) = try {
                 val keep = if (d.highlight.isNotEmpty()) "\n\n이 문장은 글자 그대로 넣어라: ${d.highlight}" else ""
+                val style = if (tone == "다정하게") "\n\n말투: 평소보다 조금 더 다정하게, 곁에서 지켜본 사람처럼 써라." else "\n\n말투: 꾸밈을 줄이고 담백하게 써라."
                 val context = if (guide != null) "\n\n상황: ${Writer.subj(guide.owner)} 남긴 길 '${guide.title}'을 따라 달린 날이다." else ""
                 val params = MessageCreateParams.builder()
                     .model("claude-opus-5-5")
                     .maxTokens(16000L)
                     .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
                     .system(SYSTEM)
-                    .addUserMessage("초안:\n${d.text}$context$keep")
+                    .addUserMessage("초안:\n${d.text}$context$keep$style")
                     .build()
                 val response = client.messages().create(params)
                 // 응답이 거절이거나 비어 있으면 규칙으로 쓴 글을 그대로 쓴다.
