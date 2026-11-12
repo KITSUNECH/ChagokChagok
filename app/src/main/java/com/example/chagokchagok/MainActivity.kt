@@ -348,9 +348,12 @@ class MainActivity : Activity(), Car.Listener {
     /** 넓으면 좌우로, 좁으면(내비 옆 세로 창) 위아래로 놓는 두 칸 틀. */
     private fun split(left: View, right: View, leftWeight: Float = 1.5f): View {
         val pad = pagePad
+        // 넓은 창에서도 두 칸이 각각 스크롤된다. 창 높이가 낮으면 아래 버튼이 잘리지 않게.
+        fun scroll(v: View) = ScrollView(this).apply { isFillViewport = true; isVerticalScrollBarEnabled = false; addView(v) }
         return if (wide) row().apply {
-            gravity = Gravity.TOP; setPadding(pad, pad, pad, pad)
-            addView(left, lp(0, MATCH, leftWeight)); addView(gap(30)); addView(right, lp(0, MATCH, 1f))
+            gravity = Gravity.TOP; setPadding(pad, pad, pad, 0)
+            left.setPadding(0, 0, 0, pad); right.setPadding(0, 0, 0, pad)
+            addView(scroll(left), lp(0, MATCH, leftWeight)); addView(gap(30)); addView(scroll(right), lp(0, MATCH, 1f))
         } else ScrollView(this).apply {
             addView(col().apply { setPadding(pad, pad, pad, pad); addView(left, lp(MATCH, WRAP)); addView(gap(26)); addView(right, lp(MATCH, WRAP)) })
         }
@@ -368,7 +371,9 @@ class MainActivity : Activity(), Car.Listener {
     private fun homeScreen(): View {
         val driver = store.driver
         val guides = store.guidesFor(driver)
-        val guide = guides.firstOrNull { it.id == chosenGuide } ?: guides.lastOrNull { !store.graduated(driver, it.id) } ?: guides.lastOrNull()
+        val guide = guides.firstOrNull { it.id == chosenGuide }
+            ?: guides.lastOrNull { it.kind == "길" && !store.graduated(driver, it.id) }
+            ?: guides.lastOrNull { !store.graduated(driver, it.id) } ?: guides.lastOrNull()
         val greeting = when (store.typeOf(driver)) {
             "초보" -> "면허 딴 지 얼마 안 됐어도 괜찮아요. 아는 길부터 같이 가요."
             "오랜만" -> "오랜만이에요. 손이 기억하고 있을 거예요. 천천히 다시 해 봐요."
@@ -755,18 +760,24 @@ class MainActivity : Activity(), Car.Listener {
             addView(ui.text(if (allDone) "다 됐어요. 이제 이 차가 손에 익었습니다." else "한 번씩 해 보면 불이 들어와요", if (wide) 44f else 32f, Ink.paint, ui.sign))
             addView(gap(22)); addView(rule())
             val tiles = if (wide) row() else col()
-            prepItems.forEach { (key, name, hint) ->
+            var pair: LinearLayout? = null
+            prepItems.forEachIndexed { idx, (key, name, hint) ->
                 val done = key in prepDone
-                tiles.addView(col().apply {
+                val holder: LinearLayout = if (wide) tiles else {
+                    if (idx % 2 == 0) { pair = row().apply { gravity = Gravity.TOP }; tiles.addView(pair, lp(MATCH, WRAP)) }
+                    pair!!
+                }
+                holder.addView(col().apply {
                     gravity = Gravity.CENTER_HORIZONTAL
                     setPadding(ui.dp(8), ui.dp(26), ui.dp(8), ui.dp(22))
                     if (key == next) setBackgroundColor(Color.parseColor("#2E2B22"))
-                    addView(Telltale(this@MainActivity, key).apply { on = done; waiting = key == next }, lp(ui.dp(96), ui.dp(96)))
+                    addView(Telltale(this@MainActivity, key).apply { on = done; waiting = key == next }, lp(ui.dp(if (wide) 96 else 72), ui.dp(if (wide) 96 else 72)))
                     addView(gap(8))
                     addView(ui.text(name, 24f).apply { typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER })
                     addView(ui.text(if (done) "확인했어요" else if (key == next || key == "belt") hint else "", 17f, if (key == next) Ink.center else Ink.dim).apply { gravity = Gravity.CENTER })
-                }, if (wide) lp(0, WRAP, 1f) else lp(MATCH, WRAP))
+                }, lp(0, WRAP, 1f))
             }
+            if (!wide && prepItems.size % 2 == 1) pair?.addView(View(this@MainActivity), lp(0, 1, 1f))
             addView(tiles, lp(MATCH, WRAP)); addView(rule())
             addView(gap(20))
             addView(ui.text("주차 중에만 하는 연습입니다. 여기서 바꾼 기어는 주행으로 기록하지 않습니다.", 19f, Ink.dim))

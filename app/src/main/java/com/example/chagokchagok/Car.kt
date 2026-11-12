@@ -43,6 +43,11 @@ import ai.pleos.playground.vehicle.listener.WiperStateListener
 
 class Car(private val ctx: Context, private val listener: Listener) {
 
+    companion object {
+        /** 화면 확인 테스트처럼 차 없이 앱을 띄울 때 true. 실제 앱에서는 쓰지 않는다. */
+        @JvmStatic var offline = false
+    }
+
     interface Listener {
         /** 차량 신호가 바뀌었다. type 은 Evt 의 값, value 는 새 상태. */
         fun onCarEvent(type: String, value: String)
@@ -208,6 +213,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     }
 
     fun start() {
+        if (offline) return
         attempt("vehicle") { vehicle = Vehicle(ctx); vehicle.initialize() }
         // 하나가 지원되지 않아도 나머지는 계속 등록되도록 각각 감싼다.
         attempt(Evt.SIGNAL) { vehicle.getTurnSignal().registerTurnSignalState(signalL) }
@@ -232,6 +238,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     }
 
     fun stop() {
+        if (offline) return
         attempt("") { vehicle.getTurnSignal().unregisterTurnSignalState(signalL) }
         attempt("") { vehicle.getBrake().unregisterBrakePedalStatus(brakeL) }
         attempt("") { vehicle.getSteeringWheel().unregisterSteeringWheelAngle(steeringL) }

@@ -48,7 +48,7 @@ class Ui(val ctx: Context) {
     private val h = ctx.resources.configuration.screenHeightDp
     /** 창이 세로로 길거나 좁아서 한 줄로 쌓아야 하는지. */
     val narrow = w < h * 1.15f || w < 700
-    val scale = (if (narrow) w / 560f else minOf(w / 900f, h / 520f)).coerceIn(0.62f, 1.6f)
+    val scale = (if (narrow) minOf(w / 560f, h / 760f) else minOf(w / 900f, h / 600f)).coerceIn(0.62f, 1.4f)
     fun dp(v: Float) = (v * density * scale).toInt()
     fun dp(v: Int) = dp(v.toFloat())
 
