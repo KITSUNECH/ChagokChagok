@@ -60,10 +60,7 @@ class MainActivity : Activity(), Car.Listener {
         setContentView(root)
         car = Car(this, this); car.start()
         chime = android.media.SoundPool.Builder().setMaxStreams(2).build().also { chimeId = it.load(this, R.raw.confirm, 1) }
-        tts = TextToSpeech(this) { status ->
-            ttsReady = status == TextToSpeech.SUCCESS
-            if (ttsReady) tts?.language = Locale.KOREAN
-        }
+        startVoice(null)
         show(HOME)
     }
 
@@ -101,7 +98,40 @@ class MainActivity : Activity(), Car.Listener {
         if (screen == READY && (type == "belt" || type == Evt.SEAT)) show(READY)
     }
 
-    override fun onDistance(km: Float) { recorder.distance(km); if (recorder.active) checkTips() }
+    override fun onDistance(km: Float) { if (!sim) moved(km) }
+    private fun moved(km: Float) { recorder.distance(km); if (recorder.active) checkTips() }
+
+    // ── 모의 주행 (시연용) ──
+    // 에뮬레이터의 내비는 차를 움직여 주지 않는다. 그래서 받은 길 위를 달리는 것처럼 거리와 회전 안내를 흉내 낸다.
+    // 깜빡이·브레이크 같은 차량 신호는 흉내 내지 않는다. 그건 가상 콘솔에서 실제로 들어온다.
+    private var sim = false
+    private var simKm = 0f
+
+    private fun startSim() {
+        val g = activeGuide ?: return
+        val total = g.drive.distKm.coerceAtLeast(1f)
+        val turns = g.drive.events.filter { it.type == Evt.SIGNAL && (it.value == "LEFT" || it.value == "RIGHT") }
+        val base = car.odometerKm ?: 0f
+        sim = true; simKm = 0f
+        if (!recorder.active) startTrip()
+        moved(base)
+        val step = total / 180f   // 0.5초마다 한 걸음, 전체 90초쯤
+        root.postDelayed(object : Runnable {
+            override fun run() {
+                if (!sim || !recorder.active) return
+                simKm += step
+                val at = simKm / total
+                val next = turns.firstOrNull { it.p > at }
+                val meters = if (next != null) ((next.p - at) * total * 1000).toInt() else 0
+                if (next != null && meters <= 500) car.setTurn("TURN_" + next.value, meters, "") else car.setTurn(null, 0, "")
+                val cam = ((0.66f - at) * total * 1000).toInt()
+                car.setAhead(50, if (cam in 1..600) cam else 0, 50)
+                moved(base + simKm)
+                if (at >= 1f) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0); say("도착했어요. 기어를 P에 놓으면 일기를 씁니다.") }
+                else root.postDelayed(this, 500)
+            }
+        }, 500)
+    }
 
     private fun startTrip() {
         recorder.start(car.odometerKm)
@@ -121,6 +151,7 @@ class MainActivity : Activity(), Car.Listener {
     }
 
     private fun endTrip() {
+        if (sim) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0) }
         ticker.removeCallbacksAndMessages(null)
         val driver = store.driver
         val drive = recorder.finish(driver)
@@ -161,13 +192,44 @@ class MainActivity : Activity(), Car.Listener {
         }
     }
 
-    private fun speak(text: String) { if (ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chagok") }
+    private var voiceStatus = "준비 중"
+    private var pendingSpeech: String? = null
+
+    /** 음성 읽기 엔진을 켠다. 기본 엔진이 안 되면 기기에 깔린 다른 엔진을 차례로 시도한다. */
+    private fun startVoice(engine: String?, tried: Set<String> = emptySet()) {
+        var created: TextToSpeech? = null
+        created = TextToSpeech(applicationContext, { status ->
+            val t = created
+            if (status == TextToSpeech.SUCCESS && t != null) {
+                val lang = t.setLanguage(Locale.KOREA)
+                val korean = lang != TextToSpeech.LANG_MISSING_DATA && lang != TextToSpeech.LANG_NOT_SUPPORTED
+                t.setAudioAttributes(android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                tts = t; ttsReady = true
+                voiceStatus = "켜짐 (${engine ?: t.defaultEngine ?: "기본"})" + if (korean) "" else ", 한국어 음성 데이터 없음"
+                pendingSpeech?.let { pendingSpeech = null; speak(it) }
+            } else {
+                val engines = try { created?.engines?.map { it.name } ?: emptyList() } catch (e: Exception) { emptyList() }
+                val next = engines.firstOrNull { it !in tried && it != engine }
+                created?.shutdown()
+                if (next != null) startVoice(next, tried + listOfNotNull(engine))
+                else voiceStatus = if (engines.isEmpty()) "이 기기에 음성 엔진이 없음" else "엔진 시작 실패 (${engines.joinToString()})"
+            }
+        }, engine)
+    }
+
+    private fun speak(text: String) {
+        if (!ttsReady) { pendingSpeech = text; return } // 엔진이 조금 늦게 켜지면 그때 읽는다
+        val r = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chagok")
+        if (r != TextToSpeech.SUCCESS) voiceStatus = "읽기 실패 ($r)"
+    }
 
     /** 버튼으로 읽어 달라고 했을 때: 소리가 나면 읽고, 어느 쪽이든 글로도 보여 준다. */
     private fun readAloud(title: String, text: String) {
         speak(text)
         AlertDialog.Builder(this).setTitle(title)
-            .setMessage(text + if (ttsReady) "" else "\n\n(이 기기에서는 음성이 준비되지 않아 글로 보여 드려요.)")
+            .setMessage(text + if (ttsReady) "" else "\n\n(음성: $voiceStatus. 글로 보여 드려요.)")
             .setPositiveButton("닫기") { _, _ -> tts?.stop() }.show()
     }
 
@@ -182,7 +244,7 @@ class MainActivity : Activity(), Car.Listener {
             background = GradientDrawable().apply { setColor(Ink.paint); cornerRadius = ui.dp(14).toFloat() }
         }
         root.addView(bar, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = ui.dp(18) })
-        ticker.postDelayed({ root.removeView(bar) }, 4000)
+        root.postDelayed({ root.removeView(bar) }, 4000) // 주행 타이머와 따로 돌아야 안내 띠가 남지 않는다
     }
 
     // ───────────── 화면 바꾸기 ─────────────
@@ -198,7 +260,16 @@ class MainActivity : Activity(), Car.Listener {
         )
     }
 
-    private val wide get() = resources.configuration.screenWidthDp > resources.configuration.screenHeightDp * 1.15f
+    private val wide get() = !ui.narrow
+    private val pagePad get() = ui.dp(if (wide) 34 else 22)
+
+    /** 버튼 여러 개: 넓으면 옆으로, 좁으면 창 너비를 채워 아래로 쌓는다. */
+    private fun buttons(vararg items: View): View =
+        if (wide) row().apply { items.forEachIndexed { i, v -> if (i > 0) addView(gap(14)); addView(v) } }
+        else col().apply { items.forEachIndexed { i, v -> if (i > 0) addView(gap(10)); addView(v, lp(MATCH, WRAP)) } }
+
+    /** 한 칸짜리 화면. 창이 낮아 내용이 넘치면 스크롤된다. */
+    private fun page(body: LinearLayout): View = ScrollView(this).apply { isFillViewport = true; addView(body) }
     private fun col() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     private fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
     private fun gap(h: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(ui.dp(h), ui.dp(h)) }
@@ -209,7 +280,7 @@ class MainActivity : Activity(), Car.Listener {
 
     /** 넓으면 좌우로, 좁으면(내비 옆 세로 창) 위아래로 놓는 두 칸 틀. */
     private fun split(left: View, right: View, leftWeight: Float = 1.5f): View {
-        val pad = ui.dp(34)
+        val pad = pagePad
         return if (wide) row().apply {
             gravity = Gravity.TOP; setPadding(pad, pad, pad, pad)
             addView(left, lp(0, MATCH, leftWeight)); addView(gap(30)); addView(right, lp(0, MATCH, 1f))
@@ -260,25 +331,23 @@ class MainActivity : Activity(), Car.Listener {
                 guide.tips.lastOrNull()?.let { addView(ui.text("“${it.text}”", 25f, Ink.paint, ui.batang).apply { setLineSpacing(0f, 1.3f) }) }
                 addView(fill())
                 addView(gap(18))
-                addView(row().apply {
-                    addView(ui.button("이 길로 출발", true) { depart(guide) })
-                    addView(gap(14))
-                    addView(ui.button("한마디 듣기", false) {
+                addView(buttons(
+                    ui.button("이 길로 출발", true) { depart(guide) },
+                    ui.button("한마디 듣기", false) {
                         if (guide.tips.isEmpty()) toast("이 길에는 아직 남긴 한마디가 없어요.")
                         else readAloud("${Writer.poss(guide.owner)} 한마디", guide.tips.mapIndexed { i, t -> "${i + 1}. ${t.text}" }.joinToString("\n\n"))
-                    })
-                })
+                    }
+                ))
             } else {
                 addView(ui.text("아직 받은 길이 없어요", 50f, Ink.paint, ui.sign))
                 addView(gap(12))
                 addView(ui.text("가족이 이 차로 달린 뒤 길을 남기면 여기에 나타납니다.\n기어를 D에 놓으면 지금 주행을 바로 기록합니다.", 22f, Color.parseColor("#CFCBC2")).apply { setLineSpacing(0f, 1.35f) })
                 addView(fill())
                 addView(gap(18))
-                addView(row().apply {
-                    addView(ui.button("지금 기록 시작", true) { activeGuide = null; startTrip() })
-                    addView(gap(14))
-                    addView(ui.button("예시 길 넣어 보기", false) { store.addSampleGuide(); show(HOME) })
-                })
+                addView(buttons(
+                    ui.button("지금 기록 시작", true) { activeGuide = null; startTrip() },
+                    ui.button("예시 길 넣어 보기", false) { store.addSampleGuide(); show(HOME) }
+                ))
             }
         }
 
@@ -432,12 +501,12 @@ class MainActivity : Activity(), Car.Listener {
     /** 출발을 누른 뒤: 무엇이 됐는지 보여 주고, 기어 D 또는 버튼으로 기록을 시작한다. */
     private fun readyScreen(): View {
         val g = activeGuide ?: return homeScreen()
-        val pad = ui.dp(34)
-        return col().apply {
+        val pad = pagePad
+        return page(col().apply {
             setPadding(pad, pad, pad, pad)
             addView(header("출발"))
             addView(gap(14))
-            addView(ui.text(g.title, 58f, Ink.paint, ui.sign))
+            addView(ui.text(g.title, if (wide) 58f else 44f, Ink.paint, ui.sign))
             addView(gap(10))
             addView(ui.text(
                 if (routeSet) "●  내비게이션에 목적지를 넣었어요." else "○  내비게이션에 목적지를 넣지 못했어요. 길 안내 없이 기록만 합니다.",
@@ -458,12 +527,12 @@ class MainActivity : Activity(), Car.Listener {
             addView(gap(20))
             addView(ui.text("기어를 D에 놓으면 기록을 시작합니다.", 30f, Ink.paint, ui.sign))
             addView(fill()); addView(gap(18))
-            addView(row().apply {
-                addView(ui.button("지금 기록 시작", true) { startTrip() })
-                addView(gap(14))
-                addView(ui.button("그만두기", false) { activeGuide = null; show(HOME) })
-            })
-        }
+            addView(buttons(
+                ui.button("지금 기록 시작", true) { startTrip() },
+                ui.button("모의 주행 (시연용)", false) { startSim() },
+                ui.button("그만두기", false) { activeGuide = null; show(HOME) }
+            ))
+        })
     }
 
     /** 가상 콘솔에 조작이 없는 신호를 시험해 볼 때 쓴다. 실제 차량 신호가 아니다. */
@@ -485,6 +554,8 @@ class MainActivity : Activity(), Car.Listener {
 
     private fun settings() {
         val status = "내비: " + (if (car.naviConnected) "연결됨" else "연결 안 됨") +
+            "\n음성: $voiceStatus" +
+            "\n창 크기: ${resources.configuration.screenWidthDp}×${resources.configuration.screenHeightDp}dp, " + (if (wide) "넓게" else "좁게") +
             "\nAI 일기: $aiStatus" +
             "\n내비 안내: " + (car.turn?.let { "$it ${car.turnMeters}m" } ?: "없음") + ", 제한 ${car.speedLimit}" +
             "\n연료/배터리: " + (car.energy?.let { "$it%" } ?: "아직 없음") +
@@ -535,13 +606,13 @@ class MainActivity : Activity(), Car.Listener {
     private fun prepScreen(): View {
         val allDone = prepDone.containsAll(prepRequired)
         val next = prepRequired.firstOrNull { it !in prepDone }
-        val pad = ui.dp(34)
+        val pad = pagePad
         val body = col().apply {
             setPadding(pad, pad, pad, pad)
             addView(header("출발 준비"))
             addView(gap(10))
             if (prepLine.isNotEmpty()) { addView(ui.text("“$prepLine”", 22f, Ink.center, ui.batang)); addView(gap(10)) }
-            addView(ui.text(if (allDone) "다 됐어요. 이제 이 차가 손에 익었습니다." else "한 번씩 해 보면 불이 들어와요", 44f, Ink.paint, ui.sign))
+            addView(ui.text(if (allDone) "다 됐어요. 이제 이 차가 손에 익었습니다." else "한 번씩 해 보면 불이 들어와요", if (wide) 44f else 32f, Ink.paint, ui.sign))
             addView(gap(22)); addView(rule())
             val tiles = if (wide) row() else col()
             prepItems.forEach { (key, name, hint) ->
@@ -570,19 +641,23 @@ class MainActivity : Activity(), Car.Listener {
     private var drivingTip: TextView? = null
     private var drivingCount: TextView? = null
     private var drivingNext: TextView? = null
+    private var drivingTrace: TraceView? = null
     private var drivingAhead: TextView? = null
 
     private fun drivingScreen(): View {
-        val pad = ui.dp(34)
-        return col().apply {
+        val pad = pagePad
+        return page(col().apply {
             setPadding(pad, pad, pad, pad)
             addView(ui.text("차곡車곡", 28f, Ink.paint, ui.sign))
             addView(gap(28))
             val g = activeGuide
             addView(ui.text(if (g != null) "${Writer.poss(g.owner)} 한마디" else "오늘의 주행", 20f, Ink.dim))
             addView(gap(8))
-            drivingTip = ui.text("", 44f, Ink.paint, ui.batang).apply { setLineSpacing(0f, 1.25f) }
+            drivingTip = ui.text("", if (wide) 44f else 34f, Ink.paint, ui.batang).apply { setLineSpacing(0f, 1.25f) }
             addView(drivingTip)
+            // 같은 길 위에서 지금 어디쯤인지
+            drivingTrace = if (g != null) TraceView(this@MainActivity, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips, faded = true)) } else null
+            drivingTrace?.let { addView(gap(14)); addView(it, lp(MATCH, ui.dp(110))) }
             addView(fill())
             // 앞길: 내비가 알려 준 다음 한 가지와 제한속도·단속 지점
             drivingNext = ui.text("", 34f, Ink.center, ui.sign)
@@ -594,16 +669,15 @@ class MainActivity : Activity(), Car.Listener {
             drivingCount = ui.text("", 20f, Ink.dim)
             addView(drivingCount)
             addView(gap(14))
-            addView(row().apply {
-                addView(ui.button("숨 고르기", false) {
+            addView(buttons(
+                ui.button("숨 고르기", false) {
                     recorder.add(Evt.CALM, "on")
                     say("괜찮아요. 천천히 가도 돼요. 길을 놓치면 내비가 다시 찾아 줘요.")
-                })
-                addView(View(this@MainActivity), lp(ui.dp(12), 1))
-                addView(ui.button("주행 끝내고 일기 쓰기", false) { if (recorder.active) endTrip() })
-            })
+                },
+                ui.button("주행 끝내고 일기 쓰기", false) { if (recorder.active) endTrip() }
+            ))
             refreshDriving()
-        }
+        })
     }
 
     private fun refreshDriving() {
@@ -617,6 +691,9 @@ class MainActivity : Activity(), Car.Listener {
         if (car.cameraMeters > 0) ahead.add((if (car.schoolZone) "어린이 보호구역 " else "") + "${car.cameraMeters}m 앞 단속" + if (car.cameraLimit > 0) " ${car.cameraLimit}" else "")
         if (car.cautionMeters > 0) ahead.add("${car.cautionMeters}m 앞 주의 구간")
         drivingAhead?.text = ahead.joinToString("   ·   ")
+        if (g != null) drivingTrace?.marker = (if (g.drive.distKm > 0.05f && recorder.kmNow() > 0f) recorder.kmNow() / g.drive.distKm
+            else recorder.secondsNow().toFloat() / g.drive.seconds.coerceAtLeast(30)).coerceIn(0f, 1f)
+        if (sim) { drivingCount?.text = "●  모의 주행 중 (시연용, 실제 위치 아님)   P에 놓으면 일기를 씁니다"; return }
         drivingCount?.text = "●  조용히 적는 중   P에 놓으면 일기를 씁니다"
     }
 
@@ -733,13 +810,13 @@ class MainActivity : Activity(), Car.Listener {
         val left = col().apply {
             addView(header("길을 남기기"))
             addView(gap(8))
-            addView(ui.text("이 길을 교본으로 남길까요?", 42f, Ink.paint, ui.sign))
+            addView(ui.text("이 길을 교본으로 남길까요?", if (wide) 42f else 32f, Ink.paint, ui.sign))
             addView(gap(6))
             addView(ui.text("평소처럼 달린 길이면 됩니다. 이름과 한마디만 얹어 주세요.", 20f, Color.parseColor("#CFCBC2")))
             addView(TraceView(this@MainActivity, ui).apply { lanes = listOf(Lane("", d.drive, giveTips)) }, lp(MATCH, ui.dp(120)))
             addView(ui.text("길 이름", 18f, Ink.dim))
             addView(gap(6))
-            addView(row().apply {
+            addView(android.widget.HorizontalScrollView(this@MainActivity).apply { isHorizontalScrollBarEnabled = false; addView(row().apply {
                 (titlePresets + "직접 쓰기").forEach { t ->
                     val on = t == giveTitle
                     addView(TextView(this@MainActivity).apply {
@@ -750,7 +827,7 @@ class MainActivity : Activity(), Car.Listener {
                         setOnClickListener { if (t == "직접 쓰기") typeIn("길 이름") { giveTitle = it; show(GIVE) } else { giveTitle = t; show(GIVE) } }
                     }, lp(WRAP, WRAP).apply { rightMargin = ui.dp(8) })
                 }
-            })
+            }) })
             if (giveTitle.isNotEmpty() && giveTitle !in titlePresets) { addView(gap(6)); addView(ui.text(giveTitle, 24f, Ink.paint, ui.sign)) }
         }
         val right = col().apply {
@@ -806,7 +883,7 @@ class MainActivity : Activity(), Car.Listener {
     // ───────────── 일기장 ─────────────
 
     private fun bookScreen(): View {
-        val pad = ui.dp(34)
+        val pad = pagePad
         val list = store.diariesOf(store.driver).reversed()
         return ScrollView(this).apply {
             addView(col().apply {

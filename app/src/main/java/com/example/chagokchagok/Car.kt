@@ -229,6 +229,12 @@ class Car(private val ctx: Context, private val listener: Listener) {
     }
     fun resetPassenger() { passenger = false }
 
+    /** 모의 주행이 앞길 정보를 넣을 때 쓴다. 실제 내비 값이 아니다. */
+    fun setAhead(limit: Int, cameraMeters: Int, cameraLimit: Int) {
+        speedLimit = limit; this.cameraMeters = cameraMeters; this.cameraLimit = cameraLimit; schoolZone = false
+        listener.onCarEvent(Evt.NAVI, "ahead")
+    }
+
     /** 내비의 회전 안내를 우리 말로 바꿔 둔다. 시험용 신호도 이 길로 들어온다. */
     fun setTurn(type: String?, meters: Int, text: String) {
         turn = when {

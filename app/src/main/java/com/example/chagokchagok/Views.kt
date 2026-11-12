@@ -43,7 +43,12 @@ class Ui(val ctx: Context) {
     val batang: Typeface = ctx.resources.getFont(R.font.gowunbatang)  // 일기와 한마디 글꼴
     private val density = ctx.resources.displayMetrics.density
     /** 화면이 클수록 조금 더 키운다. 차 화면은 팔 길이에서 본다. */
-    val scale = (ctx.resources.displayMetrics.widthPixels / density / 900f).coerceIn(0.85f, 1.6f)
+    // 기기 화면이 아니라 지금 앱이 받은 창의 크기로 잰다. 내비 옆 절반 창에서는 창이 좁고 세로로 길다.
+    private val w = ctx.resources.configuration.screenWidthDp
+    private val h = ctx.resources.configuration.screenHeightDp
+    /** 창이 세로로 길거나 좁아서 한 줄로 쌓아야 하는지. */
+    val narrow = w < h * 1.15f || w < 700
+    val scale = (if (narrow) w / 560f else minOf(w / 900f, h / 520f)).coerceIn(0.62f, 1.6f)
     fun dp(v: Float) = (v * density * scale).toInt()
     fun dp(v: Int) = dp(v.toFloat())
 
@@ -71,6 +76,9 @@ class Lane(val label: String, val drive: Drive, val tips: List<Tip> = emptyList(
 
 class TraceView(ctx: Context, private val ui: Ui, private val onPaper: Boolean = false) : View(ctx) {
     var lanes: List<Lane> = emptyList()
+        set(v) { field = v; invalidate() }
+    /** 지금 어디쯤인지(0~1). 값이 있으면 첫 줄 위에 점으로 그린다. */
+    var marker: Float? = null
         set(v) { field = v; invalidate() }
 
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -122,6 +130,14 @@ class TraceView(ctx: Context, private val ui: Ui, private val onPaper: Boolean =
         // 주행 선
         p.color = lineColor; p.strokeWidth = band * .09f
         c.drawPath(path, p)
+        // 지금 위치
+        val m = marker
+        if (m != null && lane === lanes.first()) {
+            pm.getPosTan(len * m.coerceIn(0f, 1f), pos, tan)
+            p.style = Paint.Style.FILL; p.color = Ink.center; c.drawCircle(pos[0], pos[1], band * .3f, p)
+            p.style = Paint.Style.STROKE; p.color = Ink.asphalt; p.strokeWidth = band * .08f; c.drawCircle(pos[0], pos[1], band * .3f, p)
+            p.color = lineColor; p.strokeWidth = band * .09f
+        }
         // 깜빡이와 브레이크
         val tick = band * .1f
         lane.drive.events.forEach { e ->
