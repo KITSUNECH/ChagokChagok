@@ -1,7 +1,7 @@
 // 차곡車곡 – 시작 모션
 // 천천히, 끊기지 않게: 동작이 서로 겹치며 이어지고, 튕기지 않고 부드럽게 감속한다 (prompt-motion.com의 로고 등장 사례들을 참고).
-// 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓이고 → 가운데 줄이 상자로 벌어지고 → 세로 획이 위에서 아래로 그려지며 가운데를 꿰뚫어 車이 된다.
-// 이어서 車이 왼쪽 아래 칸으로 옮겨 가고 차·곡·곡이 차례로 떠올라 정사각형 로고가 된다. 화면 전체는 내내 아주 천천히 다가온다. 누르면 건너뛴다.
+// 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓인다 → 쌓인 세 줄이 로고의 왼쪽 아래 칸으로 옮겨 가고,
+// 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다. 화면 전체는 내내 아주 천천히 다가온다. 누르면 건너뛴다.
 package com.example.chagokchagok
 
 import android.animation.ValueAnimator
@@ -64,7 +64,7 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         val ox = (w - S) / 2; val oy = (h - S) / 2 - S * .08f
 
         // 로고 바탕: 車이 옮겨 가기 시작할 때 함께 부드럽게
-        val sq = cubicOut(seg(.67f, .85f))
+        val sq = cubicOut(seg(.34f, .56f))
         if (sq > 0f) {
             p.shader = null; p.style = Paint.Style.FILL; p.color = INK; p.alpha = (255 * sq).toInt()
             val sc = .94f + .06f * sq
@@ -74,7 +74,7 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         }
 
         // 車: 처음엔 가운데에 크게, 모일 때 왼쪽 아래 칸으로
-        val move = quintInOut(seg(.64f, .86f))
+        val move = quintInOut(seg(.32f, .56f))
         val bigBox = S * .92f; val cellBox = S * .34f
         val box = bigBox + (cellBox - bigBox) * move
         val cx = w / 2 + (ox + S * .30f - w / 2) * move
@@ -84,12 +84,12 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         // 차 · 곡 · 곡 이 차례로 떠오른다 (겹치며)
         p.shader = null; p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * .34f; p.color = Color.WHITE
         listOf(Triple("차", .30f, .42f), Triple("곡", .70f, .42f), Triple("곡", .70f, .82f)).forEachIndexed { i, (ch, u, v) ->
-            val k = cubicOut(seg(.70f + i * .04f, .86f + i * .04f)); if (k <= 0f) return@forEachIndexed
+            val k = cubicOut(seg(.50f + i * .06f, .66f + i * .06f)); if (k <= 0f) return@forEachIndexed
             p.alpha = (255 * k).toInt()
             c.drawText(ch, ox + S * u, oy + S * v + (1 - k) * S * .07f, p)
         }
         // 한 줄 소개
-        val tag = cubicOut(seg(.82f, .94f))
+        val tag = cubicOut(seg(.80f, .92f))
         if (tag > 0f) {
             p.textSize = S * .085f; p.color = Color.parseColor("#C7C7CC"); p.alpha = (255 * tag).toInt()
             c.drawText("차로 쓰는 성장일기", w / 2, oy + S + S * .22f + (1 - tag) * S * .03f, p)
@@ -116,11 +116,11 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         }
 
         bar(.00f, .06f, .94f, .80f)                         // 아래 긴 줄
-        val midY = bar(.09f, .20f, .80f, .47f)              // 가운데 줄
-        bar(.18f, .24f, .76f, .15f)                         // 위 짧은 줄
+        val midY = bar(.08f, .20f, .80f, .47f)              // 가운데 줄
+        bar(.15f, .24f, .76f, .15f)                         // 위 짧은 줄
 
         // 가운데 줄이 위아래로 부드럽게 벌어져 상자(曰)가 된다
-        val open = cubicInOut(seg(.32f, .50f))
+        val open = cubicInOut(seg(.52f, .68f))
         if (midY != null && open > 0f) {
             p.alpha = 255
             val half = s * .16f * open
@@ -131,12 +131,12 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         }
 
         // 세로 획: 위에서 아래로 그려지며 가운데를 꿰뚫는다. 끝에 은은한 빛이 따라간다
-        val draw = cubicInOut(seg(.44f, .64f))
+        val draw = cubicInOut(seg(.62f, .78f))
         if (draw > 0f) {
             val top = Y(.02f); val bottom = top + (Y(.98f) - top) * draw
             p.alpha = 255
             c.drawRoundRect(RectF(X(.5f) - r, top, X(.5f) + r, maxOf(bottom, top + th)), r, r, p)
-            val glow = (if (draw < 1f) 1f else 1 - seg(.64f, .69f)) * minOf(1f, draw * 4f)
+            val glow = (if (draw < 1f) 1f else 1 - seg(.78f, .86f)) * minOf(1f, draw * 4f)
             if (glow > 0f) {
                 val rad = th * 3.2f
                 p.shader = RadialGradient(X(.5f), bottom, rad, Color.argb((150 * glow).toInt(), 255, 190, 140), Color.TRANSPARENT, Shader.TileMode.CLAMP)
