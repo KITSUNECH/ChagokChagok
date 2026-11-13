@@ -23,7 +23,7 @@ class SplashTest {
         val w = 960; val h = 540
         v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)); v.layout(0, 0, w, h)
         val dir = File(System.getProperty("shots.dir") ?: "build/shots").apply { mkdirs() }
-        val n = 66   // 2.6초를 25fps로
+        val n = 105  // 4.2초를 25fps로
         for (i in 0..n) {
             v.t = i / n.toFloat()
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
