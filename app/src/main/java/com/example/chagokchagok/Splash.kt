@@ -1,7 +1,7 @@
-// 차곡車곡 – 시작 모션 (천천히, 쫀득하게)
-// 세 줄이 위에서 가속하며 떨어져 바닥에 닿는 순간 납작해졌다 튕기며 차곡차곡 쌓이고(위 줄이 떨어지면 아래 줄들도 눌렸다 올라온다),
-// 가운데 줄이 탄성 있게 상자로 벌어진 뒤, 세로 획이 살짝 당겼다가 가운데를 꿰뚫는다. 꽂히는 순간 글자 전체가 눌렸다 튕긴다.
-// 이어서 車이 왼쪽 아래 칸으로 옮겨 가고 차·곡·곡이 하나씩 통통 튀어나와 정사각형 로고가 된다. 누르면 건너뛴다.
+// 차곡車곡 – 시작 모션
+// 천천히, 끊기지 않게: 동작이 서로 겹치며 이어지고, 튕기지 않고 부드럽게 감속한다 (prompt-motion.com의 로고 등장 사례들을 참고).
+// 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓이고 → 가운데 줄이 상자로 벌어지고 → 세로 획이 위에서 아래로 그려지며 가운데를 꿰뚫어 車이 된다.
+// 이어서 車이 왼쪽 아래 칸으로 옮겨 가고 차·곡·곡이 차례로 떠올라 정사각형 로고가 된다. 화면 전체는 내내 아주 천천히 다가온다. 누르면 건너뛴다.
 package com.example.chagokchagok
 
 import android.animation.ValueAnimator
@@ -9,13 +9,14 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.LinearInterpolator
-import kotlin.math.cos
-import kotlin.math.exp
+import kotlin.math.pow
 
 class SplashView(ctx: Context, private val face: Typeface, private val onDone: () -> Unit) : View(ctx) {
     /** 0 → 1. 테스트에서는 직접 정해 그림을 찍는다. */
@@ -26,20 +27,16 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
     private var finished = false
 
     companion object {
-        const val DURATION = 4200L
+        const val DURATION = 4000L
         val ORANGE = Color.parseColor("#EB6834")
         val INK = Color.parseColor("#1D1D1F")
         val BG = Color.parseColor("#0E0E10")
-        // 줄이 바닥에 닿는 때 (0~1)
-        const val LAND_BOTTOM = .10f
-        const val LAND_MID = .20f
-        const val LAND_TOP = .30f
     }
 
     fun play() {
         anim = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = DURATION; interpolator = LinearInterpolator()
-            addUpdateListener { t = it.animatedValue as Float; alpha = 1f - ((t - .95f) / .05f).coerceIn(0f, 1f) }
+            addUpdateListener { t = it.animatedValue as Float; alpha = 1f - ((t - .93f) / .07f).coerceIn(0f, 1f) }
             addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(a: android.animation.Animator) { finish() } })
             start()
         }
@@ -49,124 +46,103 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
 
     override fun onTouchEvent(e: MotionEvent): Boolean { if (e.action == MotionEvent.ACTION_UP) finish(); return true }
 
-    // ── 시간과 탄성 ──
+    // ── 시간과 이징 (튕김 없이 부드럽게) ──
     private fun seg(a: Float, b: Float) = ((t - a) / (b - a)).coerceIn(0f, 1f)
-    private fun easeOut(x: Float) = 1 - (1 - x) * (1 - x) * (1 - x)
-    private fun easeIn(x: Float) = x * x * x
-    /** 목표를 살짝 지나쳤다가 돌아오는 스프링 (0 → 1) */
-    private fun spring(x: Float) = if (x <= 0f) 0f else (1 - exp(-5.5f * x) * cos(11f * x))
-    /** 부딪힌 뒤의 출렁임: 처음엔 크게, 점점 잦아든다 */
-    private fun wobble(u: Float) = if (u <= 0f || u >= 1f) 0f else exp(-4.5f * u) * cos(15f * u)
-    /** 땅에 닿은 때로부터 지난 정도 (출렁임 길이 .16) */
-    private fun since(land: Float) = (t - land) / .16f
+    private fun expoOut(x: Float) = if (x >= 1f) 1f else 1 - 2f.pow(-10 * x)
+    private fun cubicOut(x: Float) = 1 - (1 - x).pow(3)
+    private fun cubicInOut(x: Float) = if (x < .5f) 4 * x * x * x else 1 - (-2 * x + 2).pow(3) / 2
+    private fun quintInOut(x: Float) = if (x < .5f) 16 * x.pow(5) else 1 - (-2 * x + 2).pow(5) / 2
 
     override fun onDraw(c: Canvas) {
         val w = width.toFloat(); val h = height.toFloat()
         c.drawColor(BG)
+        // 화면 전체가 내내 아주 천천히 다가온다 (정지된 순간이 없도록)
+        val drift = .965f + .035f * cubicOut(t)
+        c.save(); c.scale(drift, drift, w / 2, h / 2)
+
         val S = minOf(w, h) * .46f
         val ox = (w - S) / 2; val oy = (h - S) / 2 - S * .08f
 
-        // 로고로 모이기 (스프링)
-        val gather = spring(seg(.74f, .90f))
-        val sq = spring(seg(.74f, .88f))
+        // 로고 바탕: 車이 옮겨 가기 시작할 때 함께 부드럽게
+        val sq = cubicOut(seg(.67f, .85f))
         if (sq > 0f) {
-            p.style = Paint.Style.FILL; p.color = INK; p.alpha = (255 * sq.coerceAtMost(1f)).toInt()
-            val scale = .72f + .28f * sq
-            c.save(); c.scale(scale, scale, ox + S / 2, oy + S / 2)
+            p.shader = null; p.style = Paint.Style.FILL; p.color = INK; p.alpha = (255 * sq).toInt()
+            val sc = .94f + .06f * sq
+            c.save(); c.scale(sc, sc, ox + S / 2, oy + S / 2)
             c.drawRoundRect(ox, oy, ox + S, oy + S, S * .22f, S * .22f, p)
             c.restore()
         }
 
         // 車: 처음엔 가운데에 크게, 모일 때 왼쪽 아래 칸으로
+        val move = quintInOut(seg(.64f, .86f))
         val bigBox = S * .92f; val cellBox = S * .34f
-        val box = bigBox + (cellBox - bigBox) * gather
-        val cx = w / 2 + (ox + S * .30f - w / 2) * gather
-        val cy = (oy + S / 2) + (oy + S * .70f - (oy + S / 2)) * gather
+        val box = bigBox + (cellBox - bigBox) * move
+        val cx = w / 2 + (ox + S * .30f - w / 2) * move
+        val cy = (oy + S / 2) + (oy + S * .70f - (oy + S / 2)) * move
         drawCha(c, cx - box / 2, cy - box / 2, box)
 
-        // 차 · 곡 · 곡 이 하나씩 통통
-        p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * .34f; p.color = Color.WHITE
+        // 차 · 곡 · 곡 이 차례로 떠오른다 (겹치며)
+        p.shader = null; p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * .34f; p.color = Color.WHITE
         listOf(Triple("차", .30f, .42f), Triple("곡", .70f, .42f), Triple("곡", .70f, .82f)).forEachIndexed { i, (ch, u, v) ->
-            val k = seg(.80f + i * .03f, .93f + i * .03f); if (k <= 0f) return@forEachIndexed
-            val pop = spring(k)
-            p.alpha = (255 * minOf(1f, k * 4f)).toInt()
-            val px = ox + S * u; val py = oy + S * v - S * .12f
-            c.save(); c.scale(pop, pop, px, py); c.drawText(ch, px, oy + S * v, p); c.restore()
+            val k = cubicOut(seg(.70f + i * .04f, .86f + i * .04f)); if (k <= 0f) return@forEachIndexed
+            p.alpha = (255 * k).toInt()
+            c.drawText(ch, ox + S * u, oy + S * v + (1 - k) * S * .07f, p)
         }
         // 한 줄 소개
-        val tag = easeOut(seg(.88f, .95f))
+        val tag = cubicOut(seg(.82f, .94f))
         if (tag > 0f) {
             p.textSize = S * .085f; p.color = Color.parseColor("#C7C7CC"); p.alpha = (255 * tag).toInt()
-            c.drawText("차로 쓰는 성장일기", w / 2, oy + S + S * .22f + (1 - tag) * S * .04f, p)
+            c.drawText("차로 쓰는 성장일기", w / 2, oy + S + S * .22f + (1 - tag) * S * .03f, p)
         }
+        c.restore()
     }
 
     /** 車을 획으로 그린다. (x, y)에서 한 변이 s 인 칸 안에 */
     private fun drawCha(c: Canvas, x: Float, y: Float, s: Float) {
         fun X(u: Float) = x + s * u
         fun Y(v: Float) = y + s * v
-        val th = s * .085f
-        p.style = Paint.Style.FILL; p.color = ORANGE; p.alpha = 255
+        val th = s * .085f; val r = th / 2
+        p.shader = null; p.style = Paint.Style.FILL; p.color = ORANGE
 
-        // 꿰뚫린 순간 글자 전체가 아래로 눌렸다가 튕긴다
-        val hit = wobble((t - .67f) / .18f)
-        c.save()
-        c.scale(1 + .07f * hit, 1 - .13f * hit, X(.5f), Y(.98f))
-
-        // 위 줄이 떨어질 때 아래 줄들이 함께 눌리는 정도
-        fun press(landedAfter: Float) = wobble(since(landedAfter)).coerceAtLeast(0f) * s * .035f
-
-        /** 줄 하나: 떨어지기(가속) → 닿는 순간 납작 → 출렁. 그린 y를 돌려준다 */
-        fun bar(land: Float, x0: Float, x1: Float, yTarget: Float, extraY: Float): Float? {
-            val fallStart = land - .07f
-            if (t < fallStart) return null
-            val fall = ((t - fallStart) / .07f).coerceIn(0f, 1f)
-            val yy = Y(yTarget) - (1 - easeIn(fall)) * s * 1.3f + extraY
-            val wob = wobble(since(land))
-            val sy = 1 - .55f * wob; val sx = 1 + .14f * wob
-            val cxm = (X(x0) + X(x1)) / 2; val half = (X(x1) - X(x0)) / 2 * sx; val tt = th / 2 * sy
-            val base = yy + th / 2          // 바닥에 붙은 채로 납작해진다
-            p.alpha = (255 * minOf(1f, fall * 3f)).toInt()
-            c.drawRoundRect(RectF(cxm - half, base - 2 * tt, cxm + half, base), tt, tt, p)
+        /** 줄 하나: 위에서 미끄러져 내려오며 길이도 함께 늘어난다. 튕기지 않고 자리에서 멈춘다 */
+        fun bar(start: Float, x0: Float, x1: Float, yTarget: Float): Float? {
+            val k = seg(start, start + .20f); if (k <= 0f) return null
+            val e = expoOut(k)
+            val yy = Y(yTarget) - (1 - e) * s * .55f
+            val cxm = (X(x0) + X(x1)) / 2; val half = (X(x1) - X(x0)) / 2 * (.55f + .45f * e)
+            p.alpha = (255 * cubicOut(minOf(1f, k * 2.2f))).toInt()
+            c.drawRoundRect(RectF(cxm - half, yy - r, cxm + half, yy + r), r, r, p)
             return yy
         }
 
-        bar(LAND_BOTTOM, .06f, .94f, .80f, press(LAND_MID) + press(LAND_TOP))   // 아래 긴 줄
+        bar(.00f, .06f, .94f, .80f)                         // 아래 긴 줄
+        val midY = bar(.09f, .20f, .80f, .47f)              // 가운데 줄
+        bar(.18f, .24f, .76f, .15f)                         // 위 짧은 줄
 
-        // 가운데 줄 → 탄성 있게 상자(曰)로
-        val midY = bar(LAND_MID, .20f, .80f, .47f, press(LAND_TOP))
-        val open = spring(seg(.40f, .60f))
+        // 가운데 줄이 위아래로 부드럽게 벌어져 상자(曰)가 된다
+        val open = cubicInOut(seg(.32f, .50f))
         if (midY != null && open > 0f) {
             p.alpha = 255
             val half = s * .16f * open
-            val r = th / 2
             c.drawRoundRect(RectF(X(.20f), midY - half - r, X(.80f), midY - half + r), r, r, p)
             c.drawRoundRect(RectF(X(.20f), midY + half - r, X(.80f), midY + half + r), r, r, p)
             c.drawRoundRect(RectF(X(.20f) - r, midY - half - r, X(.20f) + r, midY + half + r), r, r, p)
             c.drawRoundRect(RectF(X(.80f) - r, midY - half - r, X(.80f) + r, midY + half + r), r, r, p)
         }
 
-        bar(LAND_TOP, .24f, .76f, .15f, 0f)                                    // 위 짧은 줄
-
-        // 세로 획: 위로 살짝 당겼다가(예비 동작) 빠르게 꽂힌다
-        val ready = easeOut(seg(.56f, .63f))
-        val shoot = easeIn(seg(.63f, .67f))
-        if (ready > 0f) {
+        // 세로 획: 위에서 아래로 그려지며 가운데를 꿰뚫는다. 끝에 은은한 빛이 따라간다
+        val draw = cubicInOut(seg(.44f, .64f))
+        if (draw > 0f) {
+            val top = Y(.02f); val bottom = top + (Y(.98f) - top) * draw
             p.alpha = 255
-            val pull = s * .07f * ready * (1 - shoot)
-            val top = Y(.02f) - pull
-            val stub = s * .14f * ready
-            val bottom = top + stub + (Y(.98f) - top - stub) * shoot
-            val r = th / 2
-            c.drawRoundRect(RectF(X(.5f) - r, top, X(.5f) + r, bottom), r, r, p)
-            val flash = 1 - seg(.67f, .75f)
-            if (shoot >= 1f && flash > 0f) {
-                // 꽂힌 자리에서 얇은 고리가 퍼진다
-                p.style = Paint.Style.STROKE; p.strokeWidth = th * .35f * flash; p.alpha = (200 * flash).toInt()
-                c.drawCircle(X(.5f), Y(.98f), th * (.8f + 3.2f * (1 - flash)), p)
-                p.style = Paint.Style.FILL; p.alpha = 255
+            c.drawRoundRect(RectF(X(.5f) - r, top, X(.5f) + r, maxOf(bottom, top + th)), r, r, p)
+            val glow = (if (draw < 1f) 1f else 1 - seg(.64f, .69f)) * minOf(1f, draw * 4f)
+            if (glow > 0f) {
+                val rad = th * 3.2f
+                p.shader = RadialGradient(X(.5f), bottom, rad, Color.argb((150 * glow).toInt(), 255, 190, 140), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                c.drawCircle(X(.5f), bottom, rad, p)
+                p.shader = null
             }
         }
-        c.restore()
     }
 }
