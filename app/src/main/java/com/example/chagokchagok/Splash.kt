@@ -28,10 +28,10 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
 
     companion object {
         const val DURATION = 4000L
-        // 현대자동차 CI 전용색상: Active Blue 획, Hyundai Blue 로고 바탕, 그보다 깊은 남색 화면, Sky Blue 소개 글
+        // 현대자동차 CI 전용색상: Active Blue 획, Hyundai Blue 로고 바탕, Sky Blue 소개 글. 화면 바탕은 검정
         val STROKE = Color.parseColor("#00AAD2")
         val INK = Color.parseColor("#002C5F")
-        val BG = Color.parseColor("#00162F")
+        val BG = Color.parseColor("#000000")
         val SKY = Color.parseColor("#AACAE6")
     }
 
