@@ -45,17 +45,19 @@ object Ink {
         this.night = night
         fun c(s: String) = Color.parseColor(s)
         if (night) {
-            bg = c("#0B0B0D"); surface = c("#1C1C1F"); fill = c("#2A2A2E"); line = c("#38383C")
-            text = c("#F5F5F7"); text2 = c("#A1A1A6"); text3 = c("#6E6E73")
-            accent = c("#0A84FF"); onAccent = c("#FFFFFF"); accentSoft = c("#0A2A4D")
-            go = c("#32D74B"); warn = c("#FF9F0A"); danger = c("#FF453A")
+            // 밤: 현대 블루를 깊게 낮춘 바탕, 강조는 Active Blue
+            bg = c("#080D14"); surface = c("#121A25"); fill = c("#1C2633"); line = c("#2A3646")
+            text = c("#F6F3F2"); text2 = c("#AACAE6"); text3 = c("#6F8399")
+            accent = c("#00AAD2"); onAccent = c("#00162F"); accentSoft = c("#0A2B3C")
+            go = c("#32D74B"); warn = c("#FF9F0A"); danger = c("#E63312")
             // 차량 신호 색은 색약 검사기를 통과한 조합 (Charts.kt 의 Timeline 과 같다)
             signal = c("#d95926"); brake = c("#e66767"); rain = c("#3987e5"); beam = c("#199e70")
         } else {
-            bg = c("#F2F2F5"); surface = c("#FFFFFF"); fill = c("#ECECF0"); line = c("#E1E1E6")
-            text = c("#1D1D1F"); text2 = c("#6E6E73"); text3 = c("#A1A1A6")
-            accent = c("#0071E3"); onAccent = c("#FFFFFF"); accentSoft = c("#E5F0FD")
-            go = c("#1F9D48"); warn = c("#C26A00"); danger = c("#D7261E")
+            // 낮: 현대 라이트 샌드 바탕, 샌드 선, 현대 블루 강조
+            bg = c("#F6F3F2"); surface = c("#FFFFFF"); fill = c("#EEE9E3"); line = c("#E4DCD3")
+            text = c("#0B1A2C"); text2 = c("#5E6B7A"); text3 = c("#9AA4AF")
+            accent = c("#002C5F"); onAccent = c("#FFFFFF"); accentSoft = c("#E2EBF4")
+            go = c("#1F9D48"); warn = c("#C26A00"); danger = c("#E63312")
             signal = c("#eb6834"); brake = c("#e34948"); rain = c("#2a78d6"); beam = c("#1baf7a")
         }
     }

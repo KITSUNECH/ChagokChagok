@@ -36,19 +36,19 @@ internal object Telemetry {
     fun perMinute(): Int { val now = System.currentTimeMillis(); while (recent.isNotEmpty() && now - recent.first() > 60_000) recent.removeFirst(); return recent.size }
 }
 
-/** 브랜드 마크: 정사각형 안에 차곡 / 車곡 네 글자. 車만 주황(차에서 시작한다는 뜻) */
+/** 브랜드 마크: 현대 블루 정사각형 안에 차곡 / 車곡 네 글자. 車만 Active Blue (차에서 시작한다는 뜻) */
 internal class BrandMark(ctx: android.content.Context, private val ui: Ui) : View(ctx) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(c: Canvas) {
         val s = minOf(width, height).toFloat()
         val ox = (width - s) / 2; val oy = (height - s) / 2
-        p.style = Paint.Style.FILL; p.color = android.graphics.Color.parseColor("#1D1D1F")
+        p.style = Paint.Style.FILL; p.color = android.graphics.Color.parseColor("#002C5F")
         c.drawRoundRect(ox, oy, ox + s, oy + s, s * .22f, s * .22f, p)
         p.typeface = ui.bold; p.textAlign = Paint.Align.CENTER; p.textSize = s * .34f
         val cells = listOf("차" to 0, "곡" to 1, "車" to 2, "곡" to 3)
         cells.forEach { (ch, i) ->
             val cx = ox + s * (if (i % 2 == 0) .30f else .70f); val cy = oy + s * (if (i < 2) .42f else .82f)
-            p.color = if (ch == "車") android.graphics.Color.parseColor("#EB6834") else android.graphics.Color.WHITE
+            p.color = if (ch == "車") android.graphics.Color.parseColor("#00AAD2") else android.graphics.Color.WHITE
             c.drawText(ch, cx, cy, p)
         }
     }

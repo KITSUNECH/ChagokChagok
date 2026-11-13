@@ -28,9 +28,11 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
 
     companion object {
         const val DURATION = 4000L
-        val ORANGE = Color.parseColor("#EB6834")
-        val INK = Color.parseColor("#1D1D1F")
-        val BG = Color.parseColor("#0E0E10")
+        // 현대자동차 CI 전용색상: Active Blue 획, Hyundai Blue 로고 바탕, 그보다 깊은 남색 화면, Sky Blue 소개 글
+        val STROKE = Color.parseColor("#00AAD2")
+        val INK = Color.parseColor("#002C5F")
+        val BG = Color.parseColor("#00162F")
+        val SKY = Color.parseColor("#AACAE6")
     }
 
     fun play() {
@@ -91,7 +93,7 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         // 한 줄 소개
         val tag = cubicOut(seg(.80f, .92f))
         if (tag > 0f) {
-            p.textSize = S * .085f; p.color = Color.parseColor("#C7C7CC"); p.alpha = (255 * tag).toInt()
+            p.textSize = S * .085f; p.color = SKY; p.alpha = (255 * tag).toInt()
             c.drawText("차로 쓰는 성장일기", w / 2, oy + S + S * .22f + (1 - tag) * S * .03f, p)
         }
         c.restore()
@@ -102,7 +104,7 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         fun X(u: Float) = x + s * u
         fun Y(v: Float) = y + s * v
         val th = s * .085f; val r = th / 2
-        p.shader = null; p.style = Paint.Style.FILL; p.color = ORANGE
+        p.shader = null; p.style = Paint.Style.FILL; p.color = STROKE
 
         /** 줄 하나: 위에서 미끄러져 내려오며 길이도 함께 늘어난다. 튕기지 않고 자리에서 멈춘다 */
         fun bar(start: Float, x0: Float, x1: Float, yTarget: Float): Float? {
@@ -139,7 +141,7 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
             val glow = (if (draw < 1f) 1f else 1 - seg(.78f, .86f)) * minOf(1f, draw * 4f)
             if (glow > 0f) {
                 val rad = th * 3.2f
-                p.shader = RadialGradient(X(.5f), bottom, rad, Color.argb((150 * glow).toInt(), 255, 190, 140), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                p.shader = RadialGradient(X(.5f), bottom, rad, Color.argb((150 * glow).toInt(), 170, 230, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
                 c.drawCircle(X(.5f), bottom, rad, p)
                 p.shader = null
             }

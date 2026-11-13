@@ -14,7 +14,8 @@ import android.view.animation.OvershootInterpolator
 internal data class Block(val id: String, val stage: Int, val title: String, val hint: String, val done: Boolean)
 
 internal val STAGES = listOf("초보", "주행", "소셜")
-internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#3987e5", "#199e70", "#d95926")[stage] else listOf("#2a78d6", "#1baf7a", "#eb6834")[stage])
+/** 단계 색: 현대자동차 CI 전용색상에서 (초보 Active Blue · 주행 Hyundai Blue/밤에는 Sky Blue · 소셜 Active Red). 색약 구분 검사 통과 */
+internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#00AAD2", "#AACAE6", "#E63312")[stage] else listOf("#00AAD2", "#002C5F", "#E63312")[stage])
 
 /** 지금 운전자의 차곡 블록 전부 (쌓인 순서대로 정렬) */
 internal fun MainActivity.blocks(): List<Block> {
