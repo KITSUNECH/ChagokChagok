@@ -36,21 +36,49 @@ internal object Telemetry {
     fun perMinute(): Int { val now = System.currentTimeMillis(); while (recent.isNotEmpty() && now - recent.first() > 60_000) recent.removeFirst(); return recent.size }
 }
 
-/** 브랜드 마크: 현대 블루 정사각형 안에 차곡 / 車곡 네 글자. 車만 Active Blue (차에서 시작한다는 뜻) */
+/**
+ * 車의 획 구성. Noto Sans KR Bold의 車을 재서 만든 비율이라 한글 "차"와 굵기·키·획 끝이 맞는다.
+ * 각 획은 (왼쪽, 위, 오른쪽, 아래)를 글자 상자의 폭·높이에 대한 비율로 적는다. 끝은 평평하다.
+ */
+object ChaGlyph {
+    val TOP = floatArrayOf(.027f, .088f, .967f, .199f)
+    val MID = floatArrayOf(.110f, .420f, .885f, .513f)
+    val BOTTOM = floatArrayOf(.000f, .742f, 1.00f, .856f)
+    val BOX_T = floatArrayOf(.110f, .253f, .885f, .354f)
+    val BOX_B = floatArrayOf(.110f, .582f, .885f, .684f)
+    val SIDE_L = floatArrayOf(.110f, .253f, .234f, .684f)
+    val SIDE_R = floatArrayOf(.755f, .253f, .885f, .684f)
+    val VERT = floatArrayOf(.426f, .000f, .560f, 1.00f)
+    val ALL = listOf(TOP, MID, BOTTOM, BOX_T, BOX_B, SIDE_L, SIDE_R, VERT)
+
+    /** "차"를 이 글꼴·크기로 쓸 때의 상자에 맞춘 車 상자 (중심 x, 글자 기준선) → 왼쪽, 위, 폭, 높이 */
+    fun box(p: Paint, cx: Float, baseline: Float): FloatArray {
+        val r = android.graphics.Rect(); p.getTextBounds("차", 0, 1, r)
+        val w = r.width() * 1.04f; val h = r.height() * 1.02f
+        val cy = baseline + (r.top + r.bottom) / 2f
+        return floatArrayOf(cx - w / 2, cy - h / 2, w, h)
+    }
+    fun draw(c: Canvas, p: Paint, x: Float, y: Float, w: Float, h: Float) {
+        ALL.forEach { q -> c.drawRect(x + w * q[0], y + h * q[1], x + w * q[2], y + h * q[3], p) }
+    }
+}
+
+/** 브랜드 마크: 검정 정사각형에 샌드색 차곡 / 車곡. 車은 Active Blue로, 한글과 같은 굵기의 획으로 그린다 */
 internal class BrandMark(ctx: android.content.Context, private val ui: Ui) : View(ctx) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(c: Canvas) {
         val s = minOf(width, height).toFloat()
         val ox = (width - s) / 2; val oy = (height - s) / 2
-        p.style = Paint.Style.FILL; p.color = android.graphics.Color.parseColor("#002C5F")
+        p.style = Paint.Style.FILL; p.color = android.graphics.Color.BLACK
         c.drawRoundRect(ox, oy, ox + s, oy + s, s * .22f, s * .22f, p)
         p.typeface = ui.bold; p.textAlign = Paint.Align.CENTER; p.textSize = s * .34f
-        val cells = listOf("차" to 0, "곡" to 1, "車" to 2, "곡" to 3)
-        cells.forEach { (ch, i) ->
-            val cx = ox + s * (if (i % 2 == 0) .30f else .70f); val cy = oy + s * (if (i < 2) .42f else .82f)
-            p.color = if (ch == "車") android.graphics.Color.parseColor("#00AAD2") else android.graphics.Color.WHITE
-            c.drawText(ch, cx, cy, p)
-        }
+        p.color = android.graphics.Color.parseColor("#E4DCD3")
+        c.drawText("차", ox + s * .30f, oy + s * .42f, p)
+        c.drawText("곡", ox + s * .70f, oy + s * .42f, p)
+        c.drawText("곡", ox + s * .70f, oy + s * .82f, p)
+        val b = ChaGlyph.box(p, ox + s * .30f, oy + s * .82f)
+        p.color = android.graphics.Color.parseColor("#00AAD2")
+        ChaGlyph.draw(c, p, b[0], b[1], b[2], b[3])
     }
 }
 

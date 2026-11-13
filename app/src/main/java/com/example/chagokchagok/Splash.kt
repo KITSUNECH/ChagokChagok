@@ -28,11 +28,12 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
 
     companion object {
         const val DURATION = 4000L
-        // 현대자동차 CI 전용색상: Active Blue 획, Hyundai Blue 로고 바탕, Sky Blue 소개 글. 화면 바탕은 검정
+        // 로고 G3: 검정 바탕, 현대 샌드 글자, 車은 Active Blue. 화면은 검정, 로고 정사각형은 살짝 떠 보이게
         val STROKE = Color.parseColor("#00AAD2")
-        val INK = Color.parseColor("#002C5F")
+        val INK = Color.parseColor("#161616")
         val BG = Color.parseColor("#000000")
-        val SKY = Color.parseColor("#AACAE6")
+        val SAND = Color.parseColor("#E4DCD3")
+        val SKY = Color.parseColor("#9C958D")
     }
 
     fun play() {
@@ -75,16 +76,16 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
             c.restore()
         }
 
-        // 車: 처음엔 가운데에 크게, 모일 때 왼쪽 아래 칸으로
+        // 車: 처음엔 가운데에 크게, 모일 때 왼쪽 아래 칸의 "차"에 맞춘 상자로
         val move = quintInOut(seg(.32f, .56f))
-        val bigBox = S * .92f; val cellBox = S * .34f
-        val box = bigBox + (cellBox - bigBox) * move
-        val cx = w / 2 + (ox + S * .30f - w / 2) * move
-        val cy = (oy + S / 2) + (oy + S * .70f - (oy + S / 2)) * move
-        drawCha(c, cx - box / 2, cy - box / 2, box)
+        p.typeface = face; p.textSize = S * .34f
+        val fin = ChaGlyph.box(p, ox + S * .30f, oy + S * .82f)
+        val bigW = S * .80f; val bigH = bigW * fin[3] / fin[2]
+        val bx = w / 2 - bigW / 2; val by = oy + S / 2 - bigH / 2
+        drawCha(c, bx + (fin[0] - bx) * move, by + (fin[1] - by) * move, bigW + (fin[2] - bigW) * move, bigH + (fin[3] - bigH) * move)
 
         // 차 · 곡 · 곡 이 차례로 떠오른다 (겹치며)
-        p.shader = null; p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * .34f; p.color = Color.WHITE
+        p.shader = null; p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * .34f; p.color = SAND
         listOf(Triple("차", .30f, .42f), Triple("곡", .70f, .42f), Triple("곡", .70f, .82f)).forEachIndexed { i, (ch, u, v) ->
             val k = cubicOut(seg(.50f + i * .06f, .66f + i * .06f)); if (k <= 0f) return@forEachIndexed
             p.alpha = (255 * k).toInt()
@@ -99,50 +100,50 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         c.restore()
     }
 
-    /** 車을 획으로 그린다. (x, y)에서 한 변이 s 인 칸 안에 */
-    private fun drawCha(c: Canvas, x: Float, y: Float, s: Float) {
-        fun X(u: Float) = x + s * u
-        fun Y(v: Float) = y + s * v
-        val th = s * .085f; val r = th / 2
+    /** 車을 획으로 그린다. (x, y)에서 폭 w, 높이 h 인 상자 안에. 획은 ChaGlyph 와 같고 끝이 평평하다 */
+    private fun drawCha(c: Canvas, x: Float, y: Float, w: Float, h: Float) {
         p.shader = null; p.style = Paint.Style.FILL; p.color = STROKE
-
-        /** 줄 하나: 위에서 미끄러져 내려오며 길이도 함께 늘어난다. 튕기지 않고 자리에서 멈춘다 */
-        fun bar(start: Float, x0: Float, x1: Float, yTarget: Float): Float? {
-            val k = seg(start, start + .20f); if (k <= 0f) return null
+        fun rect(q: FloatArray, dy: Float = 0f, grow: Float = 1f) {
+            val cxm = x + w * (q[0] + q[2]) / 2; val half = w * (q[2] - q[0]) / 2 * grow
+            c.drawRect(cxm - half, y + h * q[1] + dy, cxm + half, y + h * q[3] + dy, p)
+        }
+        /** 줄 하나: 위에서 미끄러져 내려오며 길이도 함께 늘어난다 */
+        fun bar(start: Float, q: FloatArray): Boolean {
+            val k = seg(start, start + .20f); if (k <= 0f) return false
             val e = expoOut(k)
-            val yy = Y(yTarget) - (1 - e) * s * .55f
-            val cxm = (X(x0) + X(x1)) / 2; val half = (X(x1) - X(x0)) / 2 * (.55f + .45f * e)
             p.alpha = (255 * cubicOut(minOf(1f, k * 2.2f))).toInt()
-            c.drawRoundRect(RectF(cxm - half, yy - r, cxm + half, yy + r), r, r, p)
-            return yy
+            rect(q, -(1 - e) * h * .55f, .55f + .45f * e)
+            return true
         }
+        bar(.00f, ChaGlyph.BOTTOM)
+        val midShown = bar(.08f, ChaGlyph.MID)
+        bar(.15f, ChaGlyph.TOP)
+        p.alpha = 255
 
-        bar(.00f, .06f, .94f, .80f)                         // 아래 긴 줄
-        val midY = bar(.08f, .20f, .80f, .47f)              // 가운데 줄
-        bar(.15f, .24f, .76f, .15f)                         // 위 짧은 줄
-
-        // 가운데 줄이 위아래로 부드럽게 벌어져 상자(曰)가 된다
+        // 가운데 줄이 위아래로 벌어져 상자(曰)가 된다: 위·아래 테두리가 가운데에서 제자리로, 양옆 기둥이 자란다
         val open = cubicInOut(seg(.52f, .68f))
-        if (midY != null && open > 0f) {
-            p.alpha = 255
-            val half = s * .16f * open
-            c.drawRoundRect(RectF(X(.20f), midY - half - r, X(.80f), midY - half + r), r, r, p)
-            c.drawRoundRect(RectF(X(.20f), midY + half - r, X(.80f), midY + half + r), r, r, p)
-            c.drawRoundRect(RectF(X(.20f) - r, midY - half - r, X(.20f) + r, midY + half + r), r, r, p)
-            c.drawRoundRect(RectF(X(.80f) - r, midY - half - r, X(.80f) + r, midY + half + r), r, r, p)
+        if (midShown && open > 0f) {
+            val midTop = ChaGlyph.MID[1]; val midBot = ChaGlyph.MID[3]
+            fun lerp(a: Float, b: Float) = a + (b - a) * open
+            val t1 = floatArrayOf(ChaGlyph.BOX_T[0], lerp(midTop, ChaGlyph.BOX_T[1]), ChaGlyph.BOX_T[2], lerp(midBot, ChaGlyph.BOX_T[3]))
+            val b1 = floatArrayOf(ChaGlyph.BOX_B[0], lerp(midTop, ChaGlyph.BOX_B[1]), ChaGlyph.BOX_B[2], lerp(midBot, ChaGlyph.BOX_B[3]))
+            rect(t1); rect(b1)
+            val sideTop = lerp(midTop, ChaGlyph.SIDE_L[1]); val sideBot = lerp(midBot, ChaGlyph.SIDE_L[3])
+            rect(floatArrayOf(ChaGlyph.SIDE_L[0], sideTop, ChaGlyph.SIDE_L[2], sideBot))
+            rect(floatArrayOf(ChaGlyph.SIDE_R[0], sideTop, ChaGlyph.SIDE_R[2], sideBot))
         }
 
-        // 세로 획: 위에서 아래로 그려지며 가운데를 꿰뚫는다. 끝에 은은한 빛이 따라간다
+        // 세로 획: 위에서 아래로 그려지며 가운데를 꿰뚫는다. 끝에 은은한 빛
         val draw = cubicInOut(seg(.62f, .78f))
         if (draw > 0f) {
-            val top = Y(.02f); val bottom = top + (Y(.98f) - top) * draw
-            p.alpha = 255
-            c.drawRoundRect(RectF(X(.5f) - r, top, X(.5f) + r, maxOf(bottom, top + th)), r, r, p)
+            val q = ChaGlyph.VERT
+            val top = y + h * q[1]; val bottom = top + (y + h * q[3] - top) * draw
+            c.drawRect(x + w * q[0], top, x + w * q[2], maxOf(bottom, top + w * .05f), p)
             val glow = (if (draw < 1f) 1f else 1 - seg(.78f, .86f)) * minOf(1f, draw * 4f)
             if (glow > 0f) {
-                val rad = th * 3.2f
-                p.shader = RadialGradient(X(.5f), bottom, rad, Color.argb((150 * glow).toInt(), 170, 230, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-                c.drawCircle(X(.5f), bottom, rad, p)
+                val rad = w * .28f
+                p.shader = RadialGradient(x + w * (q[0] + q[2]) / 2, bottom, rad, Color.argb((150 * glow).toInt(), 170, 230, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                c.drawCircle(x + w * (q[0] + q[2]) / 2, bottom, rad, p)
                 p.shader = null
             }
         }
