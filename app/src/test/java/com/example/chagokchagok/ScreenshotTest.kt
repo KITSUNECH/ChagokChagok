@@ -49,17 +49,24 @@ class ScreenshotTest {
             v.draw(Canvas(bmp))
             File(dir, "${tag}_$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        snap("00_onboard")
+        Onboard.step = 0; Onboard.shownBlocks = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
+        Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00b_onboard_type")
+        Onboard.step = 3; Onboard.solo = true; a.go(MainActivity.ONBOARD); snap("00c_onboard_solo")
+        Onboard.step = 5; a.go(MainActivity.ONBOARD); snap("00d_onboard_ready")
         val store = a.store
         store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true
         a.go(MainActivity.TODAY); snap("01_today_empty")
         store.addSampleGuide(); store.addSampleFriend()
+        val keep = store.guides(); keep.forEach { store.removeGuide(it.id) }
         // 지난 주행 몇 번 (분석 차트용)
         repeat(4) { i ->
             val evs = listOf(Ev(.2f, Evt.SIGNAL, "RIGHT"), Ev(.3f, Evt.BRAKE, "on"), Ev(.5f, Evt.LIGHT, "on"), Ev(.55f, Evt.WIPER, "on"), Ev(.7f, Evt.WIPER, "off"), Ev(.8f, Evt.SIGNAL, "LEFT"), Ev(.85f, Evt.BRAKE, "on"))
-            val dr = Drive("나", System.currentTimeMillis() - (6 - i) * 86400000L, 3f + i * 2.2f, 12 + i * 5, 900, evs, 2 + i, 9 - i, i == 2, i == 3, 5 - i, 0, 12 - i * 2, turns = 4, turnsSignaled = 1 + i, passenger = i == 1)
+            val dr = Drive("나", System.currentTimeMillis() - (6 - i) * 86400000L, 3f + i * 2.2f, 12 + i * 5, 900, evs, 2 + i, 9 - i, i == 2, i == 3, 5 - i, 0, 12 - i * 2, turns = 4, turnsSignaled = 1 + i, passenger = i == 1,
+                place = if (i % 2 == 1) listOf("동네 마트", "도서관")[i / 2] else null, placeLat = if (i % 2 == 1) 37.49 else null, placeLng = if (i % 2 == 1) 127.03 else null)
             store.addDiary(Writer.write(dr, store.diariesOf("나"), if (i % 2 == 0) store.guide("sample") else null, 1))
         }
+        a.go(MainActivity.TODAY); snap("01b_today_solo")
+        keep.forEach { store.addGuide(it) }
         a.go(MainActivity.TODAY); snap("02_today")
         if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep") }
         a.depart(store.guide("sample")!!); snap("04_ready")

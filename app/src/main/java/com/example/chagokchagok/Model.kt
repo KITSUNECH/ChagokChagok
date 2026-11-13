@@ -215,6 +215,12 @@ class Store(ctx: Context) {
     fun setDrivers(names: List<String>) = prefs.edit().putString("drivers", names.distinct().joinToString("|")).apply()
     fun removeDriver(name: String) { setDrivers(drivers - name); if (driver == name) driver = drivers.firstOrNull() ?: "나" }
 
+    /** 해낸 길잡이 (처음이라면) */
+    fun coursesDone(name: String): Set<String> = prefs.getStringSet("courses_$name", emptySet()) ?: emptySet()
+    fun addCourseDone(name: String, id: String) = prefs.edit().putStringSet("courses_$name", coursesDone(name) + id).apply()
+    /** 지난번의 내가 이 곳에 남긴 길 (다음의 나에게 한마디) */
+    fun selfGuide(name: String, place: String) = guides().firstOrNull { it.owner == name && it.kind == "나" && it.title == place }
+
     /** 한 번이라도 해 본 일 (응원 보내기 등) */
     fun flag(name: String) = prefs.getBoolean("flag_$name", false)
     fun setFlag(name: String) = prefs.edit().putBoolean("flag_$name", true).apply()

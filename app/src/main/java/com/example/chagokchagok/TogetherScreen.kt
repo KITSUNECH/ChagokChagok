@@ -21,7 +21,7 @@ internal fun MainActivity.togetherScreen(): View {
     val k = kit; val me = store.driver
     data class Item(val date: Long, val view: () -> View, val kind: Int)
     val items = mutableListOf<Item>()
-    store.guides().forEach { g -> items.add(Item(g.drive.date, { guideCard(g) }, if (g.kind == "추천") 2 else 1)) }
+    store.guides().filter { it.kind != "나" }.forEach { g -> items.add(Item(g.drive.date, { guideCard(g) }, if (g.kind == "추천") 2 else 1)) }
     store.diaries().filter { visible(it) && it.guideId == null }.forEach { d -> items.add(Item(d.date, { diaryCard(d) }, 3)) }
     if (store.demoOn) Demo.posts.filter { it.friend.id !in store.demoRemoved() }.forEach { p -> items.add(Item(System.currentTimeMillis() - p.daysAgo * 86400000L, { demoPostCard(p) }, when (p.kind) { "추천" -> 2; "일기" -> 3; else -> 1 })) }
     val shown = items.filter { FeedPrefs.filter == 0 || it.kind == FeedPrefs.filter }.sortedByDescending { it.date }
@@ -31,7 +31,8 @@ internal fun MainActivity.togetherScreen(): View {
         if (store.demoOn) { addView(demoFriendsSection()); addView(k.gap(18)) }
         addView(k.chips(listOf("전체", "건네준 길", "추천 장소", "일기"), listOf("전체", "건네준 길", "추천 장소", "일기")[FeedPrefs.filter]) { FeedPrefs.filter = listOf("전체", "건네준 길", "추천 장소", "일기").indexOf(it); render() })
         addView(k.gap(18))
-        if (shown.isEmpty()) addView(k.card { addView(k.empty("people", "아직 올라온 것이 없어요", "일기에서 ‘함께 차곡에 올리기’나 ‘이 길 건네주기’를 누르면 여기에 쌓여요.",
+        if (shown.isEmpty()) addView(k.card { addView(k.empty("people", "아직 함께 쓰는 사람이 없어요", "혼자서도 괜찮아요. 내가 다녀온 길이 차곡이 되고, 다음의 나에게 한마디를 남길 수 있어요. 누군가 이 차를 함께 쓰게 되면 여기에 그 사람의 길이 쌓여요.",
+            k.button("사람 추가", Kit.Btn.Secondary, "plus") { addPerson() },
             k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() })) })
         else addView(k.grid(if (ui.wide) 2 else 1, shown.map { it.view() }, 18))
     }
@@ -144,7 +145,7 @@ private fun MainActivity.diaryCard(d: Diary): View {
 
 internal fun MainActivity.roadsScreen(): View {
     val k = kit; val me = store.driver
-    val mine = store.guides().filter { it.owner == me }
+    val mine = store.guides().filter { it.owner == me && it.kind != "나" }
     val saved = (store.guides() + if (store.demoOn) listOf(Demo.dadCommute, Demo.seoyeonPractice) else emptyList()).filter { it.id in store.saved(me) }
     val trips = store.diariesOf(me).filter { it.guideId == null && it.drive.place != null && !it.drive.sim }.groupBy { it.drive.place!! }
     val body = when (roadsTab) {
@@ -162,7 +163,7 @@ internal fun MainActivity.roadsScreen(): View {
                 sheets.choose(place, null, listOfNotNull(if (last.drive.placeLat != null) "다시 가기" else null, "추천 장소로 건네주기", "일기 보기")) { i ->
                     val opts = listOfNotNull(if (last.drive.placeLat != null) "again" else null, "give", "diary")
                     when (opts[i]) {
-                        "again" -> depart(Guide("again_${place.hashCode()}", me, place, last.drive.placeLat, last.drive.placeLng, last.drive, emptyList(), ds.size, kind = "다시"))
+                        "again" -> goAgain(place, last)
                         "give" -> { giveTitle = place; giveTips.clear(); giveKind = "추천"; go(MainActivity.GIVE, last.id) }
                         else -> go(MainActivity.DIARY, last.id)
                     }

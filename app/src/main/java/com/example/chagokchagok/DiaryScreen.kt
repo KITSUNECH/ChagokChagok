@@ -118,6 +118,7 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
             }
         }
     })
+    rows.add(k.item("다음의 나에게 한마디", "다음에 같은 곳에 갈 때 그 자리에서 들려줘요", "quote", chevron = true) { noteToSelf(d) })
     rows.add(k.item("이 길 건네주기", "가족·친구가 같은 길을 달릴 수 있게", "gift", chevron = true) {
         giveTitle = d.drive.place ?: ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = if (d.drive.place != null && guide == null) "추천" else "길"
         go(MainActivity.GIVE, d.id)

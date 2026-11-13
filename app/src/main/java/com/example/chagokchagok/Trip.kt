@@ -177,13 +177,14 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         heard.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
         praised = 0; spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
-        support = when (guide?.kind) { "연습" -> 1; "길" -> 2; else -> 3 }
+        support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }
         car.seatPos?.let { store.setSeat(store.driver, it) }
         host.tripStarted()
         val g = guide
         val placed = g?.tips?.count { it.placed } ?: 0
         host.say(when {
             g == null -> "출발합니다. 조용히 적고 있을게요."
+            g.kind == "나" -> "지난번의 내가 남긴 길로 출발합니다. 그 자리에 가면 알려 드릴게요."
             placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 한마디를 남긴 자리에 가면 알려 드릴게요."
             else -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 조용히 적고 있을게요."
         })
@@ -221,7 +222,11 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")
         main.postDelayed({ saveHandover(driver, store.handover()?.takeIf { it.from == driver }?.note ?: "") }, 1500) // 차 상태 값이 조금 늦게 온다
-        val d = Writer.write(drive, store.diariesOf(driver), g, heard.size, store.tone(driver), seasoned = store.typeOf(driver) == "익숙")
+        val written = Writer.write(drive, store.diariesOf(driver), g, heard.size, store.tone(driver), seasoned = store.typeOf(driver) == "익숙")
+        // 처음이라면(길잡이) 중 이번에 해낸 것이 있으면 일기에 적는다
+        val courses = store.newlyDoneCourses(driver, drive)
+        courses.forEach { store.addCourseDone(driver, it.id) }
+        val d = if (courses.isEmpty()) written else written.copy(text = written.text + " 오늘 ‘${courses.joinToString("’, ‘") { it.title }}’를 해냈다.")
         store.addDiary(d)
         guide = null; routeSent = false
         host.tripEnded(d)

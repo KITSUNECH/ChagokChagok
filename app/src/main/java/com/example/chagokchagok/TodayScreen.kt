@@ -47,8 +47,12 @@ internal fun MainActivity.todayScreen(): View {
     val head = k.header("$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · $greeting",
         trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
 
-    val hero = heroCard()
+    car.refreshNavi()
+    // 주인공: 누가 건네준 길이 있으면 그 길, 없으면 내가 가고 싶은 곳
+    val hero = if (todaysGuide() != null) heroCard() else myRouteHero()
     val side = mutableListOf<View>()
+    weekCard()?.let { side.add(it) }
+    starterCard()?.let { side.add(it) }
     if (!store.prepDone(d)) side.add(k.card(onClick = { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") }) {
         addView(k.row(14).apply {
             addView(k.icon("steering", Ink.accent, 30))

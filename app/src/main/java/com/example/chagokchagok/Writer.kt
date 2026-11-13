@@ -148,7 +148,7 @@ object Writer {
         var highlight = ""
         var stamp: String? = null
 
-        if (guide != null) sb.append("${subj(guide.owner)} 다니던 길을 오늘은 네가 운전했다. ")
+        if (guide != null) sb.append(if (guide.kind == "나") "지난번의 나와 같은 길을 다시 달렸다. " else "${subj(guide.owner)} 다니던 길을 오늘은 네가 운전했다. ")
         else if (n == 1) sb.append("오늘 처음으로 같이 달렸다. ")
 
         val firstRain = drive.rained && before.none { it.drive.rained }
@@ -183,7 +183,7 @@ object Writer {
         // 연습을 건네준 사람의 초보 시절과 나란히 놓는다. 순위가 아니라 "누구나 처음엔"을 보여 주려는 것이다.
         if (guide != null && guide.kind == "연습" && guide.drive.parkMoves > 0 && drive.parkMoves > 0)
             sb.append("${guide.owner}도 처음엔 기어를 ${times(guide.drive.parkMoves)} 바꿨다고 했다. 나는 ${times(drive.parkMoves)}이었다. ")
-        if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
+        if (heardTips > 0 && guide != null) sb.append(if (guide.kind == "나") "지난번의 내가 남긴 한마디를 ${times(heardTips)} 들었다. " else "${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
         if (drive.signals > 0) sb.append("깜빡이는 ${times(drive.signals)} 켰다. ")
         if (drive.turns > 0) sb.append(
             if (drive.turnsSignaled == drive.turns) "돌 때마다 미리 깜빡이를 켰다. "
@@ -205,7 +205,7 @@ object Writer {
             val followed = before.count { it.guideId == guide.id && it.drive.completed && !it.drive.sim } + if (drive.completed && !drive.sim) 1 else 0
             if (!drive.completed) sb.append("오늘은 끝까지 가지 않고 멈췄다. ")
             if (drive.completed && !drive.sim && followed == GRADUATE) { sb.append("이 길은 이제 졸업이다. "); stamp = "졸업" }
-            else sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 네 기록이 생겼다. ")
+            else if (guide.kind != "나") sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 네 기록이 생겼다. ")
         }
 
         // 다음에 챙길 것 하나
@@ -223,7 +223,7 @@ object Writer {
 
         if (tone == "다정하게") sb.append(if (n == 1) "시작한 것만으로 충분한 날이다. " else "오늘도 무사히 다녀와 줘서 고맙다. ")
 
-        val title = if (guide != null && guide.kind == "추천") "${poss(guide.owner)} 추천 따라" else if (guide != null && guide.kind == "연습") "${poss(guide.owner)} 연습 따라" else if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else if (seasoned) "드라이브 일기" else "${ordinal(n)} 운전"
+        val title = if (guide != null && guide.kind == "나") "같은 길, 다른 날" else if (guide != null && guide.kind == "추천") "${poss(guide.owner)} 추천 따라" else if (guide != null && guide.kind == "연습") "${poss(guide.owner)} 연습 따라" else if (guide != null) "같은 길, 다른 자리" else if (drive.place != null && before.none { it.drive.place == drive.place }) "처음 가 본 길" else if (seasoned) "드라이브 일기" else "${ordinal(n)} 운전"
         return Diary("d${drive.date}", drive.driver, drive.date, title, sb.toString().trim(), highlight, stamp, drive, guide?.id)
     }
 }
