@@ -1,6 +1,6 @@
 // 차곡車곡 – 시작 모션
 // 천천히, 끊기지 않게: 동작이 서로 겹치며 이어지고, 튕기지 않고 부드럽게 감속한다 (prompt-motion.com의 로고 등장 사례들을 참고).
-// 세 줄을 상자처럼 하나씩 내려놓아 차곡차곡 쌓는다 (기울여 들고 와 수평으로, 아주 느리게 닿고 살짝 눌림) → 쌓인 세 줄이 로고의 왼쪽 아래 칸으로 옮겨 가고,
+// 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓인다 → 쌓인 세 줄이 로고의 왼쪽 아래 칸으로 옮겨 가고,
 // 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다. 화면 전체는 내내 아주 천천히 다가온다. 누르면 건너뛴다.
 package com.example.chagokchagok
 
@@ -17,7 +17,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.animation.LinearInterpolator
 import kotlin.math.pow
-import kotlin.math.sin
 
 class SplashView(ctx: Context, private val face: Typeface, private val onDone: () -> Unit) : View(ctx) {
     /** 0 → 1. 테스트에서는 직접 정해 그림을 찍는다. */
@@ -55,7 +54,6 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
     private fun expoOut(x: Float) = if (x >= 1f) 1f else 1 - 2f.pow(-10 * x)
     private fun cubicOut(x: Float) = 1 - (1 - x).pow(3)
     private fun cubicInOut(x: Float) = if (x < .5f) 4 * x * x * x else 1 - (-2 * x + 2).pow(3) / 2
-    private fun quintOut(x: Float) = 1 - (1 - x).pow(5)
     private fun quintInOut(x: Float) = if (x < .5f) 16 * x.pow(5) else 1 - (-2 * x + 2).pow(5) / 2
 
     override fun onDraw(c: Canvas) {
@@ -109,46 +107,17 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
             val cxm = x + w * (q[0] + q[2]) / 2; val half = w * (q[2] - q[0]) / 2 * grow
             c.drawRect(cxm - half, y + h * q[1] + dy, cxm + half, y + h * q[3] + dy, p)
         }
-        /**
-         * 줄 하나를 상자처럼 내려놓는다: 살짝 기울어진 채 내려오다 바닥 직전에 수평이 되고,
-         * 아주 느리게 닿은 뒤 조금 눌렸다 자리를 잡는다. 놓일 자리에는 옅은 빛이 먼저 비친다.
-         */
-        val DUR = .22f; val TOUCH = .84f
-        fun touch(start: Float): Float {           // 닿은 뒤 눌림 정도 (0 → 1 → 0)
-            val k = seg(start, start + DUR); if (k < TOUCH) return 0f
-            return sin(Math.PI.toFloat() * ((k - TOUCH) / (1 - TOUCH)))
-        }
-        fun place(start: Float, q: FloatArray, tilt: Float, press: Float): Boolean {
-            val k = seg(start, start + DUR); if (k <= 0f) return false
-            val cxm = x + w * (q[0] + q[2]) / 2; val half = w * (q[2] - q[0]) / 2
-            val bottom = y + h * q[3]; val thick = h * (q[3] - q[1])
-            // 놓일 자리의 옅은 빛 (닿기 전까지 점점 진해졌다가 닿으면 사라짐)
-            val near = (k / TOUCH).coerceIn(0f, 1f); val after = ((k - TOUCH) / (1 - TOUCH)).coerceIn(0f, 1f)
-            val glowA = near * near * (1 - after)
-            if (glowA > 0f) {
-                p.shader = RadialGradient(cxm, bottom + thick * .2f, half * 1.1f, Color.argb((70 * glowA).toInt(), 0, 170, 210), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-                c.save(); c.scale(1f, .22f, cxm, bottom + thick * .2f); c.drawCircle(cxm, bottom + thick * .2f, half * 1.1f, p); c.restore()
-                p.shader = null
-            }
-            // 내려오기: 바닥 가까이서 아주 느려진다
-            val fall = cubicOut(quintOut(near))
-            val dy = -(1 - fall) * h * .5f + press
-            // 기울기: 닿기 직전 수평으로
-            val ang = tilt * (1 - cubicOut(near))
-            // 닿는 순간 살짝 눌림 (바닥에 붙은 채)
-            val sq = if (k >= TOUCH) sin(Math.PI.toFloat() * after) else 0f
-            val sy = 1 - .10f * sq; val sx = 1 + .025f * sq
-            p.alpha = (255 * cubicOut(minOf(1f, k * 2.5f))).toInt()
-            c.save()
-            c.translate(cxm, bottom + dy); c.rotate(ang); c.scale(sx, sy)
-            c.drawRect(-half, -thick, half, 0f, p)
-            c.restore()
+        /** 줄 하나: 위에서 미끄러져 내려오며 길이도 함께 늘어난다 */
+        fun bar(start: Float, q: FloatArray): Boolean {
+            val k = seg(start, start + .20f); if (k <= 0f) return false
+            val e = expoOut(k)
+            p.alpha = (255 * cubicOut(minOf(1f, k * 2.2f))).toInt()
+            rect(q, -(1 - e) * h * .55f, .55f + .45f * e)
             return true
         }
-        val tMid = .08f; val tTop = .16f
-        place(.00f, ChaGlyph.BOTTOM, -4f, h * .012f * (touch(tMid) + touch(tTop)))
-        val midShown = place(tMid, ChaGlyph.MID, 4f, h * .012f * touch(tTop))
-        place(tTop, ChaGlyph.TOP, -3f, 0f)
+        bar(.00f, ChaGlyph.BOTTOM)
+        val midShown = bar(.08f, ChaGlyph.MID)
+        bar(.15f, ChaGlyph.TOP)
         p.alpha = 255
 
         // 가운데 줄이 위아래로 벌어져 상자(曰)가 된다: 위·아래 테두리가 가운데에서 제자리로, 양옆 기둥이 자란다
