@@ -36,23 +36,26 @@ internal object Telemetry {
     fun perMinute(): Int { val now = System.currentTimeMillis(); while (recent.isNotEmpty() && now - recent.first() > 60_000) recent.removeFirst(); return recent.size }
 }
 
-/** 브랜드 마크: 세 단계 색 블록이 엇갈려 쌓인 모양 (초보 · 주행 · 소셜) */
-internal class BrandMark(ctx: android.content.Context) : View(ctx) {
+/** 브랜드 마크: 정사각형 안에 차곡 / 車곡 네 글자. 車만 주황(차에서 시작한다는 뜻) */
+internal class BrandMark(ctx: android.content.Context, private val ui: Ui) : View(ctx) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(c: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat()
-        val bh = h / 3.4f; val g = h * .07f; val r = bh * .32f
-        listOf(0, 1, 2).forEach { i ->
-            val y = h - (i + 1) * bh - i * g
-            val shift = if (i == 1) w * .12f else 0f
-            p.color = stageColor(i)
-            c.drawRoundRect(shift, y, w * .88f + shift, y + bh, r, r, p)
+        val s = minOf(width, height).toFloat()
+        val ox = (width - s) / 2; val oy = (height - s) / 2
+        p.style = Paint.Style.FILL; p.color = android.graphics.Color.parseColor("#1D1D1F")
+        c.drawRoundRect(ox, oy, ox + s, oy + s, s * .22f, s * .22f, p)
+        p.typeface = ui.bold; p.textAlign = Paint.Align.CENTER; p.textSize = s * .34f
+        val cells = listOf("차" to 0, "곡" to 1, "車" to 2, "곡" to 3)
+        cells.forEach { (ch, i) ->
+            val cx = ox + s * (if (i % 2 == 0) .30f else .70f); val cy = oy + s * (if (i < 2) .42f else .82f)
+            p.color = if (ch == "車") android.graphics.Color.parseColor("#EB6834") else android.graphics.Color.WHITE
+            c.drawText(ch, cx, cy, p)
         }
     }
 }
 
 /** 화면 위 브랜드 줄: 마크 + 이름 */
 internal fun MainActivity.brand(size: Int = 30): View = kit.row(10).apply {
-    addView(BrandMark(context), kit.lp(ui.dp(size), ui.dp(size)))
+    addView(BrandMark(context, ui), kit.lp(ui.dp(size), ui.dp(size)))
     addView(kit.text("차곡車곡", Type.Title))
 }

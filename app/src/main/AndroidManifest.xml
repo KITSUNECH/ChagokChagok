@@ -25,7 +25,7 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_chagok"
+        android:icon="@mipmap/ic_launcher"
         android:label="차곡車곡"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
