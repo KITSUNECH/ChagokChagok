@@ -80,6 +80,13 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             go(TODAY)
             if (store.locationOn && !places.permitted() && !Car.offline) askLocation()
         } else go(ONBOARD)
+        // 시작 모션: 세 줄이 쌓이고 세로 획이 꿰뚫어 車이 된다 (주행 중 다시 켜졌을 때는 보여 주지 않는다)
+        if (!Car.offline && !trip.active && savedInstanceState == null) {
+            var splash: SplashView? = null
+            splash = SplashView(this, ui.bold) { root.post { splash?.let { root.removeView(it) } } }
+            root.addView(splash, FrameLayout.LayoutParams(-1, -1))
+            splash.play()
+        }
     }
 
     override fun onDestroy() {
