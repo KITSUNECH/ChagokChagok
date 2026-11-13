@@ -21,7 +21,7 @@ class SqueezeTest {
         val ui = Ui(ctx)
         val dir = File("build/shots").apply { mkdirs() }
         for (level in 1..3) {
-            val blocks = (0 until level).map { Block("c$it", it, "", "", true) } + (0 until 12).map { Block("b$it", Gauge.stageOfSlot(it + 1), "", "", false) }
+            val blocks = (0 until level).map { Block("c$it", 0, "", "", true) } + (0 until 12).map { Block("b$it", Gauge.stageOfSlot(it + 1), "", "", false) }
             val v = StackView(ctx, ui, blocks, 0, Gauge.cap(level))
             val f = StackView::class.java.getDeclaredField("sq").apply { isAccessible = true }
             for (i in 0..24) {

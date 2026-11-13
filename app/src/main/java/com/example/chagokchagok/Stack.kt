@@ -4,6 +4,7 @@
 //
 // 처음 설정에서는 13칸 게이지를 고른 운전 경험만큼 채운다 (초보는 조금, 주행은 절반쯤, 차곡은 가득).
 // 홈에 처음 오면 그 게이지가 압축되며 단계마다 한 칸으로 접힌다: 초보 1칸, 주행 2칸, 차곡 3칸.
+// 접히면서 모두 초보 색으로 바뀐다. 경험이 많아도 홈의 바는 초보 단계에서 시작하고, 칸 수로만 앞서 간다.
 // 처음부터 꽉 찬 바를 주지 않고, 나머지는 직접 해내며 쌓게 한다.
 package com.example.chagokchagok
 
@@ -43,8 +44,8 @@ internal fun MainActivity.blocks(): List<Block> {
     val level = levelOf(store.typeOf(me))
     val start = listOfNotNull(
         Block("seat", 0, "운전석에 앉았어요", "시작 안내를 마쳐요", store.onboarded),
-        if (level >= 2) Block("career", 1, "운전 경험으로 한 칸", "처음 설정에서 고른 운전 경험", true) else null,
-        if (level >= 3) Block("seasoned", 2, "익숙한 손으로 한 칸", "처음 설정에서 고른 운전 경험", true) else null,
+        if (level >= 2) Block("career", 0, "운전 경험으로 한 칸", "처음 설정에서 고른 운전 경험", true) else null,
+        if (level >= 3) Block("seasoned", 0, "익숙한 손으로 한 칸", "처음 설정에서 고른 운전 경험", true) else null,
     )
     return start + listOf(
         Block("prep", 0, "차와 친해졌어요", "출발 준비에서 네 가지를 해 봐요", store.prepDone(me)),
@@ -77,7 +78,7 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
     init {
         if (squeeze > 0) post {
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 1500; startDelay = 500; interpolator = LinearInterpolator()
+                duration = 1900; startDelay = 500; interpolator = LinearInterpolator()
                 addUpdateListener { sq = it.animatedValue as Float; invalidate() }
             }.start()
         } else if (fresh > 0) post {
@@ -101,15 +102,14 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
         for (i in done.size until n) c.drawRoundRect(RectF(0f, slotTop(i), w, slotTop(i) + bh), r, r, p)
 
         if (sq < 1f) {
-            // 압축 모션: 게이지에서 채웠던 칸들이 단계별 한 칸으로 모인다.
-            // 앞 30%는 게이지 그대로 보여 주고, 뒤 70% 동안 겹치듯 부드럽게 접힌다.
+            // 압축 모션: 게이지에서 채웠던 칸들이 단계별 한 칸으로 모인다 (앞 20%는 게이지 그대로, 겹치듯 부드럽게).
+            // 다 모이면 위 칸들이 아래에서부터 초보 색으로 차오른다. 색을 섞지 않아 중간에 탁한 색이 나오지 않는다.
             val counts = IntArray(3); for (i in 0 until squeeze) counts[Gauge.stageOfSlot(i)]++
             val seen = IntArray(3)
             for (i in 0 until squeeze) {
                 val s = Gauge.stageOfSlot(i); val k = seen[s]++
-                val stagger = i * .012f
-                val t = ease(((sq - .30f - stagger) / (.62f)).coerceIn(0f, 1f))
-                val target = done.indexOfFirst { it.stage == s }.coerceAtLeast(0)
+                val t = ease(((sq - .20f - i * .008f) / .48f).coerceIn(0f, 1f))
+                val target = s.coerceAtMost(done.size - 1).coerceAtLeast(0)   // 단계 s의 조각들은 아래에서 s번째 칸으로
                 val sliceH = bh / counts[s]
                 val y0 = slotTop(i); val h0 = bh
                 val y1 = slotTop(target) + (counts[s] - 1 - k) * sliceH; val h1 = sliceH
@@ -118,8 +118,18 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
                 p.color = stageColor(s)
                 c.drawRoundRect(RectF(0f, y, w, y + hh + (if (t > .95f) .8f else 0f)), rr, rr, p)
             }
-            // 다 모이면 진짜 블록이 덮는다
-            val cover = ((sq - .9f) / .1f).coerceIn(0f, 1f)
+            // 초보 색으로 차오르기: 주행 칸 다음 차곡 칸 순서로, 아래에서 위로
+            for (s in 1..2) {
+                if (counts[s] == 0) continue
+                val f = ease(((sq - (.70f + (s - 1) * .09f)) / .14f).coerceIn(0f, 1f))
+                if (f <= 0f) continue
+                val top = slotTop(s.coerceAtMost(done.size - 1)); val bot = top + bh
+                c.save(); c.clipRect(0f, bot - bh * f, w, bot)
+                p.color = stageColor(0); c.drawRoundRect(RectF(0f, top, w, bot), r, r, p)
+                c.restore()
+            }
+            // 마지막에 진짜 블록이 덮는다 (같은 색이라 이음매가 보이지 않는다)
+            val cover = ((sq - .94f) / .06f).coerceIn(0f, 1f)
             if (cover > 0f) done.forEachIndexed { i, b -> p.color = stageColor(b.stage); p.alpha = (255 * cover).toInt(); c.drawRoundRect(RectF(0f, slotTop(i), w, slotTop(i) + bh), r, r, p); p.alpha = 255 }
             return
         }

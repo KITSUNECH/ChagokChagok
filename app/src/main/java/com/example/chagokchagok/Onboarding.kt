@@ -27,10 +27,10 @@ internal object Onboard {
 internal data class Branch(val type: String, val title: String, val sub: String, val icon: String, val voice: String, val first: String, val stage: String)
 
 internal val BRANCHES = listOf(
-    Branch("초보", "면허 딴 지 얼마 안 됐어요", "처음부터 같이 가요", "steering", "자주 · 회전 전 깜빡이까지", "출발 준비 · 처음이라면 3가지", "초보 1칸"),
-    Branch("오랜만", "오랜만에 다시 운전해요", "장롱면허도 여기", "clock", "보통 · 한마디와 경고", "면허 딴 뒤 바뀐 법규", "주행 2칸"),
-    Branch("새 차", "이 차가 처음이에요", "운전은 하는데 차가 낯설어요", "car", "보통 · 한마디와 경고", "출발 준비 · 이 차의 기어", "주행 2칸"),
-    Branch("익숙", "운전이 익숙해요", "기록하고 길을 건네요", "road", "가끔 · 경고만", "내 길 건네주기", "차곡 3칸"),
+    Branch("초보", "면허 딴 지 얼마 안 됐어요", "처음부터 같이 가요", "steering", "자주 · 회전 전 깜빡이까지", "출발 준비 · 처음이라면 3가지", "초보 단계 1칸"),
+    Branch("오랜만", "오랜만에 다시 운전해요", "장롱면허도 여기", "clock", "보통 · 한마디와 경고", "면허 딴 뒤 바뀐 법규", "초보 단계 2칸"),
+    Branch("새 차", "이 차가 처음이에요", "운전은 하는데 차가 낯설어요", "car", "보통 · 한마디와 경고", "출발 준비 · 이 차의 기어", "초보 단계 2칸"),
+    Branch("익숙", "운전이 익숙해요", "기록하고 길을 건네요", "road", "가끔 · 경고만", "내 길 건네주기", "초보 단계 3칸"),
 )
 
 /** 한 줄 선택지: 아이콘 · 제목/설명 · 체크. 세로 공간이 좁은 차 화면에 맞춘 높이 */
@@ -151,7 +151,7 @@ internal fun MainActivity.onboardScreen(): View {
                 side(specTable(listOf(
                     specRow("말로 알려 주기", branch.voice, "speaker"),
                     specRow("홈에서 먼저", branch.first, "today"),
-                    specRow("시작 칸", branch.stage, "layers", stageColor(levelOf(O.type) - 1)),
+                    specRow("시작 칸", branch.stage, "layers", stageColor(0)),
                 )))
             }
             3 -> {
@@ -234,7 +234,7 @@ internal fun MainActivity.onboardScreen(): View {
                     specRow("운전 경험", branch.title, branch.icon),
                     specRow("면허", lic?.let { "${it}년 · 그 뒤 바뀐 법규 ${Laws.since(it).size}가지" } ?: "기억 안 남 · 법규 전부", "info"),
                     specRow("함께", if (O.solo == false) (listOf(O.name) + O.others).joinToString(" · ") else "혼자 · 다음의 나에게", "people"),
-                    specRow("시작 칸", branch.stage, "layers", stageColor(levelOf(O.type) - 1)),
+                    specRow("시작 칸", branch.stage, "layers", stageColor(0)),
                 )))
                 side(k.text("이렇게 시작해요", Type.Headline))
                 side(k.grid(1, listOf(
