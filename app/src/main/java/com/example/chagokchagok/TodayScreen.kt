@@ -62,25 +62,80 @@ internal fun MainActivity.todayScreen(): View {
     val candidates = listOf<() -> View?>(
         { carCard() },
         { newsCard() },
-        { if (!store.prepDone(d) && type in listOf("초보", "새 차")) small("steering", "출발 준비", "면허시험 차와 다른 곳을 손으로 익혀요") { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") } else null },
-        { if (type == "오랜만" && !store.flag("law_$d")) small("info", "그동안 바뀐 법규", "빨간불 우회전, 보호구역… 다섯 가지만 보고 가요") { store.setFlag("law_$d"); go(MainActivity.LEARN, "law") } else null },
+        { lawCard() },
+        { if (!store.prepDone(d) && type in listOf("초보", "새 차")) small("steering", "출발 준비", shifterLine() ?: "면허시험 차와 다른 곳을 손으로 익혀요") { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") } else null },
         { if (store.demoOn) small("people", "친구들의 오늘", Demo.friends.filter { it.driving }.joinToString { it.name + " 운전 중" }.ifEmpty { "함께 차곡에서 보기" } + " · 시연용") { go(MainActivity.TOGETHER) } else null },
-        { weekCard() },
         { if (diaries.isEmpty()) starterCard() else null },
         { if (!store.prepDone(d)) small("steering", "출발 준비", "깜빡이, 와이퍼, 전조등, 기어를 한 번씩") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) } else null },
     )
     val side = mutableListOf<View>()
     for (c in candidates) { if (side.size >= 2) break; c()?.let { side.add(it) } }
+    // 아래 줄: 성장 바의 다음 한 칸 + 이번 주 (있을 때)
+    val bottom = listOfNotNull(nextBlockCard(), weekCard())
 
     return k.col().apply {
         addView(head); addView(k.gap(24))
-        if (ui.wide) addView(k.row(20).apply {
-            gravity = Gravity.TOP
-            addView(hero, k.lp(0, k.WRAP, 1.55f))
-            addView(k.col(16).apply { side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
-        }) else addView(k.col(16).apply { addView(hero); side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
+        if (ui.wide) {
+            addView(k.row(20).apply {
+                gravity = Gravity.TOP
+                addView(hero, k.lp(0, k.WRAP, 1.55f))
+                addView(k.col(16).apply { side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
+            })
+            if (bottom.isNotEmpty()) { addView(k.gap(20)); addView(k.row(20).apply { gravity = Gravity.TOP; bottom.forEachIndexed { i, v -> addView(v, k.lp(0, k.WRAP, if (i == 0) 1.55f else 1f)) }; if (bottom.size == 1) addView(k.fill(), k.lp(0, 0, 1f)) }) }
+        } else addView(k.col(16).apply { addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
     }
 }
+
+/** 성장 바의 다음 한 칸: 무엇을 하면 한 칸이 쌓이는지 */
+private fun MainActivity.nextBlockCard(): View? {
+    val k = kit
+    val bs = blocks(); val next = bs.firstOrNull { !it.done } ?: return null
+    val stageBlocks = bs.filter { it.stage == next.stage }
+    val col = stageColor(next.stage)
+    return k.card(pad = 22, onClick = { stackSheet() }) {
+        addView(k.row(18).apply {
+            // 쌓일 칸 미리보기: 단계 색 테두리의 빈 블록
+            addView(android.widget.FrameLayout(context).apply {
+                background = k.rounded(Ink.alpha(col, .10f), 10, 2, col)
+                addView(IconView(context, "plus", col), android.widget.FrameLayout.LayoutParams(ui.dp(22), ui.dp(22), Gravity.CENTER))
+            }, k.lp(ui.dp(64), ui.dp(44)))
+            addView(k.col(3).apply {
+                addView(k.row(8).apply { addView(k.text("다음 한 칸", Type.Caption, Ink.text2)); addView(k.tag("${STAGES[next.stage]} ${stageBlocks.count { it.done }}/${stageBlocks.size}", col)) })
+                addView(k.text(next.title, Type.Headline))
+                addView(k.text(next.hint, Type.Sub, Ink.text2))
+            }, k.lp(0, k.WRAP, 1f))
+            addView(k.col(2).apply {
+                gravity = Gravity.END
+                addView(k.text("${bs.count { it.done }}", Type.Title).apply { gravity = Gravity.END })
+                addView(k.text("/ ${bs.size}칸", Type.Caption, Ink.text2).apply { gravity = Gravity.END })
+            })
+        })
+    }
+}
+
+/** 면허 딴 해 이후 바뀐 법규 (없으면 꼭 알아 둘 것). 한 번 열어 보면 접는다. */
+private fun MainActivity.lawCard(): View? {
+    val d = store.driver
+    if (store.flag("law_$d")) return null
+    val year = store.licenseYear(d)
+    val since = Laws.since(year)
+    val type = store.typeOf(d)
+    if (since.isEmpty() && type !in listOf("초보", "오랜만")) return null
+    val k = kit
+    return k.card(pad = 22, onClick = { store.setFlag("law_$d"); go(MainActivity.LEARN, "law") }) {
+        addView(k.row(14).apply {
+            addView(k.icon("scale", Ink.accent, 28))
+            addView(k.col(3).apply {
+                addView(k.text(if (since.isEmpty()) "꼭 알아 둘 법규" else "바뀐 법규 ${since.size}가지", Type.Headline))
+                addView(k.text(if (since.isEmpty()) "초보가 많이 놓치는 ${Laws.core.size}가지" else (year?.let { "${it}년 면허 뒤로 · " } ?: "면허 딴 뒤로 · ") + since.last().title, Type.Sub, Ink.text2, lines = 2))
+            }, k.lp(0, k.WRAP, 1f))
+            addView(k.icon("chevron", Ink.text3, 20))
+        })
+    }
+}
+
+/** 이 차의 기어 한 줄 (알면) */
+internal fun MainActivity.shifterLine(): String? = Shifters.of(this)?.let { "이 차는 ${it.name} · ${it.park}" }
 
 /** 오늘의 길: 가족·친구가 건네준 길 하나 */
 private fun MainActivity.heroCard(): View {
@@ -237,7 +292,7 @@ internal val PREP_ITEMS = listOf(
     Triple("signal", "깜빡이", "왼쪽, 오른쪽 한 번씩"),
     Triple("wiper", "와이퍼", "한 번 켜 보기"),
     Triple("light", "전조등", "한 번 켜 보기"),
-    Triple("gear", "기어", "R에 넣었다가 P로"),
+    Triple("gear", "기어", "R에 넣었다가 P로 · 아래 그림"),
     Triple("belt", "안전벨트", "매면 켜져요"),
 )
 /** 안전벨트는 에뮬레이터에서 체결 상태를 바꿀 수 없을 수 있어 마치는 조건에서 뺀다 */
@@ -272,6 +327,8 @@ internal fun MainActivity.prepScreen(): View {
             }
         }
         addView(k.grid(if (ui.wide) 5 else 2, tiles, 14))
+        addView(k.gap(16))
+        addView(shifterCard())
         addView(k.gap(22))
         addView(k.buttons(
             k.button(if (all) "홈으로" else "나중에 하기", if (all) Kit.Btn.Primary else Kit.Btn.Secondary) { back() },

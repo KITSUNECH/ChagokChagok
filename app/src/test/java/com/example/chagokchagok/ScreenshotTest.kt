@@ -49,12 +49,18 @@ class ScreenshotTest {
             v.draw(Canvas(bmp))
             File(dir, "${tag}_$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        Onboard.step = 0; Onboard.shownBlocks = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
+        Onboard.step = 0; Onboard.gaugeShown = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
         Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00b_onboard_type")
-        Onboard.step = 3; Onboard.solo = true; a.go(MainActivity.ONBOARD); snap("00c_onboard_solo")
-        Onboard.step = 5; a.go(MainActivity.ONBOARD); snap("00d_onboard_ready")
+        Onboard.step = 3; a.go(MainActivity.ONBOARD); snap("00c2_onboard_license")
+        Onboard.step = 4; Onboard.solo = false; Onboard.others.add("아빠"); a.go(MainActivity.ONBOARD); snap("00c_onboard_who")
+        Onboard.step = 6; a.go(MainActivity.ONBOARD); snap("00d_onboard_ready"); Onboard.others.clear()
         val store = a.store
         store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true
+        Onboard.squeeze = Gauge.cap(2); store.setType("나", "오랜만"); a.go(MainActivity.TODAY)
+        // 압축 모션 중간과 끝 (시계를 앞으로 돌려 본다)
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1250)); snap("01a_squeeze_mid")
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1200)); snap("01a_squeeze_end")
+        store.setType("나", "초보")
         a.go(MainActivity.TODAY); snap("01_today_empty")
         store.addSampleGuide(); store.addSampleFriend()
         val keep = store.guides(); keep.forEach { store.removeGuide(it.id) }
@@ -68,7 +74,7 @@ class ScreenshotTest {
         a.go(MainActivity.TODAY); snap("01b_today_solo")
         keep.forEach { store.addGuide(it) }
         a.go(MainActivity.TODAY); snap("02_today")
-        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep") }
+        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.shifter = "column"; a.onPrep(Evt.GEAR, "R"); snap("03b_prep_gear"); store.shifter = null }
         a.depart(store.guide("sample")!!); snap("04_ready")
         a.trip.start(); a.onCarEvent(Evt.SIGNAL, "RIGHT"); a.car.setTurn("TURN_RIGHT", 80, ""); a.onCarEvent(Evt.NAVI, "turn")
         a.trip.onLocation(SampleRoute.points[16].first, SampleRoute.points[16].second, null)
@@ -76,6 +82,16 @@ class ScreenshotTest {
         a.onCarEvent(Evt.WIPER, "on"); a.onCarEvent(Evt.BRAKE, "on"); a.onCarEvent(Evt.SEAT, "on")
         a.onCarEvent(Evt.GEAR, "P")
         snap("06_diary")
+        if (!short) {
+            // 같은 곳에 다시 간 날: 지난번과 비교 + 한마디 후보
+            val again = Drive("나", System.currentTimeMillis(), 4.1f, 13, 820, listOf(Ev(.2f, Evt.SIGNAL, "RIGHT"), Ev(.4f, Evt.BRAKE, "on"), Ev(.42f, Evt.BRAKE, "on"), Ev(.45f, Evt.BRAKE, "on"), Ev(.6f, Evt.CALM, "on"), Ev(.8f, Evt.SIGNAL, "LEFT")),
+                2, 5, false, false, 1, 0, 6, turns = 4, turnsSignaled = 3, calm = 1, place = "동네 마트", placeLat = 37.49, placeLng = 127.03,
+                path = SampleRoute.points.mapIndexed { i, q -> Pt(i / (SampleRoute.points.size - 1f), q.first, q.second) })
+            val dd = Writer.write(again, store.diariesOf("나"), null, 0); store.addDiary(dd)
+            a.go(MainActivity.DIARY, dd.id); snap("06b_diary_compare")
+            a.noteToSelf(dd); snap("06c_tip_ideas"); a.onBackPressed()
+            DiaryPrefs.mode = 1; a.go(MainActivity.DIARY, dd.id); snap("06d_diary_paper"); DiaryPrefs.mode = 0
+        }
         if (!short) {
             val last = store.diariesOf("나").last()
             a.giveTitle = ""; a.giveKind = "길"; a.go(MainActivity.GIVE, last.id); snap("07_give")

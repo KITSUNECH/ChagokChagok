@@ -110,9 +110,10 @@ class Overlay(private val host: FrameLayout, private val kitOf: () -> Kit) {
             addView(k.icon(icon, Color.WHITE, 22))
             addView(k.text(s, Type.Sub, Color.WHITE).apply { maxLines = 3 })
         }
-        host.addView(bar, FrameLayout.LayoutParams(k.WRAP, k.WRAP, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = ui.dp(18); leftMargin = ui.dp(24); rightMargin = ui.dp(24) })
+        // 아래 가운데: 제목과 겹치지 않게. 좁은 창은 탭 막대 위로.
+        host.addView(bar, FrameLayout.LayoutParams(k.WRAP, k.WRAP, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = ui.dp(if (ui.wide) 28 else 96); leftMargin = ui.dp(24); rightMargin = ui.dp(24) })
         banner = bar
-        bar.alpha = 0f; bar.translationY = -ui.dp(10).toFloat(); bar.animate().alpha(1f).translationY(0f).setDuration(180).start()
+        bar.alpha = 0f; bar.translationY = ui.dp(12).toFloat(); bar.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
         bar.postDelayed({ if (banner === bar) { bar.animate().alpha(0f).setDuration(200).withEndAction { host.removeView(bar) }.start(); banner = null } }, 4200)
     }
 }

@@ -99,6 +99,9 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var destLat: Double? = null; private set
     var destLng: Double? = null; private set
     var destName: String? = null; private set
+    /** 차대번호 (CarInfo SDK). 차종과 변속 방식을 알아내는 데만 쓰고 밖으로 보내지 않는다. */
+    var vin: String? = null; private set
+    var isEv: Boolean? = null; private set
     /** 신호별로 마지막에 실패한 이유. 화면의 점검 칸에서 보여 준다. */
     val failures = mutableMapOf<String, String>()
 
@@ -237,6 +240,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt("telltale") { vehicle.getSafety().registerTelltales(telltaleL) }
         attempt("seatPos") { vehicle.getSeat().registerSeatForeAftPosition(driverSeat, seatPosL) }
         refreshCondition()
+        attempt("vin") { vehicle.getCarInfo().getVINInfo({ v -> ui { vin = v?.trim()?.takeIf { it.length >= 10 }; listener.onCarEvent(Evt.NAVI, "vin") } }, { e -> failures["vin"] = e.message ?: "실패" }) }
 
         navi = NaviHelper(ctx.applicationContext)
         navi.initialize(
@@ -266,7 +270,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     /** 다음 사람에게 전할 차 상태를 다시 읽는다. 답은 조금 뒤에 따로 온다. */
     fun refreshCondition() {
         attempt("fuel") { vehicle.getFuel().getFuelPercent({ v -> if (v != null) energy = v }, { e -> failures["fuel"] = e.message ?: "실패" }) }
-        attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> if (v != null && energy == null) energy = v }, { e -> failures["battery"] = e.message ?: "실패" }) }
+        attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> if (v != null) { isEv = true; if (energy == null) energy = v } }, { e -> failures["battery"] = e.message ?: "실패" }) }
         listOf(WheelValue.LEFT_FRONT, WheelValue.RIGHT_FRONT, WheelValue.LEFT_REAR, WheelValue.RIGHT_REAR).forEach { w ->
             attempt("tire") { vehicle.getTire().getTirePressure(WheelArea(w), { v -> if (v != null) tires[w.name] = v }, { e -> failures["tire"] = e.message ?: "실패" }) }
         }
@@ -280,6 +284,11 @@ class Car(private val ctx: Context, private val listener: Listener) {
         (now - lampsOn).forEach { listener.onCarEvent(Evt.LAMP, "$it:on") }
         (lampsOn - now).forEach { listener.onCarEvent(Evt.LAMP, "$it:off") }
         lampsOn.clear(); lampsOn.addAll(now)
+    }
+
+    /** Pleos 내비 화면을 앞으로 불러온다. keyword가 있으면 장소 검색 화면으로. 연결 안 됐으면 false. */
+    fun openNavi(keyword: String? = null): Boolean = naviConnected && attempt("navi") {
+        navi.requestNavigationScreen(if (keyword != null) ai.pleos.playground.navi.data.NavigationScreenRequest.SearchPlace(keyword) else ai.pleos.playground.navi.data.NavigationScreenRequest.Foreground)
     }
 
     /** 놀란 운전자를 위해 내비 경로를 편안한 길로 바꾼다. */

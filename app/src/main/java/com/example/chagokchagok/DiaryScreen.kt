@@ -7,35 +7,140 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import java.util.Locale
 
-internal object DiaryPrefs { var plain = false }
+/** 일기 보기: 0 읽기(기본, 가독성) · 1 원고지 */
+internal object DiaryPrefs { var mode = 0 }
 
 internal fun MainActivity.diaryScreen(id: String?): View {
     val k = kit
     val d = store.diaries().firstOrNull { it.id == id } ?: return todayScreen()
     val guide = store.guide(d.guideId)
-    val paper = paperPage(d, guide)
+    val prev = previousSame(d)
+    val paper = if (DiaryPrefs.mode == 1) paperPage(d, guide) else readPage(d, guide, prev)
     val side = k.col().apply {
-        addView(k.section("이 기록의 근거"))
-        addView(evidence(d, guide))
+        addView(k.section("오늘의 숫자"))
+        addView(numbers(d))
+        if (prev != null) {
+            addView(k.section("지난번과 비교 · ${visits(d)}번째"))
+            addView(compareCard(prev, d))
+        }
         addView(k.section("주행 타임라인"))
         addView(k.card(pad = 20) {
             addView(Timeline(context, ui, d.drive), k.lp(k.MATCH, ui.dp(176)))
             addView(k.gap(8))
             addView(k.text(timelineSummary(d.drive), Type.Caption, Ink.text2))
         })
+        addView(k.section("이 기록의 근거"))
+        addView(evidence(d, guide))
         addView(k.section("다음으로"))
         addView(actions(d, guide))
     }
     return k.col().apply {
         addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + if (d.drive.sim) " · 모의 주행" else "", onBack = { back() },
-            trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 48) { readAloud(d.title, d.text) }))
+            trailing = k.row(10).apply {
+                addView(k.segmented(listOf("읽기", "원고지"), DiaryPrefs.mode) { DiaryPrefs.mode = it; render() }, k.lp(ui.dp(200), k.WRAP))
+                addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 48) { readAloud(d.title, d.text) })
+            }))
         addView(k.gap(18))
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(paper, k.lp(0, k.WRAP, 1.15f)); addView(side, k.lp(0, k.WRAP, 1f)) })
         else { addView(paper); addView(side) }
     }
 }
 
-/** 종이 한 장: 날짜와 날씨, 그림 칸(두 사람의 주행), 원고지 또는 줄글, 도장 */
+/** 같은 곳(목적지 이름) 또는 같은 받은 길로 간 바로 전 주행 (모의 주행 제외) */
+internal fun MainActivity.previousSame(d: Diary): Diary? = store.diariesOf(d.driver).filter { o ->
+    o.id != d.id && o.date < d.date && !o.drive.sim &&
+        ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
+}.maxByOrNull { it.date }
+
+private fun MainActivity.visits(d: Diary) = store.diariesOf(d.driver).count { o ->
+    !o.drive.sim && o.date <= d.date && ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
+}
+
+/** 읽기 보기: 큰 제목, 한 줄 요약(인용), 넉넉한 줄 간격의 본문. 그림 칸에는 지난번의 나도 옅게. */
+private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
+    val k = kit
+    return k.card(pad = 30) {
+        addView(k.row(10).apply {
+            addView(k.text(dateText(d.date), Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
+            val w = store.weather(d.id) ?: if (d.drive.rained) "와이퍼 1분 넘게" else null
+            if (w != null) addView(k.row(6).apply { addView(k.icon("cloud", Ink.text2, 18)); addView(k.text(w, Type.Sub, Ink.text2)) })
+            if (d.drive.night) addView(k.row(6).apply { addView(k.icon("moon", Ink.text2, 18)); addView(k.text("밤길", Type.Sub, Ink.text2)) })
+        })
+        addView(k.gap(12))
+        val lanes = mutableListOf<Lane>()
+        when {
+            guide != null -> lanes.add(Lane(guide.owner, guide.drive, guide.tips, faded = true))
+            prev != null -> lanes.add(Lane("지난번의 나", prev.drive, faded = true))
+        }
+        lanes.add(Lane(if (lanes.isEmpty()) "" else "오늘의 나", d.drive))
+        addView(TraceView(context, ui).apply { this.lanes = lanes }, k.lp(k.MATCH, ui.dp(if (lanes.size > 1) 170 else 110)))
+        if (d.highlight.isNotEmpty()) {
+            addView(k.gap(18))
+            addView(k.row(16).apply {
+                addView(View(context).apply { background = k.rounded(Ink.accent, 2) }, k.lp(ui.dp(4), k.MATCH))
+                addView(k.text(d.highlight, Type.Title).apply { typeface = ui.batang; setLineSpacing(0f, 1.3f) }, k.lp(0, k.WRAP, 1f))
+            })
+        }
+        addView(k.gap(18))
+        addView(k.text(d.text, Type.Body).apply { textSize = ui.sp(21f); setLineSpacing(0f, 1.62f) })
+        store.feeling(d.id)?.let {
+            addView(k.gap(16))
+            addView(k.row(10).apply { addView(k.icon("pencil", Ink.accent, 18)); addView(k.text("내 한 줄 · $it", Type.BodyStrong, Ink.accent)) })
+        }
+        if (d.ai) { addView(k.gap(10)); addView(k.text("문장은 생성형 AI가 다듬었어요. 사실은 차량 기록 그대로예요.", Type.Caption, Ink.text3)) }
+        d.stamp?.let { addView(k.gap(14)); addView(k.row().apply { addView(k.fill()); addView(stamp(it, true, 1, 76)) }) }
+    }
+}
+
+/** 오늘의 숫자: 네 칸 */
+private fun MainActivity.numbers(d: Diary): View {
+    val k = kit; val v = d.drive
+    val tiles = listOf(
+        k.stat(if (v.distKm > 0.05f) String.format(java.util.Locale.KOREA, "%.1fkm", v.distKm) else "–", "거리"),
+        k.stat(if (v.minutes >= 1) "${v.minutes}분" else "${v.seconds}초", "시간"),
+        k.stat(if (v.turns > 0) "${v.turnsSignaled}/${v.turns}" else "${v.signals}번", if (v.turns > 0) "돌기 전 깜빡이" else "깜빡이"),
+        k.stat(if (v.distKm > 0.3f) String.format(java.util.Locale.KOREA, "%.1f", v.brakes / v.distKm) else "${v.brakes}번", if (v.distKm > 0.3f) "1km마다 브레이크" else "브레이크"),
+    )
+    return k.card(pad = 20) { addView(k.grid(2, tiles, 14)) }
+}
+
+/** 지난번과 비교: 같은 곳에 다시 간 날, 무엇이 달라졌는지 막대 두 개씩 */
+private fun MainActivity.compareCard(a: Diary, b: Diary): View {
+    val k = kit
+    data class M(val label: String, val prev: Float, val now: Float, val unit: String, val lowerIsEasier: Boolean)
+    val ms = mutableListOf(M("걸린 시간", a.drive.minutes.toFloat().coerceAtLeast(a.drive.seconds / 60f), b.drive.minutes.toFloat().coerceAtLeast(b.drive.seconds / 60f), "분", true))
+    if (a.drive.distKm > 0.3f && b.drive.distKm > 0.3f) ms.add(M("1km마다 브레이크", a.drive.brakes / a.drive.distKm, b.drive.brakes / b.drive.distKm, "번", true))
+    if (a.drive.turns > 0 && b.drive.turns > 0) ms.add(M("돌기 전 깜빡이", 100f * a.drive.turnsSignaled / a.drive.turns, 100f * b.drive.turnsSignaled / b.drive.turns, "%", false))
+    ms.add(M("숨 고르기", a.drive.calm.toFloat(), b.drive.calm.toFloat(), "번", true))
+    fun fmt(v: Float, u: String) = (if (v % 1f == 0f || v >= 10) String.format("%.0f", v) else String.format("%.1f", v)) + u
+    return k.card(pad = 20) {
+        addView(k.row(14).apply {
+            addView(k.row(6).apply { addView(View(context).apply { background = k.rounded(Ink.line, 3) }, k.lp(ui.dp(14), ui.dp(8))); addView(k.text("지난번 ${dateText(a.date, "M/d")}", Type.Caption, Ink.text2)) })
+            addView(k.row(6).apply { addView(View(context).apply { background = k.rounded(Ink.accent, 3) }, k.lp(ui.dp(14), ui.dp(8))); addView(k.text("오늘", Type.Caption, Ink.text2)) })
+        })
+        addView(k.gap(8))
+        ms.forEach { m ->
+            val max = maxOf(m.prev, m.now, 0.01f)
+            val easier = if (m.lowerIsEasier) m.now < m.prev else m.now > m.prev
+            val same = Math.abs(m.now - m.prev) < 0.05f * max
+            addView(k.col(6).apply {
+                setPadding(0, ui.dp(10), 0, ui.dp(4))
+                addView(k.row().apply {
+                    addView(k.text(m.label, Type.Sub), k.lp(0, k.WRAP, 1f))
+                    addView(k.text("${fmt(m.prev, m.unit)} → ${fmt(m.now, m.unit)}", Type.BodyStrong))
+                    addView(k.gap(8))
+                    addView(k.tag(if (same) "비슷해요" else if (easier) "한결 수월" else "오늘은 달랐어요", if (same) Ink.text2 else if (easier) Ink.go else Ink.text2))
+                })
+                addView(Bar(context, ui).apply { color = Ink.line; value = m.prev / max }, k.lp(k.MATCH, ui.dp(7)))
+                addView(Bar(context, ui).apply { color = Ink.accent; value = m.now / max }, k.lp(k.MATCH, ui.dp(7)))
+            })
+        }
+        addView(k.gap(8))
+        addView(k.text("같은 곳에 간 기록끼리만 비교해요. 길이 막혔던 날은 시간이 늘 수 있어요.", Type.Caption, Ink.text3))
+    }
+}
+
+/** 원고지 보기: 종이 한 장 (날짜와 날씨, 그림 칸, 원고지, 도장) */
 private fun MainActivity.paperPage(d: Diary, guide: Guide?): View {
     val k = kit
     val page = FrameLayout(this).apply {
@@ -55,12 +160,7 @@ private fun MainActivity.paperPage(d: Diary, guide: Guide?): View {
                 background = k.rounded(android.graphics.Color.WHITE, 12, 1, Ink.paperLine)
                 addView(TraceView(context, ui, onPaper = true).apply { this.lanes = lanes }, FrameLayout.LayoutParams(-1, -1))
             }, k.lp(k.MATCH, ui.dp(if (lanes.size > 1) 190 else 120)))
-            addView(k.row().apply {
-                addView(k.fill())
-                addView(k.text(if (DiaryPrefs.plain) "원고지로 보기" else "줄글로 보기", Type.Caption, Ink.paperLine).apply { setPadding(ui.dp(8), ui.dp(4), 0, ui.dp(4)); setOnClickListener { DiaryPrefs.plain = !DiaryPrefs.plain; render() } })
-            })
-            if (DiaryPrefs.plain) addView(k.voice(d.text, 23f, Ink.ink))
-            else addView(GridText(context, ui).apply { cols = if (ui.wide) 13 else 11; highlight = d.highlight; text = d.text })
+            addView(GridText(context, ui).apply { cols = if (ui.wide) 13 else 11; highlight = d.highlight; text = d.text })
             store.feeling(d.id)?.let { addView(k.voice("— 내 한 줄: $it", 19f, Ink.ink)) }
             if (d.ai) addView(k.text("문장은 생성형 AI가 다듬었어요. 사실은 차량 기록 그대로예요.", Type.Caption, Ink.paperLine))
         }, FrameLayout.LayoutParams(-1, -2))
@@ -245,12 +345,17 @@ internal fun MainActivity.giveScreen(id: String?): View {
 }
 
 private fun MainActivity.addTip(d: Diary) {
-    val presets = if (giveKind == "추천") listOf("주차장이 넓어요.", "입구가 좁으니 천천히.", "풍경이 좋아요.") else listOf("미리 오른쪽 차로로 가 있어.", "여기는 속도를 줄이는 게 좋아.", "주차장 입구가 좁아. 천천히 들어가.", "여기서 차선을 바꾸면 편해.")
-    sheets.choose("어디쯤에서 할 말인가요?", null, TIP_PLACES.map { it.first }) { where ->
-        sheets.choose("한마디", null, presets + "직접 쓰기") { i ->
-            fun add(t: String) { giveTips.add(Tip(TIP_PLACES[where].second, t)); giveTips.sortBy { it.p }; render() }
-            if (i == presets.size) sheets.input("한마디", "예: 큰 사거리 지나면 바로 우회전") { add(it) } else add(presets[i])
+    if (giveKind == "추천") {
+        val presets = listOf("주차장이 넓어요.", "입구가 좁으니 천천히.", "풍경이 좋아요.")
+        sheets.choose("한 줄 후기", null, presets + "직접 쓰기") { i ->
+            fun add(t: String) { giveTips.add(Tip(.92f, t)); render() }
+            if (i == presets.size) sheets.input("한 줄 후기", "예: 주차장은 건물 뒤쪽") { add(it) } else add(presets[i])
         }
+        return
+    }
+    // 길·연습: 이번 주행 기록에서 만든 후보 셋 + 직접 쓰기
+    pickTips("한마디 더하기", "받는 사람이 그 자리에 가까워지면 들려줘요.", TipSuggest.ideas(d.drive, forSelf = false)) { picked ->
+        giveTips.addAll(picked.filter { p -> giveTips.none { it.text == p.text } }); giveTips.sortBy { it.p }; render()
     }
 }
 

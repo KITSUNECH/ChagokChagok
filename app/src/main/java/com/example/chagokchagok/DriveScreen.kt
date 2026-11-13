@@ -1,6 +1,8 @@
 // 차곡車곡 – 달리는 동안
 // 운전자가 볼 것은 세 가지뿐: 다음 회전, 방금 들려준 한마디, 길 위의 지금 위치.
-// 누르는 것은 '숨 고르기' 하나. 나머지는 말로 알려 준다. 글은 3줄을 넘기지 않는다.
+// 누르는 것은 '숨 고르기'와 '내비' 둘. 나머지는 말로 알려 준다. 글은 3줄을 넘기지 않는다.
+// 한눈(2초 안)에 읽히게: 지금 할 일 하나만 크게, 일이 없을 때는 화면이 조용해진다.
+// 회전까지 남은 거리는 줄어드는 막대로, 한마디가 나오는 동안만 한마디 칸이 밝아진다.
 package com.example.chagokchagok
 
 import android.graphics.Color
@@ -26,6 +28,25 @@ internal object DriveViews {
     var limit: TextView? = null
     var limitBox: View? = null
     var ahead: TextView? = null
+    var turnBar: Bar? = null
+    var tipCard: View? = null
+    var tipNow: View? = null
+    var stats: TextView? = null
+    var statsSub: TextView? = null
+    var limitCard: View? = null
+    var statsCard: View? = null
+}
+
+/** 줄어드는 막대 (회전까지 남은 거리) */
+internal class Bar(ctx: android.content.Context, private val ui: Ui) : View(ctx) {
+    var value = 0f; set(v) { field = v; invalidate() }
+    var color = Ink.accent
+    private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    override fun onDraw(c: android.graphics.Canvas) {
+        val r = height / 2f
+        p.color = Ink.fill; c.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), r, r, p)
+        if (value > 0f) { p.color = color; c.drawRoundRect(0f, 0f, width * value.coerceIn(0f, 1f), height.toFloat(), r, r, p) }
+    }
 }
 
 internal fun MainActivity.driveScreen(): View {
@@ -45,27 +66,35 @@ internal fun MainActivity.driveScreen(): View {
         addView(View(context).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Ink.danger) } }, k.lp(ui.dp(12), ui.dp(12)))
         V.status = k.text("", Type.Sub, Ink.text2); addView(V.status, k.lp(0, k.WRAP, 1f))
         if (trip.sim) addView(k.tag("모의 주행 · 시연용", Ink.warn))
+        // Pleos 내비를 앞으로 (NaviHelper requestNavigationScreen). 분할 화면이면 옆 창에 뜬다.
+        addView(k.gap(8))
+        addView(k.button("내비", Kit.Btn.Secondary, "navi") { if (!car.openNavi()) say("내비가 연결되지 않았어요.") })
     }
 
     // 다음 회전 (내비)
     V.turnIcon = IconView(this, "turnRight", Ink.text)
-    V.turnText = k.text("", Type.Large)
+    V.turnText = k.text("", Type.Display)
     V.turnSub = k.text("", Type.Body, Ink.text2)
+    V.turnBar = Bar(this, ui)
     val turnCard = k.card(26) {
-        addView(k.row(20).apply {
-            addView(V.turnIcon, k.lp(ui.dp(72), ui.dp(72)))
+        addView(k.row(22).apply {
+            addView(V.turnIcon, k.lp(ui.dp(84), ui.dp(84)))
             addView(k.col(4).apply { addView(V.turnText); addView(V.turnSub) }, k.lp(0, k.WRAP, 1f))
         })
+        addView(k.gap(16))
+        addView(V.turnBar, k.lp(k.MATCH, ui.dp(8)))
     }
     V.turnCard = turnCard
 
     // 한마디
     V.tipWho = k.text("", Type.Sub, Ink.accent)
     V.tip = k.voice("", if (ui.wide) 32f else 26f).apply { maxLines = 3 }
+    V.tipNow = k.tag("지금", Ink.accent)
     val tipCard = k.card(26) {
-        addView(k.row(10).apply { if (g != null) addView(k.avatar(g.owner, 30)); addView(V.tipWho) })
+        addView(k.row(10).apply { if (g != null) addView(k.avatar(g.owner, 30)); addView(V.tipWho, k.lp(0, k.WRAP, 1f)); addView(V.tipNow) })
         addView(k.gap(10)); addView(V.tip)
     }
+    V.tipCard = tipCard
 
     // 길 위의 지금 위치
     V.trace = if (g != null) TraceView(this, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips, faded = true)) } else null
@@ -87,6 +116,12 @@ internal fun MainActivity.driveScreen(): View {
         addView(V.limitBox, k.lp(k.MATCH, ui.dp(104)))
         addView(V.ahead.apply { gravity = Gravity.CENTER })
     }
+    V.limitCard = limitCard
+    // 제한속도를 모를 때는 빈 표지판 대신 지금까지의 기록을 크게
+    V.stats = k.text("", Type.Display)
+    V.statsSub = k.text("", Type.Sub, Ink.text2)
+    val statsCard = k.card(24) { addView(k.text("지금까지", Type.Caption, Ink.text2)); addView(V.stats); addView(V.statsSub) }
+    V.statsCard = statsCard
     val breathe = k.button("숨 고르기", Kit.Btn.Secondary, "breath") { trip.breathe() }
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
     val stop = if (car.failures.containsKey(Evt.GEAR)) k.button("기록 멈추기", Kit.Btn.Danger, "stop") { trip.end() } else null
@@ -95,13 +130,13 @@ internal fun MainActivity.driveScreen(): View {
         gravity = Gravity.TOP
         addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard) }, k.lp(0, k.MATCH, 1.7f))
         addView(k.col(18).apply {
-            addView(limitCard, k.lp(k.MATCH, k.WRAP)); addView(k.fill())
+            addView(limitCard, k.lp(k.MATCH, k.WRAP)); addView(statsCard, k.lp(k.MATCH, k.WRAP)); addView(k.fill())
             addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
         addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard)
-        addView(k.row(14).apply { addView(limitCard, k.lp(0, k.WRAP, 1f)); addView(breathe, k.lp(0, ui.dp(84), 1.2f)) })
+        addView(k.row(14).apply { addView(limitCard, k.lp(0, k.WRAP, 1f)); addView(statsCard, k.lp(0, k.WRAP, 1f)); addView(breathe, k.lp(0, ui.dp(84), 1.2f)) })
         stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
     }
     return FrameLayout(this).apply {
@@ -126,6 +161,12 @@ internal fun MainActivity.refreshDrive() {
         else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "이대로 쭉"; V.turnSub?.text = if (trip.routeSent) "내비 안내를 따라가요" else "조용히 적고 있어요" }
     }
 
+    // 회전까지 남은 거리 막대 (300m부터 줄어든다), 깜빡이 안내 중이면 신호 색
+    val meters = if (side != null) car.turnMeters else 0
+    V.turnBar?.apply { color = if (prompt != null) Ink.signal else Ink.accent; value = if (meters in 1..300) 1f - meters / 300f else 0f; visibility = if (meters in 1..300) View.VISIBLE else View.INVISIBLE }
+    // 일이 없을 때는 조용히
+    V.turnText?.setTextColor(if (prompt == null && side == null && !trip.arrived) Ink.text2 else Ink.text)
+
     // 한마디
     V.tipWho?.text = when {
         g == null -> "혼자 가는 길"
@@ -138,6 +179,11 @@ internal fun MainActivity.refreshDrive() {
         g.tips.isNotEmpty() -> "출발 전에 들은 한마디를 기억해 둬요."
         else -> "같은 길을 달리고 있어요."
     }
+
+    // 한마디가 나오는 동안만 밝게
+    val speaking = trip.currentTip != null
+    (V.tipCard?.background as? GradientDrawable)?.setColor(if (speaking) Ink.accentSoft else Ink.surface)
+    V.tipNow?.visibility = if (speaking) View.VISIBLE else View.GONE
 
     // 길 위의 위치
     if (g != null) {
@@ -159,5 +205,10 @@ internal fun MainActivity.refreshDrive() {
     if (car.cameraMeters > 0) ahead.add((if (car.schoolZone) "어린이 보호구역 " else "단속 ") + "${car.cameraMeters}m")
     if (car.cautionMeters > 0) ahead.add("주의 구간 ${car.cautionMeters}m")
     refreshConvoy()
-    V.ahead?.text = ahead.joinToString("\n").ifEmpty { if (car.speedLimit > 0) "지금 길 제한속도" else "제한속도 정보 없음" }
+    V.ahead?.text = ahead.joinToString("\n").ifEmpty { "지금 길 제한속도" }
+    val known = car.speedLimit > 0 || ahead.isNotEmpty()
+    V.limitCard?.visibility = if (known) View.VISIBLE else View.GONE
+    V.statsCard?.visibility = if (known && ui.narrow) View.GONE else View.VISIBLE
+    V.stats?.text = if (km > 0.05f) String.format(Locale.KOREA, "%.1fkm", km) else "${sec / 60}분"
+    V.statsSub?.text = listOfNotNull(if (km > 0.05f) "${sec / 60}분" else null, trip.recorder.signalsNow().takeIf { it > 0 }?.let { "깜빡이 ${it}번" }).joinToString(" · ").ifEmpty { "조용히 적고 있어요" }
 }

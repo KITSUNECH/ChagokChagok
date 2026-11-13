@@ -59,6 +59,8 @@ class Recorder {
     /** 이번 주행에서 지금까지 달린 거리(km). 주행거리 신호가 없으면 0. */
     fun kmNow(): Float { val a = startKm; val b = lastKm; return if (a != null && b != null) (b - a).coerceAtLeast(0f) else 0f }
     fun secondsNow() = ((System.currentTimeMillis() - startTime) / 1000).toInt()
+    /** 지금까지 켠 깜빡이 수 (끄는 신호는 빼고) */
+    fun signalsNow() = raw.count { it.type == Evt.SIGNAL && it.value != "OFF" }
 
     /** 어떤 장치가 켜져 있던 시간을 모두 더한다(초). */
     private fun onSeconds(type: String, end: Long): Int {

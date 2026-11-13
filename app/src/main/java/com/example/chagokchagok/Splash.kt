@@ -1,7 +1,7 @@
 // 차곡車곡 – 시작 모션
 // 천천히, 끊기지 않게: 동작이 서로 겹치며 이어지고, 튕기지 않고 부드럽게 감속한다 (prompt-motion.com의 로고 등장 사례들을 참고).
 // 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓인다 → 쌓인 세 줄이 로고의 왼쪽 아래 칸으로 옮겨 가고,
-// 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다. 화면 전체는 내내 아주 천천히 다가온다. 누르면 건너뛴다.
+// 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다. 화면 전체는 내내 아주 천천히 다가온다. 눌러도 끝까지 보여 준다.
 package com.example.chagokchagok
 
 import android.animation.ValueAnimator
@@ -47,7 +47,8 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
 
     private fun finish() { if (finished) return; finished = true; anim?.cancel(); onDone() }
 
-    override fun onTouchEvent(e: MotionEvent): Boolean { if (e.action == MotionEvent.ACTION_UP) finish(); return true }
+    /** 눌러도 건너뛰지 않는다: 모션은 끝까지 보여 주고, 아래 화면으로 터치가 새지 않게만 막는다. */
+    override fun onTouchEvent(e: MotionEvent): Boolean = true
 
     // ── 시간과 이징 (튕김 없이 부드럽게) ──
     private fun seg(a: Float, b: Float) = ((t - a) / (b - a)).coerceIn(0f, 1f)

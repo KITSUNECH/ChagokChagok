@@ -114,6 +114,7 @@ private fun MainActivity.editPerson(n: String) {
 
 internal fun MainActivity.learnScreen(key: String?): View {
     val k = kit
+    if (key == null || key == "law") return lawScreen()
     val (title, sub, notes) = when (key) {
         "lamp" -> Triple("경고등 색 읽는 법", "색으로 먼저 판단하고, 자세한 뜻은 차의 설명서를 따라요.", Notes.lamps + car.lampsOn.mapNotNull { Lamps.all[it] }.map { Note("지금 켜진 표시등 · ${it.name} (${it.level})", it.what) })
         "newcar" -> Triple("면허시험 차와 다른 곳", "차마다 다르니 출발 준비에서 직접 해 보세요.", Notes.newCar)
@@ -133,6 +134,65 @@ internal fun MainActivity.learnScreen(key: String?): View {
             }
         }, 16))
         if (key == "newcar") { addView(k.gap(18)); addView(k.button("출발 준비에서 직접 해 보기", Kit.Btn.Primary, "steering") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) }) }
+    }
+}
+
+/** 면허 딴 해 이후 바뀐 법규: 시행일 순 타임라인, 항목마다 위반 시와 출처 */
+internal fun MainActivity.lawScreen(): View {
+    val k = kit; val d = store.driver
+    val year = store.licenseYear(d)
+    val since = Laws.since(year)
+    val older = Laws.changes.filter { it !in since }
+    fun lawCard(l: Law, last: Boolean): View = k.row(18).apply {
+        gravity = Gravity.TOP
+        // 왼쪽: 시행일과 이어지는 선
+        addView(k.col(6).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            addView(k.text(l.date.take(4), Type.BodyStrong, Ink.accent).apply { gravity = Gravity.CENTER })
+            addView(k.text(l.date.substring(5).replace("-", "."), Type.Caption, Ink.text3).apply { gravity = Gravity.CENTER })
+            if (!last) addView(View(context).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(2), ui.dp(60)))
+        }, k.lp(ui.dp(64), k.WRAP))
+        addView(k.card(pad = 20) {
+            addView(k.row().apply {
+                addView(k.text(l.title, Type.Headline), k.lp(0, k.WRAP, 1f))
+                addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 40) { speak(l.title + ". " + l.line) })
+            })
+            addView(k.gap(6)); addView(k.text(l.line, Type.Body, Ink.text2))
+            addView(k.gap(12))
+            addView(k.row(8).apply {
+                l.penalty?.let { addView(k.tag("위반하면 · $it", Ink.danger)) }
+            })
+            addView(k.gap(8))
+            addView(k.row(6).apply { addView(k.icon("book", Ink.text3, 14)); addView(k.text("출처 · ${l.source} · ${l.date.replace("-", ".")} 시행", Type.Caption, Ink.text3), k.lp(0, k.WRAP, 1f)) })
+        }, k.lp(0, k.WRAP, 1f))
+    }
+    return k.col().apply {
+        addView(k.header(if (since.isEmpty()) "꼭 알아 둘 법규" else "면허 딴 뒤 바뀐 법규", 
+            (year?.let { "${it}년에 면허를 땄다면 · " } ?: "면허 딴 해를 모를 때는 전부 · ") + "시행일 순, 법령 출처는 국가법령정보센터", onBack = { back() },
+            trailing = k.button(year?.let { "${it}년" } ?: "면허 딴 해", Kit.Btn.Tinted, "pencil") { pickLicenseYear() }))
+        addView(k.gap(18))
+        // 요약: 바뀐 것 · 그 전 것 · 꼭 알 것
+        addView(k.grid(3, listOf(k.stat("${since.size}가지", "면허 딴 뒤 바뀜"), k.stat("${older.size}가지", "그 전에 바뀜"), k.stat("${Laws.core.size}가지", "언제든 꼭")), 12).apply { background = k.rounded(Ink.surface, 18); setPadding(ui.dp(20), ui.dp(16), ui.dp(20), ui.dp(16)) })
+        addView(k.gap(20))
+        if (since.isNotEmpty()) {
+            addView(k.section("면허 딴 뒤 바뀐 것 · 최근부터"))
+            val list = since.reversed(); list.forEachIndexed { i, l -> addView(lawCard(l, i == list.lastIndex)); addView(k.gap(10)) }
+        }
+        addView(k.section("언제 땄든 꼭 알아 둘 것"))
+        Laws.core.forEachIndexed { i, l -> addView(lawCard(l, i == Laws.core.lastIndex)); addView(k.gap(10)) }
+        if (older.isNotEmpty()) {
+            addView(k.section("면허 따기 전에 바뀐 것 · 면허 시험에 나왔어요"))
+            addView(k.groupOf(older.reversed().map { l -> k.item(l.title, "${l.date.take(4)} · ${l.source}", "check", Ink.text3) }))
+        }
+    }
+}
+
+internal fun MainActivity.pickLicenseYear() {
+    val y = Laws.thisYear
+    val years = (0..30).map { y - it }
+    sheets.choose("면허는 언제 땄나요?", "그 뒤로 바뀐 법규만 골라 보여 드려요.", years.map { "${it}년" + if (it == y) " · 올해" else " · ${y - it}년 전" } + "기억 안 나요",
+        selected = store.licenseYear(store.driver)?.let { years.indexOf(it) } ?: years.size) { i ->
+        store.setLicenseYear(store.driver, years.getOrNull(i)); render()
     }
 }
 

@@ -68,6 +68,31 @@ class IconView(ctx: Context, var name: String, var color: Int, private val weigh
             "chevron" -> c.drawPath(path { moveTo(9f, 5f); lineTo(16f, 12f); lineTo(9f, 19f) }, p)
             "down" -> c.drawPath(path { moveTo(5f, 9f); lineTo(12f, 16f); lineTo(19f, 9f) }, p)
             "plus" -> { c.drawLine(12f, 5f, 12f, 19f, p); c.drawLine(5f, 12f, 19f, 12f, p) }
+            "minus" -> c.drawLine(5f, 12f, 19f, 12f, p)
+            // 쌓인 칸 (성장)
+            "layers" -> { c.drawRoundRect(RectF(4f, 15f, 20f, 20f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(5.5f, 9f, 18.5f, 14f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(7f, 3f, 17f, 8f), 1.5f, 1.5f, p) }
+            // 잇기
+            "link" -> {
+                c.drawPath(path { moveTo(10.5f, 13.5f); cubicTo(9f, 12f, 9f, 10f, 10.5f, 8.5f); lineTo(13f, 6f); cubicTo(14.5f, 4.5f, 16.8f, 4.5f, 18.3f, 6f); cubicTo(19.8f, 7.5f, 19.8f, 9.8f, 18.3f, 11.3f); lineTo(17f, 12.6f) }, p)
+                c.drawPath(path { moveTo(13.5f, 10.5f); cubicTo(15f, 12f, 15f, 14f, 13.5f, 15.5f); lineTo(11f, 18f); cubicTo(9.5f, 19.5f, 7.2f, 19.5f, 5.7f, 18f); cubicTo(4.2f, 16.5f, 4.2f, 14.2f, 5.7f, 12.7f); lineTo(7f, 11.4f) }, p)
+            }
+            // 기어 (P R N D)
+            "gear" -> {
+                c.drawRoundRect(RectF(7f, 3f, 17f, 21f), 5f, 5f, p)
+                c.drawLine(12f, 7f, 12f, 17f, p); fillOn(); c.drawCircle(12f, 9.5f, 2.2f, p); strokeOn()
+            }
+            // 차트
+            "chart" -> { c.drawLine(4f, 20f, 20f, 20f, p); c.drawRoundRect(RectF(6f, 12f, 9f, 20f), 1f, 1f, p); c.drawRoundRect(RectF(10.5f, 7f, 13.5f, 20f), 1f, 1f, p); c.drawRoundRect(RectF(15f, 10f, 18f, 20f), 1f, 1f, p) }
+            // 비교 (지난번 ↔ 이번)
+            "compare" -> { c.drawLine(4f, 8f, 18f, 8f, p); c.drawPath(path { moveTo(15f, 5f); lineTo(18f, 8f); lineTo(15f, 11f) }, p); c.drawLine(20f, 16f, 6f, 16f, p); c.drawPath(path { moveTo(9f, 13f); lineTo(6f, 16f); lineTo(9f, 19f) }, p) }
+            // 내비 (화살표 커서)
+            "navi" -> c.drawPath(path { moveTo(12f, 3f); lineTo(19f, 20f); lineTo(12f, 16f); lineTo(5f, 20f); close() }, p)
+            // 법 (저울)
+            "scale" -> {
+                c.drawLine(12f, 4f, 12f, 20f, p); c.drawLine(8f, 20f, 16f, 20f, p); c.drawLine(5f, 7f, 19f, 7f, p)
+                c.drawPath(path { moveTo(5f, 7f); lineTo(2.5f, 13f); cubicTo(3.5f, 14.5f, 6.5f, 14.5f, 7.5f, 13f); close() }, p)
+                c.drawPath(path { moveTo(19f, 7f); lineTo(16.5f, 13f); cubicTo(17.5f, 14.5f, 20.5f, 14.5f, 21.5f, 13f); close() }, p)
+            }
             "close" -> { c.drawLine(6f, 6f, 18f, 18f, p); c.drawLine(18f, 6f, 6f, 18f, p) }
             "check" -> c.drawPath(path { moveTo(4.5f, 12.5f); lineTo(9.5f, 17.5f); lineTo(19.5f, 6.5f) }, p)
             "checkCircle" -> { c.drawCircle(12f, 12f, 9f, p); c.drawPath(path { moveTo(8f, 12.3f); lineTo(11f, 15.3f); lineTo(16.5f, 9f) }, p) }

@@ -226,6 +226,13 @@ class Store(ctx: Context) {
     fun setFlag(name: String) = prefs.edit().putBoolean("flag_$name", true).apply()
     /** 차곡 탑에서 마지막으로 본 블록 수 (새로 쌓인 것만 떨어뜨리려고) */
     fun stackSeen(name: String) = prefs.getInt("stack_$name", 0)
+    /** 면허를 딴 해 (모르면 null). 그 뒤로 바뀐 법규를 고르는 데 쓴다. */
+    fun licenseYear(name: String): Int? = prefs.getInt("lic_$name", 0).takeIf { it > 0 }
+    fun setLicenseYear(name: String, year: Int?) = prefs.edit().apply { if (year == null) remove("lic_$name") else putInt("lic_$name", year) }.apply()
+    /** 이 차의 변속 방식 (lever · button · dial · column). VIN으로 못 알아내면 운전자가 고른다. */
+    var shifter: String?
+        get() = prefs.getString("shifter", null)
+        set(v) = prefs.edit().putString("shifter", v).apply()
     fun setStackSeen(name: String, n: Int) = prefs.edit().putInt("stack_$name", n).apply()
 
     /** 달리는 중인 기록 (앱이 꺼졌다 켜져도 이어 쓰려고) */

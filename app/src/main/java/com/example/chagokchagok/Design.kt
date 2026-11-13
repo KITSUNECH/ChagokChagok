@@ -54,7 +54,7 @@ object Ink {
             signal = c("#d95926"); brake = c("#e66767"); rain = c("#3987e5"); beam = c("#199e70")
         } else {
             // 낮: 현대 라이트 샌드 바탕, 샌드 선, 현대 블루 강조
-            bg = c("#F6F3F2"); surface = c("#FFFFFF"); fill = c("#EEE9E3"); line = c("#E4DCD3")
+            bg = c("#F6F3F2"); surface = c("#FFFFFF"); fill = c("#F1EDE9"); line = c("#E4DCD3")
             text = c("#0B1A2C"); text2 = c("#5E6B7A"); text3 = c("#9AA4AF")
             accent = c("#002C5F"); onAccent = c("#FFFFFF"); accentSoft = c("#E2EBF4")
             go = c("#1F9D48"); warn = c("#C26A00"); danger = c("#E63312")

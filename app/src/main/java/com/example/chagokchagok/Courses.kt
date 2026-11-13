@@ -38,12 +38,14 @@ internal fun MainActivity.myRouteHero(): View {
             addView(k.item(dest, "내비에 넣은 목적지", "pin", trailing = k.button("이 길로 출발", Kit.Btn.Primary, "play") { trip.guide = null; trip.routeSent = true; trip.start() }).apply { background = k.rounded(Ink.accentSoft, 18) })
         } else {
             addView(k.row(14).apply {
-                setPadding(ui.dp(18), ui.dp(16), ui.dp(18), ui.dp(16)); background = k.rounded(Ink.fill, 18)
+                setPadding(ui.dp(18), ui.dp(14), ui.dp(14), ui.dp(14)); background = k.rounded(Ink.surface, 18, 1, Ink.line)
                 addView(k.icon("pin", Ink.accent, 26))
                 addView(k.col(2).apply {
-                    addView(k.text("내비에서 목적지를 골라 주세요", Type.BodyStrong))
-                    addView(k.text("목적지가 없어도 괜찮아요. 기어를 D에 놓으면 오늘 주행이 기록돼요.", Type.Caption, Ink.text2))
+                    addView(k.text("목적지가 아직 없어요", Type.BodyStrong))
+                    addView(k.text("없어도 괜찮아요. 기어를 D에 놓으면 오늘 주행이 기록돼요.", Type.Caption, Ink.text2))
                 }, k.lp(0, k.WRAP, 1f))
+                // 실제 Pleos 내비의 장소 검색 화면을 연다 (NaviHelper requestNavigationScreen)
+                addView(k.button("내비에서 찾기", Kit.Btn.Tinted, "navi") { if (!car.openNavi()) toast("내비가 연결되지 않았어요. 내비 앱에서 목적지를 골라 주세요.") })
             })
         }
         if (places.isNotEmpty()) {
@@ -111,23 +113,16 @@ internal fun MainActivity.weekCard(): View? {
     }
 }
 
-/** 일기에서: 다음의 나에게 한마디 (같은 곳에 다시 가면 그 자리에서 들려준다) */
+/** 일기에서: 다음의 나에게 한마디 (같은 곳에 다시 가면 그 자리에서 들려준다). 주행 기록으로 만든 후보 셋 중 여러 개 + 직접 쓰기 */
 internal fun MainActivity.noteToSelf(d: Diary) {
     val place = d.drive.place ?: store.guide(d.guideId)?.title ?: "지난번 그 길"
-    sheets.choose("어디쯤에서 들을 말인가요?", "다음에 ‘$place’에 갈 때 그 자리에서 들려줄게요.", TIP_PLACES.map { it.first }) { where ->
-        val presets = listOf("여기서 미리 차선 바꾸기", "여기는 천천히", "주차장 입구 좁음", "여기 신호가 짧아")
-        sheets.choose("다음의 나에게", null, presets + "직접 쓰기") { i ->
-            fun save(t: String) {
-                val p = TIP_PLACES[where].second
-                val pt = Paths.at(d.drive.path, p)
-                val old = store.selfGuide(d.driver, place)
-                val tips = (old?.tips.orEmpty() + Tip(p, t, pt?.lat, pt?.lng)).sortedBy { it.p }
-                store.addGuide(Guide(old?.id ?: "self_${d.driver}_${place.hashCode()}", d.driver, place, d.drive.placeLat ?: old?.lat, d.drive.placeLng ?: old?.lng,
-                    d.drive, tips, (old?.times ?: 0) + 1, kind = "나"))
-                toast("다음에 ‘$place’에 갈 때 그 자리에서 들려줄게요.")
-                render()
-            }
-            if (i == presets.size) sheets.input("다음의 나에게", "예: 두 번째 신호에서 우회전") { save(it) } else save(presets[i])
-        }
+    pickTips("다음의 나에게", "다음에 ‘$place’에 갈 때 그 자리에서 들려줄게요.", TipSuggest.ideas(d.drive, forSelf = true)) { picked ->
+        val old = store.selfGuide(d.driver, place)
+        val placed = picked.map { t -> Paths.at(d.drive.path, t.p)?.let { pt -> t.copy(lat = pt.lat, lng = pt.lng) } ?: t }
+        val tips = (old?.tips.orEmpty() + placed).distinctBy { it.text }.sortedBy { it.p }
+        store.addGuide(Guide(old?.id ?: "self_${d.driver}_${place.hashCode()}", d.driver, place, d.drive.placeLat ?: old?.lat, d.drive.placeLng ?: old?.lng,
+            d.drive, tips, (old?.times ?: 0) + 1, kind = "나"))
+        toast("한마디 ${picked.size}개를 남겼어요. 다음에 ‘$place’에 갈 때 그 자리에서 들려줄게요.")
+        render()
     }
 }

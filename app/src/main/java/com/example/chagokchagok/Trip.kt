@@ -177,7 +177,10 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         heard.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
         praised = 0; spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
-        support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }
+        // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
+        support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
+            when (store.typeOf(store.driver)) { "초보" -> minOf(base, 2); "익숙" -> 3; else -> base }
+        }
         car.seatPos?.let { store.setSeat(store.driver, it) }
         host.tripStarted()
         val g = guide
