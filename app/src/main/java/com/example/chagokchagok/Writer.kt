@@ -60,6 +60,14 @@ class Recorder {
     fun kmNow(): Float { val a = startKm; val b = lastKm; return if (a != null && b != null) (b - a).coerceAtLeast(0f) else 0f }
     fun secondsNow() = ((System.currentTimeMillis() - startTime) / 1000).toInt()
 
+    /** 어떤 장치가 켜져 있던 시간을 모두 더한다(초). */
+    private fun onSeconds(type: String, end: Long): Int {
+        var total = 0L; var since = 0L
+        raw.filter { it.type == type }.forEach { if (it.value == "on") { if (since == 0L) since = it.time } else if (since > 0) { total += it.time - since; since = 0L } }
+        if (since > 0) total += end - since
+        return (total / 1000).toInt()
+    }
+
     /** 주행을 끝내고 요약을 만든다. */
     fun finish(driver: String): Drive {
         active = false
@@ -88,8 +96,10 @@ class Recorder {
             driver = driver, date = end, distKm = totalKm, minutes = (totalMs / 60000).toInt(), seconds = (totalMs / 1000).toInt(), events = events,
             signals = signals.count { it.value != "OFF" },
             brakes = raw.count { it.type == Evt.BRAKE && it.value == "on" },
-            rained = raw.any { it.type == Evt.WIPER && it.value == "on" },
-            night = raw.any { it.type == Evt.LIGHT && it.value == "on" },
+            // 와이퍼는 세척에도 쓰므로 모두 합쳐 1분 넘게 켜 둔 날만 비 온 날로 본다
+            rained = onSeconds(Evt.WIPER, end) >= 60,
+            // 전조등은 터널에서도 켜므로, 해가 진 시간(18시~6시)에 켠 날만 밤길로 본다
+            night = raw.any { it.type == Evt.LIGHT && it.value == "on" } && java.util.Calendar.getInstance().apply { timeInMillis = end }.get(java.util.Calendar.HOUR_OF_DAY).let { it >= 18 || it < 6 },
             parkMoves = if (firstR < 0) 0 else gears.size - firstR,
             lostWay = raw.count { it.type == Evt.LOST },
             longestSignalSec = (longest / 1000).toInt(),
@@ -130,7 +140,8 @@ object Writer {
         val firstRain = drive.rained && before.none { it.drive.rained }
         val firstNight = drive.night && before.none { it.drive.night }
         if (firstRain) { highlight = "와이퍼를 처음 켰다."; sb.append("$highlight "); stamp = "첫\n빗길" }
-        else if (drive.rained) sb.append("비가 와서 와이퍼를 켰다. ")
+        else if (drive.rained) sb.append("와이퍼를 켜고 달렸다. ")
+        else if (drive.events.any { it.type == Evt.WIPER && it.value == "on" }) sb.append("와이퍼를 잠깐 썼다. ")
         if (firstNight) { sb.append("전조등을 켜고 달린 것도 처음이다. "); if (stamp == null) stamp = "첫\n밤길" }
 
         val firstCruise = drive.cruise && before.none { it.drive.cruise }
@@ -157,7 +168,7 @@ object Writer {
         }
         // 연습을 건네준 사람의 초보 시절과 나란히 놓는다. 순위가 아니라 "누구나 처음엔"을 보여 주려는 것이다.
         if (guide != null && guide.kind == "연습" && guide.drive.parkMoves > 0 && drive.parkMoves > 0)
-            sb.append("${guide.owner}도 처음엔 ${times(guide.drive.parkMoves)} 오갔다고 했다. 나는 ${times(drive.parkMoves)}이었다. ")
+            sb.append("${guide.owner}도 처음엔 기어를 ${times(guide.drive.parkMoves)} 바꿨다고 했다. 나는 ${times(drive.parkMoves)}이었다. ")
         if (heardTips > 0 && guide != null) sb.append("${poss(guide.owner)} 한마디를 ${times(heardTips)} 들었다. ")
         if (drive.signals > 0) sb.append("깜빡이는 ${times(drive.signals)} 켰다. ")
         if (drive.turns > 0) sb.append(
@@ -168,7 +179,7 @@ object Writer {
 
         if (drive.parkMoves > 0) {
             val last = before.lastOrNull { it.drive.parkMoves > 0 }?.drive?.parkMoves
-            val s = "주차는 ${times(drive.parkMoves)} 만에 넣었다."
+            val s = "후진을 넣은 뒤 기어를 ${times(drive.parkMoves)} 바꿔 자리를 잡았다."
             sb.append("$s ")
             if (last != null && drive.parkMoves < last) {
                 sb.append("지난번엔 ${times(last)}이었다. ")
@@ -176,8 +187,10 @@ object Writer {
             }
         }
         if (guide != null) {
-            val followed = before.count { it.guideId == guide.id } + 1
-            if (followed == GRADUATE) { sb.append("이 길은 이제 졸업이다. "); stamp = "졸업" }
+            // 졸업은 끝까지 달린 날만 센다. 중간에 멈춘 날과 모의 주행은 넣지 않는다.
+            val followed = before.count { it.guideId == guide.id && it.drive.completed && !it.drive.sim } + if (drive.completed && !drive.sim) 1 else 0
+            if (!drive.completed) sb.append("오늘은 끝까지 가지 않고 멈췄다. ")
+            if (drive.completed && !drive.sim && followed == GRADUATE) { sb.append("이 길은 이제 졸업이다. "); stamp = "졸업" }
             else sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 네 기록이 생겼다. ")
         }
 
@@ -188,7 +201,7 @@ object Writer {
                 seasoned -> if (drive.place != null) "${drive.place}까지 다녀온 오늘을 남겨 둔다. 누군가에게 이 길을 건네줘도 좋겠다." else "오늘의 드라이브를 남겨 둔다."
                 drive.longestSignalSec >= 20 -> "다음엔 깜빡이 끄는 것 하나만 챙기자."
                 drive.turns > drive.turnsSignaled -> "다음엔 돌기 조금 전에 깜빡이를 먼저 켜 보자."
-                drive.lostWay > 0 -> "길을 한 번 놓쳤지만 괜찮다."
+                drive.lostWay > 0 -> "내비가 길을 다시 찾았지만 괜찮다."
                 else -> "오늘은 이대로 좋았다."
             }
         )

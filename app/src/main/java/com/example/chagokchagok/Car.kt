@@ -71,6 +71,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var washerLow = false; private set
     /** 워셔액 경고를 실제로 읽어 왔는지. */
     var washerKnown = false; private set
+    /** 내비가 경로 안내를 시작했다고 알려 왔는지 (요청만 보낸 것과 구분) */
+    var routeStarted = false; private set
     /** 지금 켜져 있는 표시등 종류 */
     val lampsOn = mutableSetOf<String>()
     /** 바퀴별 공기압 (차가 주는 단위 그대로) */
@@ -186,6 +188,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     // ── 내비 이벤트 리스너 ──
     private val naviL = object : NaviHelperEventListener {
         override fun onReRouteEnded() = ui { listener.onCarEvent(Evt.LOST, "reroute") }
+        override fun onRouteStarted(routeStartInfo: ai.pleos.playground.navi.data.RouteStartInfo) = ui { routeStarted = true; listener.onCarEvent(Evt.NAVI, "route") }
+        override fun onRoutingCompleted() = ui { routeStarted = true; listener.onCarEvent(Evt.NAVI, "route") }
         override fun onDestinationArrived(destinationArrivedInfo: ai.pleos.playground.navi.data.DestinationArrivedInfo) =
             ui { listener.onArrived() }
         override fun onCurrentLocationInfo(currentLocationInfo: CurrentLocationInfo) {
@@ -304,6 +308,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
 
     /** 건네준 길의 목적지를 내비에 넣는다. 좌표가 없거나 내비가 연결되지 않았으면 false. */
     fun requestRoute(name: String, lat: Double?, lng: Double?, comfortable: Boolean = false): Boolean {
+        routeStarted = false
         if (!naviConnected || lat == null || lng == null) return false
         return attempt("navi") {
             navi.requestRoute(

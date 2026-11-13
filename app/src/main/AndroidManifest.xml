@@ -40,7 +40,9 @@
         </activity>
 
         <!-- 글레오가 호출하는 기능 세 가지 (assets/schema.json 과 이름이 같아야 한다) -->
-        <receiver android:name=".GleoReceiver" android:exported="true">
+        <!-- 공모전 참가팀은 Gleo Interface(App Schema) 검토·승인을 신청할 수 없어 제출판에서는 꺼 둔다.
+             켜면 다른 앱이 일기 내용을 요청할 수 있으므로, 승인 절차가 열리면 권한과 함께 다시 켠다. -->
+        <receiver android:name=".GleoReceiver" android:exported="true" android:enabled="false">
             <intent-filter>
                 <action android:name="READ_LATEST_DIARY" />
                 <action android:name="GET_NEXT_ROUTE" />

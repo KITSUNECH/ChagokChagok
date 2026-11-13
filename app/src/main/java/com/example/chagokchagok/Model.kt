@@ -36,7 +36,11 @@ data class Drive(
     val place: String? = null,    // 내비 목적지 이름 (건네준 길 없이 간 길)
     val lamps: List<String> = emptyList(), // 달리는 동안 켜진 표시등 종류
     val placeLat: Double? = null,  // 목적지 좌표 (다시 가기, 건네주기에 쓴다)
-    val placeLng: Double? = null
+    val placeLng: Double? = null,
+    /** 목적지에 도착했거나 받은 길의 거리를 거의 다 달렸는지. 졸업은 이것만 센다. */
+    val completed: Boolean = true,
+    /** 시연용 모의 주행으로 만든 기록. 졸업·다녀온 곳·성장 숫자에 넣지 않는다. */
+    val sim: Boolean = false
 )
 
 /** 건네준 길: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -113,6 +117,7 @@ class Store(ctx: Context) {
     /** 함께 차곡에 올린 일기와 그때 남긴 한 줄. */
     fun posted(diaryId: String): String? = prefs.getString("post_$diaryId", null)
     fun post(diaryId: String, caption: String) = prefs.edit().putString("post_$diaryId", caption).apply()
+    fun unpost(diaryId: String) = prefs.edit().remove("post_$diaryId").apply()
     /** 응원(하트)을 누른 사람들. 숫자로 줄 세우지 않고 누가 응원했는지만 보여 준다. */
     fun hearts(id: String): Set<String> = prefs.getStringSet("heart_$id", emptySet()) ?: emptySet()
     fun toggleHeart(id: String, name: String) { val h = hearts(id).toMutableSet(); if (!h.remove(name)) h.add(name); prefs.edit().putStringSet("heart_$id", h).apply() }
@@ -132,7 +137,7 @@ class Store(ctx: Context) {
     fun setSeat(name: String, pos: Int) = prefs.edit().putInt("seat_$name", pos).apply()
 
     /** 이 운전자가 건네준 길 없이 다녀온 곳들. */
-    fun places(name: String) = diariesOf(name).mapNotNull { if (it.guideId == null) it.drive.place else null }.distinct()
+    fun places(name: String) = diariesOf(name).mapNotNull { if (it.guideId == null && !it.drive.sim) it.drive.place else null }.distinct()
 
     /** 일기 말투: 담백하게, 다정하게. */
     fun tone(name: String) = prefs.getString("tone_$name", "담백하게") ?: "담백하게"
@@ -148,7 +153,7 @@ class Store(ctx: Context) {
     }.toString()).apply()
 
     /** 이 운전자가 이 건네준 길을 몇 번 따라 달렸는지. 세 번이면 졸업이다. */
-    fun timesFollowed(driver: String, guideId: String) = diaries().count { it.driver == driver && it.guideId == guideId }
+    fun timesFollowed(driver: String, guideId: String) = diaries().count { it.driver == driver && it.guideId == guideId && it.drive.completed && !it.drive.sim }
     fun graduated(driver: String, guideId: String) = timesFollowed(driver, guideId) >= GRADUATE
     fun totalKm(driver: String) = diariesOf(driver).sumOf { it.drive.distKm.toDouble() }.toFloat()
 
@@ -195,7 +200,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }; put("completed", d.completed); put("sim", d.sim)
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -210,7 +215,7 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }, if (o.has("placeLat")) o.getDouble("placeLat") else null, if (o.has("placeLng")) o.getDouble("placeLng") else null
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }, if (o.has("placeLat")) o.getDouble("placeLat") else null, if (o.has("placeLng")) o.getDouble("placeLng") else null, o.optBoolean("completed", true), o.optBoolean("sim", false)
         )
     }
 

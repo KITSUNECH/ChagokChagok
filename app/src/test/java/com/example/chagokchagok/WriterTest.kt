@@ -17,7 +17,9 @@ class WriterTest {
         r.add(Evt.WIPER, "on"); r.distance(104.2f)
         r.add(Evt.GEAR, "R"); r.add(Evt.GEAR, "D"); r.add(Evt.GEAR, "R")
         val d = r.finish("나")
-        assertEquals(1, d.signals); assertEquals(1, d.brakes); assertEquals(3, d.parkMoves); assertTrue(d.rained)
+        assertEquals(1, d.signals); assertEquals(1, d.brakes); assertEquals(3, d.parkMoves)
+        // 와이퍼를 잠깐 켠 것은 세척일 수 있어 비 온 날로 치지 않는다 (1분 넘게 켜야 비)
+        assertTrue(!d.rained)
         assertEquals(4.2f, d.distKm, 0.01f)
         println("DRIVE " + d)
     }
