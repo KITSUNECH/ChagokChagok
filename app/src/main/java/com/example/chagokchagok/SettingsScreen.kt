@@ -148,8 +148,10 @@ internal fun MainActivity.lawScreen(): View {
         // 왼쪽: 시행일과 이어지는 선
         addView(k.col(6).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            addView(k.text(l.date.take(4), Type.BodyStrong, Ink.accent).apply { gravity = Gravity.CENTER })
-            addView(k.text(l.date.substring(5).replace("-", "."), Type.Caption, Ink.text3).apply { gravity = Gravity.CENTER })
+            if (l.dated) {
+                addView(k.text(l.date.take(4), Type.BodyStrong, Ink.accent).apply { gravity = Gravity.CENTER })
+                addView(k.text(l.date.substring(5).replace("-", "."), Type.Caption, Ink.text3).apply { gravity = Gravity.CENTER })
+            } else addView(k.icon("scale", Ink.accent, 24))
             if (!last) addView(View(context).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(2), ui.dp(60)))
         }, k.lp(ui.dp(64), k.WRAP))
         addView(k.card(pad = 20) {
@@ -163,12 +165,12 @@ internal fun MainActivity.lawScreen(): View {
                 l.penalty?.let { addView(k.tag("위반하면 · $it", Ink.danger)) }
             })
             addView(k.gap(8))
-            addView(k.row(6).apply { addView(k.icon("book", Ink.text3, 14)); addView(k.text("출처 · ${l.source} · ${l.date.replace("-", ".")} 시행", Type.Caption, Ink.text3), k.lp(0, k.WRAP, 1f)) })
+            addView(k.row(6).apply { addView(k.icon("book", Ink.text3, 14)); addView(k.text("근거 · ${l.source}" + (if (l.dated) " · ${l.date.replace("-", ".")} 시행" else "") + " · " + l.url.substringAfter("//").substringBefore("/"), Type.Caption, Ink.text3), k.lp(0, k.WRAP, 1f)) })
         }, k.lp(0, k.WRAP, 1f))
     }
     return k.col().apply {
         addView(k.header(if (since.isEmpty()) "꼭 알아 둘 법규" else "면허 딴 뒤 바뀐 법규", 
-            (year?.let { "${it}년에 면허를 땄다면 · " } ?: "면허 딴 해를 모를 때는 전부 · ") + "시행일 순, 법령 출처는 국가법령정보센터", onBack = { back() },
+            (year?.let { "${it}년에 면허를 땄다면 · " } ?: "면허 딴 해를 모를 때는 전부 · ") + "시행일 순 · 법제처 생활법령정보·정책브리핑 기준", onBack = { back() },
             trailing = k.button(year?.let { "${it}년" } ?: "면허 딴 해", Kit.Btn.Tinted, "pencil") { pickLicenseYear() }))
         addView(k.gap(18))
         // 요약: 바뀐 것 · 그 전 것 · 꼭 알 것

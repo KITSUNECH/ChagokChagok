@@ -233,6 +233,13 @@ class Store(ctx: Context) {
     var shifter: String?
         get() = prefs.getString("shifter", null)
         set(v) = prefs.edit().putString("shifter", v).apply()
+    /** 운전자가 고른 이 차의 차종 이름 (Shifters.models) */
+    var carModel: String?
+        get() = prefs.getString("carModel", null)
+        set(v) = prefs.edit().putString("carModel", v).apply()
+    /** 운전자별 위치 기록 동의 (위치정보법 제15조: 동의 없이 수집하지 않는다). null = 아직 묻지 않음 */
+    fun locationConsent(name: String): Boolean? = if (prefs.contains("loc_$name")) prefs.getBoolean("loc_$name", false) else null
+    fun setLocationConsent(name: String, on: Boolean) = prefs.edit().putBoolean("loc_$name", on).apply()
     fun setStackSeen(name: String, n: Int) = prefs.edit().putInt("stack_$name", n).apply()
 
     /** 달리는 중인 기록 (앱이 꺼졌다 켜져도 이어 쓰려고) */

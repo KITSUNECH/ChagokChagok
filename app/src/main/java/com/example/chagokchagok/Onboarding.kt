@@ -74,8 +74,10 @@ internal fun MainActivity.lawRow(l: Law, compact: Boolean = false): View {
         gravity = Gravity.TOP
         setPadding(ui.dp(18), ui.dp(14), ui.dp(18), ui.dp(14))
         addView(k.col(0).apply {
-            addView(k.text(l.date.take(4), Type.BodyStrong, Ink.accent))
-            addView(k.text(l.date.substring(5, 7).trimStart('0') + "월", Type.Caption, Ink.text3))
+            if (l.dated) {
+                addView(k.text(l.date.take(4), Type.BodyStrong, Ink.accent))
+                addView(k.text(l.date.substring(5, 7).trimStart('0') + "월", Type.Caption, Ink.text3))
+            } else addView(k.icon("scale", Ink.accent, 22))
         }, k.lp(ui.dp(52), k.WRAP))
         addView(k.col(2).apply {
             addView(k.text(l.title, Type.BodyStrong))
@@ -176,7 +178,7 @@ internal fun MainActivity.onboardScreen(): View {
                 }))
                 val since = Laws.since(y)
                 side(k.text(if (since.isEmpty()) "바뀐 법규는 없어요" else "그 뒤로 바뀐 법규 ${since.size}가지", Type.Headline))
-                side(k.text(if (since.isEmpty()) "대신 초보가 꼭 알아 둘 것을 보여 드릴게요." else "시행일 순이에요. 출처는 국가법령정보센터의 법령이에요.", Type.Sub, Ink.text2))
+                side(k.text(if (since.isEmpty()) "대신 초보가 꼭 알아 둘 것을 보여 드릴게요." else "시행일 순이에요. 법제처 생활법령정보와 정책브리핑으로 확인했어요.", Type.Sub, Ink.text2))
                 val all = if (since.isEmpty()) Laws.core else since
                 val list = all.takeLast(if (ui.wide) 4 else 3)
                 side(specTable(list.map { lawRow(it, compact = true) }))
@@ -218,7 +220,7 @@ internal fun MainActivity.onboardScreen(): View {
                 addView(k.text("이렇게 쓸게요", Type.Large))
                 addView(k.text("모두 나중에 설정에서 바꿀 수 있어요.", Type.Sub, Ink.text2))
                 addView(k.groupOf(listOf(
-                    k.toggleItem("한마디를 그 자리에서 듣기", "차의 위치로 한마디를 남긴 자리에 가까워졌는지 봐요. 위치는 이 차 안에만 저장돼요.", store.locationOn, "pin") { store.locationOn = it; if (it && !places.permitted()) askLocation() },
+                    k.toggleItem("한마디를 그 자리에서 듣기", "${O.name} 님의 위치로 한마디를 남긴 자리에 가까워졌는지 봐요. 위치는 이 차 안에만 저장되고, 함께 쓰는 사람은 각자 따로 동의해요.", store.locationOn, "pin") { store.locationOn = it; if (it && !places.permitted()) askLocation() },
                     k.toggleItem("소리로 알려 주기", "달리는 동안 화면 대신 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
                     k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
                 )))
@@ -306,6 +308,7 @@ private fun MainActivity.finishOnboarding(prepFirst: Boolean) {
     store.setDrivers(listOf(O.name) + O.others.filter { it != O.name })
     store.driver = O.name; store.setType(O.name, O.type); store.setRelation(O.name, "가족")
     store.setLicenseYear(O.name, O.license)
+    store.setLocationConsent(O.name, store.locationOn)   // 첫 설정의 위치 켜기 = 이 운전자의 동의
     O.others.forEach { store.setRelation(it, if (it == "친구") "친구" else "가족") }
     store.onboarded = true
     if (store.locationOn) places.start()

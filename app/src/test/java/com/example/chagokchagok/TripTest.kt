@@ -33,7 +33,7 @@ class TripTest {
     @Before fun setUp() {
         Car.offline = true
         val ctx = RuntimeEnvironment.getApplication()
-        store = Store(ctx).apply { clearAll(); setDrivers(listOf("나", "아빠")); driver = "나"; weatherOn = false; addSampleGuide() }
+        store = Store(ctx).apply { clearAll(); setDrivers(listOf("나", "아빠")); driver = "나"; weatherOn = false; setLocationConsent("나", true); addSampleGuide() }
         val car = Car(ctx, object : Car.Listener { override fun onCarEvent(type: String, value: String) {} })
         trip = Trip(store, car, host)
         trip.guide = store.guide("sample")

@@ -55,7 +55,7 @@ class ScreenshotTest {
         Onboard.step = 4; Onboard.solo = false; Onboard.others.add("아빠"); a.go(MainActivity.ONBOARD); snap("00c_onboard_who")
         Onboard.step = 6; a.go(MainActivity.ONBOARD); snap("00d_onboard_ready"); Onboard.others.clear()
         val store = a.store
-        store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true
+        store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setLocationConsent("나", true); store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true
         Onboard.squeeze = Gauge.cap(2); store.setType("나", "오랜만"); a.go(MainActivity.TODAY)
         // 압축 모션 중간과 끝 (시계를 앞으로 돌려 본다)
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1250)); snap("01a_squeeze_mid")
@@ -74,7 +74,7 @@ class ScreenshotTest {
         a.go(MainActivity.TODAY); snap("01b_today_solo")
         keep.forEach { store.addGuide(it) }
         a.go(MainActivity.TODAY); snap("02_today")
-        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.shifter = "column"; a.onPrep(Evt.GEAR, "R"); snap("03b_prep_gear"); store.shifter = null }
+        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.carModel = "더 뉴 그랜저 (2026)"; a.onPrep(Evt.GEAR, "R"); snap("03b_prep_gear"); store.carModel = null }
         a.depart(store.guide("sample")!!); snap("04_ready")
         a.trip.start(); a.onCarEvent(Evt.SIGNAL, "RIGHT"); a.car.setTurn("TURN_RIGHT", 80, ""); a.onCarEvent(Evt.NAVI, "turn")
         a.trip.onLocation(SampleRoute.points[16].first, SampleRoute.points[16].second, null)

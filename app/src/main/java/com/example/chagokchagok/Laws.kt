@@ -6,13 +6,16 @@ package com.example.chagokchagok
 import java.util.Calendar
 
 internal data class Law(
-    val date: String,          // 시행일 YYYY-MM-DD
+    val date: String,          // 시행일 YYYY-MM-DD (늘 알아야 할 규칙은 빈 문자열)
     val title: String,
     val line: String,          // 운전자에게 하는 한 줄
     val penalty: String?,      // 위반하면
     val source: String,        // 법령과 조항
     val url: String,
-) { val year get() = date.take(4).toInt() }
+) {
+    val year get() = date.take(4).toIntOrNull() ?: 0
+    val dated get() = date.length == 10
+}
 
 internal object Laws {
     /** 시행일 순. 조사 근거는 README 와 설계 자료에 함께 적었다. */

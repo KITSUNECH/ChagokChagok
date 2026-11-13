@@ -233,12 +233,23 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         }
     }
 
+    /** 운전자마다 위치 기록 동의를 따로 받는다 (위치정보법 제15조: 누구든지 동의 없이 개인위치정보를 수집하면 안 된다) */
+    internal fun askLocationConsent(n: String) {
+        sheets.sheet("$n 님의 위치를 써도 될까요?", "한마디를 남긴 자리에 가까워졌는지 보고, 지나온 길을 이 차 안에만 저장해요. 다른 사람에게는 $n 님이 고른 일기만 보여요.", dismissible = false) { close ->
+            addView(kit.buttons(
+                kit.button("쓰지 않기", Kit.Btn.Secondary) { store.setLocationConsent(n, false); close(); toast("위치 없이 기록해요. 설정에서 바꿀 수 있어요.") },
+                kit.button("동의해요", Kit.Btn.Primary, "pin") { store.setLocationConsent(n, true); close() },
+                stack = false))
+        }
+    }
+
     internal fun switchDriver() {
         val names = store.drivers
         sheets.sheet("누가 운전하나요?", "운전석에 앉은 사람의 기록과 받은 길이 보여요.") { close ->
             addView(kit.groupOf(names.map { n ->
                 kit.item(n, "${store.relation(n)} · ${store.typeOf(n)}", trailing = if (n == store.driver) kit.icon("check", Ink.accent, 20) else kit.avatar(n, 32)) {
                     close(); store.driver = n; chosenGuide = null; go(TODAY); toast("$n 님의 운전석으로 바꿨어요.")
+                    if (store.locationOn && store.locationConsent(n) == null) askLocationConsent(n)
                 }
             } + kit.item("사람 추가·관리", icon = "plus") { close(); go(PEOPLE) }).apply { background = kit.rounded(Ink.fill, 18) })
         }

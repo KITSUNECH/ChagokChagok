@@ -1,6 +1,6 @@
 // 차곡車곡 – 달리는 동안
 // 운전자가 볼 것은 세 가지뿐: 다음 회전, 방금 들려준 한마디, 길 위의 지금 위치.
-// 누르는 것은 '숨 고르기'와 '내비' 둘. 나머지는 말로 알려 준다. 글은 3줄을 넘기지 않는다.
+// 누르는 것은 '숨 고르기'와 '내비' 둘, 그것도 멈췄을 때만(도로교통법 제49조). 나머지는 말로 알려 준다. 글은 3줄을 넘기지 않는다.
 // 한눈(2초 안)에 읽히게: 지금 할 일 하나만 크게, 일이 없을 때는 화면이 조용해진다.
 // 회전까지 남은 거리는 줄어드는 막대로, 한마디가 나오는 동안만 한마디 칸이 밝아진다.
 package com.example.chagokchagok
@@ -68,7 +68,7 @@ internal fun MainActivity.driveScreen(): View {
         if (trip.sim) addView(k.tag("모의 주행 · 시연용", Ink.warn))
         // Pleos 내비를 앞으로 (NaviHelper requestNavigationScreen). 분할 화면이면 옆 창에 뜬다.
         addView(k.gap(8))
-        addView(k.button("내비", Kit.Btn.Secondary, "navi") { if (!car.openNavi()) say("내비가 연결되지 않았어요.") })
+        addView(k.button("내비", Kit.Btn.Secondary, "navi", enabled = !limits.restricted) { if (!car.openNavi()) say("내비가 연결되지 않았어요.") })
     }
 
     // 다음 회전 (내비)
@@ -122,7 +122,9 @@ internal fun MainActivity.driveScreen(): View {
     V.statsSub = k.text("", Type.Sub, Ink.text2)
     val statsCard = k.card(24) { addView(k.text("지금까지", Type.Caption, Ink.text2)); addView(V.stats); addView(V.statsSub) }
     V.statsCard = statsCard
-    val breathe = k.button("숨 고르기", Kit.Btn.Secondary, "breath") { trip.breathe() }
+    // 도로교통법 제49조 제1항 제11호의2: 운전 중 화면 조작은 정지 중에만. 차가 주행 제한을 걸면(움직이는 중) 버튼을 잠근다.
+    val moving = limits.restricted
+    val breathe = k.button(if (moving) "멈추면 누를 수 있어요" else "숨 고르기", Kit.Btn.Secondary, "breath", enabled = !moving) { trip.breathe() }
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
     val stop = if (car.failures.containsKey(Evt.GEAR)) k.button("기록 멈추기", Kit.Btn.Danger, "stop") { trip.end() } else null
 

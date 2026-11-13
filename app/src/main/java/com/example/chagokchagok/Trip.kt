@@ -87,6 +87,11 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             else if (prompt != null && ((type == Evt.SIGNAL && value != "OFF") || car.turn == null)) { if (type == Evt.SIGNAL) host.chime(); prompt = null }
         }
         if (active && type == Evt.LOST) host.say("괜찮아요. 내비가 경로를 다시 찾았어요.")
+        // 달리는 동안은 화면을 누를 수 없으니(도로교통법 제49조), 15초 안에 브레이크를 세 번 밟으면 먼저 말을 건넨다. 한 주행에 한 번.
+        if (active && type == Evt.BRAKE && value == "on") {
+            val now = System.currentTimeMillis(); brakeTimes.add(now); brakeTimes.removeAll { now - it > 15000 }
+            if (brakeTimes.size >= 3 && spoken.add("calm_auto")) host.say("괜찮아요. 천천히 가도 돼요.")
+        }
         if (type == Evt.SEAT && value == "on") withPassenger = true
         if (type == Evt.LAMP) onLamp(value)
         if (active) roadside(type, value)
@@ -108,6 +113,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     /** 위치가 바뀌었다 (위치 SDK, 내비, 또는 모의 주행) */
     fun onLocation(lat: Double, lng: Double, heading: Float?) {
         if (!active) return
+        // 운전자가 위치 사용에 동의하지 않았으면 위치를 쓰지도 남기지도 않는다 (모의 주행 좌표는 예시 길이라 예외)
+        if (!sim && store.locationConsent(store.driver) != true) return
         val last = path.lastOrNull()
         if (last == null || Places.meters(last.first, last.second, lat, lng) >= 30) { path.add(lat to lng); if (!sim) save() }
         tipsNear(lat, lng, heading)
@@ -167,6 +174,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     }
 
     // ───────── 시작과 끝 ─────────
+
+    private val brakeTimes = mutableListOf<Long>()
 
     fun start() {
         recorder.start(car.odometerKm)
