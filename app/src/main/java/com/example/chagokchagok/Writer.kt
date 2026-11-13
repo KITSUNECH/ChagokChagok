@@ -68,6 +68,20 @@ class Recorder {
         return (total / 1000).toInt()
     }
 
+    /** 앱이 꺼져도 이어 쓸 수 있게 지금까지의 기록을 글자로 남긴다 */
+    fun snapshot(): org.json.JSONObject = org.json.JSONObject().apply {
+        put("start", startTime); startKm?.let { put("startKm", it.toDouble()) }; lastKm?.let { put("lastKm", it.toDouble()) }
+        put("raw", org.json.JSONArray().apply { raw.forEach { put(org.json.JSONArray().put(it.time).put(it.km.toDouble()).put(it.type).put(it.value)) } })
+    }
+    fun restore(o: org.json.JSONObject) {
+        raw.clear(); active = true
+        startTime = o.getLong("start")
+        startKm = if (o.has("startKm")) o.getDouble("startKm").toFloat() else null
+        lastKm = if (o.has("lastKm")) o.getDouble("lastKm").toFloat() else null
+        val a = o.getJSONArray("raw")
+        for (i in 0 until a.length()) a.getJSONArray(i).let { raw.add(Raw(it.getLong(0), it.getDouble(1).toFloat(), it.getString(2), it.getString(3))) }
+    }
+
     /** 주행을 끝내고 요약을 만든다. */
     fun finish(driver: String): Drive {
         active = false

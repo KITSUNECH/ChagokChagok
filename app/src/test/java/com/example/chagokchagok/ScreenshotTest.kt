@@ -75,10 +75,14 @@ class ScreenshotTest {
             a.journalTab = 0; a.go(MainActivity.JOURNAL); snap("08_journal")
             a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("09_analysis")
             a.go(MainActivity.TOGETHER); snap("10_together")
+            store.demoOn = true; a.go(MainActivity.TOGETHER); snap("15_social_demo")
+            a.convoyWith(Demo.friends[0], store.guide("sample")); a.trip.start(); snap("16_convoy_drive"); a.onCarEvent(Evt.GEAR, "P"); store.demoOn = false
             a.roadsTab = 2; a.go(MainActivity.ROADS); snap("11_roads")
             a.go(MainActivity.SETTINGS); snap("12_settings")
             a.go(MainActivity.LEARN, "law"); snap("13_learn")
             a.go(MainActivity.CHECK); snap("14_check")
+            a.go(MainActivity.PROPOSE); snap("17_propose")
+            a.go(MainActivity.TODAY); a.stackSheet(); snap("18_stack_sheet")
         } else { a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("09_analysis") }
         ctrl.pause().stop().destroy()
     }

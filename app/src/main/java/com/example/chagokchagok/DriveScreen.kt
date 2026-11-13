@@ -93,14 +93,14 @@ internal fun MainActivity.driveScreen(): View {
 
     val view = if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
-        addView(k.col(18).apply { addView(top); addView(turnCard); addView(tipCard); addView(routeCard) }, k.lp(0, k.MATCH, 1.7f))
+        addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard) }, k.lp(0, k.MATCH, 1.7f))
         addView(k.col(18).apply {
             addView(limitCard, k.lp(k.MATCH, k.WRAP)); addView(k.fill())
             addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
-        addView(top); addView(turnCard); addView(tipCard); addView(routeCard)
+        addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard)
         addView(k.row(14).apply { addView(limitCard, k.lp(0, k.WRAP, 1f)); addView(breathe, k.lp(0, ui.dp(84), 1.2f)) })
         stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
     }
@@ -158,5 +158,6 @@ internal fun MainActivity.refreshDrive() {
     val ahead = mutableListOf<String>()
     if (car.cameraMeters > 0) ahead.add((if (car.schoolZone) "어린이 보호구역 " else "단속 ") + "${car.cameraMeters}m")
     if (car.cautionMeters > 0) ahead.add("주의 구간 ${car.cautionMeters}m")
+    refreshConvoy()
     V.ahead?.text = ahead.joinToString("\n").ifEmpty { if (car.speedLimit > 0) "지금 길 제한속도" else "제한속도 정보 없음" }
 }

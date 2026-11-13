@@ -23,10 +23,12 @@ internal fun MainActivity.togetherScreen(): View {
     val items = mutableListOf<Item>()
     store.guides().forEach { g -> items.add(Item(g.drive.date, { guideCard(g) }, if (g.kind == "추천") 2 else 1)) }
     store.diaries().filter { visible(it) && it.guideId == null }.forEach { d -> items.add(Item(d.date, { diaryCard(d) }, 3)) }
+    if (store.demoOn) Demo.posts.filter { it.friend.id !in store.demoRemoved() }.forEach { p -> items.add(Item(System.currentTimeMillis() - p.daysAgo * 86400000L, { demoPostCard(p) }, when (p.kind) { "추천" -> 2; "일기" -> 3; else -> 1 })) }
     val shown = items.filter { FeedPrefs.filter == 0 || it.kind == FeedPrefs.filter }.sortedByDescending { it.date }
     return k.col().apply {
         addView(k.header("함께 차곡", "함께 쓰는 사람들이 건넨 길과 다녀온 이야기예요. 마음에 들면 나도 가 볼 수 있어요."))
         addView(k.gap(18))
+        if (store.demoOn) { addView(demoFriendsSection()); addView(k.gap(18)) }
         addView(k.chips(listOf("전체", "건네준 길", "추천 장소", "일기"), listOf("전체", "건네준 길", "추천 장소", "일기")[FeedPrefs.filter]) { FeedPrefs.filter = listOf("전체", "건네준 길", "추천 장소", "일기").indexOf(it); render() })
         addView(k.gap(18))
         if (shown.isEmpty()) addView(k.card { addView(k.empty("people", "아직 올라온 것이 없어요", "일기에서 ‘함께 차곡에 올리기’나 ‘이 길 건네주기’를 누르면 여기에 쌓여요.",
@@ -105,6 +107,7 @@ private fun MainActivity.guideCard(g: Guide): View {
                 else k.button(if (saved) "저장됨" else "저장", Kit.Btn.Secondary, if (saved) "bookmarkFill" else "bookmark") { store.toggleSaved(me, g.id); toast(if (saved) "저장을 풀었어요." else "내 길 › 저장한 길에 넣었어요."); render() },
                 stack = false))
         } else addView(k.text("내가 건넨 길이에요 · 따라 달린 사람 ${followers.map { it.driver }.distinct().size}명", Type.Caption, Ink.text2))
+        addView(commentsBlock("g_${g.id}"))
         addView(heartsRow("g_${g.id}"))
     }
 }
@@ -132,6 +135,7 @@ private fun MainActivity.diaryCard(d: Diary): View {
         else if (d.drive.placeLat != null) addView(k.button("나도 가 보기", Kit.Btn.Primary, "play") {
             depart(Guide("visit_${d.id}", d.driver, d.drive.place ?: d.title, d.drive.placeLat, d.drive.placeLng, d.drive.copy(path = Paths.shareable(d.drive.path)), emptyList(), 1, kind = "추천"))
         })
+        addView(commentsBlock("d_${d.id}"))
         addView(heartsRow("d_${d.id}"))
     }
 }
@@ -141,7 +145,7 @@ private fun MainActivity.diaryCard(d: Diary): View {
 internal fun MainActivity.roadsScreen(): View {
     val k = kit; val me = store.driver
     val mine = store.guides().filter { it.owner == me }
-    val saved = store.guides().filter { it.id in store.saved(me) }
+    val saved = (store.guides() + if (store.demoOn) listOf(Demo.dadCommute, Demo.seoyeonPractice) else emptyList()).filter { it.id in store.saved(me) }
     val trips = store.diariesOf(me).filter { it.guideId == null && it.drive.place != null && !it.drive.sim }.groupBy { it.drive.place!! }
     val body = when (roadsTab) {
         0 -> if (mine.isEmpty()) k.card { addView(k.empty("gift", "아직 건넨 길이 없어요", "평소처럼 달린 뒤 일기에서 ‘이 길 건네주기’를 누르면, 가족이나 친구가 같은 길을 달릴 수 있어요.")) }

@@ -36,10 +36,10 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     companion object {
         const val TODAY = "today"; const val JOURNAL = "journal"; const val TOGETHER = "together"; const val ROADS = "roads"; const val SETTINGS = "settings"
         const val PREP = "prep"; const val READY = "ready"; const val DIARY = "diary"; const val GIVE = "give"; const val LEARN = "learn"
-        const val PEOPLE = "people"; const val ONBOARD = "onboard"; const val DRIVE = "drive"; const val ANALYSIS = "analysis"; const val CHECK = "check"
+        const val PEOPLE = "people"; const val ONBOARD = "onboard"; const val DRIVE = "drive"; const val ANALYSIS = "analysis"; const val CHECK = "check"; const val PROPOSE = "propose"
         val TABS = listOf(TODAY, JOURNAL, TOGETHER, ROADS, SETTINGS)
         /** 주차 중에만 여는 화면 */
-        val PARKED_ONLY = setOf(PREP, READY, DIARY, GIVE, LEARN, PEOPLE, JOURNAL, TOGETHER, ROADS, SETTINGS, ANALYSIS, CHECK)
+        val PARKED_ONLY = setOf(PREP, READY, DIARY, GIVE, LEARN, PEOPLE, JOURNAL, TOGETHER, ROADS, SETTINGS, ANALYSIS, CHECK, PROPOSE)
         const val REQ_LOCATION = 7
     }
 
@@ -74,13 +74,16 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
         sound = SoundPool.Builder().setMaxStreams(2).build().also { chimeId = it.load(this, R.raw.confirm, 1) }
-        if (store.onboarded) {
+        if (store.onboarded && trip.resume { id -> store.guide(id) ?: if (id == Demo.dadCommute.id) Demo.dadCommute else null }) {
+            tripStarted(); say("끊겼던 기록을 이어 갈게요.")
+        } else if (store.onboarded) {
             go(TODAY)
             if (store.locationOn && !places.permitted() && !Car.offline) askLocation()
         } else go(ONBOARD)
     }
 
     override fun onDestroy() {
+        trip.save(force = true)
         car.stop(); voice.release(); places.stop(); limits.stop(); sound?.release()
         super.onDestroy()
     }
@@ -127,6 +130,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     internal fun render() {
         stage.removeAllViews()
+        // 달리는 동안 화면이 꺼지지 않게
+        if (driving) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (driving && route.name != DRIVE) { route = Route(DRIVE); stack.clear(); stack.add(route) }
         if (!driving && route.name == DRIVE) { route = Route(TODAY); stack.clear(); stack.add(route) }
         val view = when (route.name) {
@@ -150,6 +155,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         PEOPLE -> peopleScreen()
         ANALYSIS -> analysisScreen()
         CHECK -> checkScreen()
+        PROPOSE -> proposeScreen()
         else -> todayScreen()
     }
 
@@ -169,9 +175,11 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             addView(sidebar(), k.lp(ui.dp(268), k.MATCH))
             addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(1), k.MATCH))
             addView(body, k.lp(0, k.MATCH, 1f))
+            addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(1), k.MATCH))
+            addView(stackRail(), k.lp(ui.dp(84), k.MATCH))
         }
         return k.col().apply {
-            addView(body, k.lp(k.MATCH, 0, 1f))
+            addView(k.row().apply { gravity = Gravity.TOP; addView(body, k.lp(0, k.MATCH, 1f)); addView(stackRail(), k.lp(ui.dp(56), k.MATCH)) }, k.lp(k.MATCH, 0, 1f))
             addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(k.MATCH, ui.dp(1)))
             addView(tabBar(), k.lp(k.MATCH, k.WRAP))
         }
@@ -294,7 +302,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     override fun chime() { sound?.play(chimeId, 1f, 1f, 1, 0, 1f) }
     override fun tripStarted() { sheets.closeAll(); route = Route(DRIVE); stack.clear(); stack.add(route); render() }
     override fun tripChanged() { if (route.name == DRIVE) refreshDrive() }
-    override fun tripEnded(d: Diary) { stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
+    override fun tripEnded(d: Diary) { Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
     override fun diaryUpdated(d: Diary) { if (route.name == DIARY && route.arg == d.id) render() }
     override fun lampsChanged() { if (route.name == TODAY) render() }
 

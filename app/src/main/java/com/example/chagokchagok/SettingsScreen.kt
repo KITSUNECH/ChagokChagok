@@ -42,6 +42,8 @@ internal fun MainActivity.settingsScreen(): View {
         )))
         addView(k.section("연결과 시연"))
         addView(k.groupOf(listOf(
+            k.toggleItem("Pleos 발전 제안 보기 (시연용)", "친구·가족 계정 연동이 생기면 어떻게 쓸지 가상의 친구로 보여 줘요. 지금 되는 기능과 따로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() },
+            k.item("Pleos에 제안하는 것", "지금 되는 것과 앞으로 바라는 것", "sparkle", chevron = true) { go(MainActivity.PROPOSE) },
             k.item("연결 상태", "차량 신호, 내비, 위치, 음성, 주행 제한", "car", chevron = true) { go(MainActivity.CHECK) },
             k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
             k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
@@ -250,5 +252,38 @@ internal fun MainActivity.onboardScreen(): View {
                 if (O.step > 0) addView(k.button("뒤로", Kit.Btn.Plain) { O.step--; render() })
             }, FrameLayout.LayoutParams(minOf(ui.dp(640), resources.displayMetrics.widthPixels - ui.dp(48)), -2, Gravity.CENTER))
         }), FrameLayout.LayoutParams(-1, -1))
+    }
+}
+
+// ═══════════════ Pleos에 제안하는 것 ═══════════════
+// 지금 Pleos에서 실제로 되는 것과, 플랫폼이 이렇게 발전하면 차곡車곡이 할 수 있는 것을 나눠 보여 준다.
+
+internal fun MainActivity.proposeScreen(): View {
+    val k = kit
+    fun row(title: String, now: String, ok: Boolean, icon: String) = k.item(title, now, icon, if (ok) Ink.go else Ink.warn, trailing = k.tag(if (ok) "구현함" else "제안", if (ok) Ink.go else Ink.warn))
+    return k.col().apply {
+        addView(k.header("Pleos에 제안하는 것", "차곡車곡은 지금 Pleos에서 되는 것으로 만들었고, 플랫폼이 아래처럼 발전하면 가족·친구와 이어질 수 있어요.", onBack = { back() }))
+        addView(k.section("지금 Pleos SDK로 구현한 것"))
+        addView(k.groupOf(listOf(
+            row("차량 신호로 주행 기록과 일기", "Vehicle SDK · 깜빡이, 브레이크, 와이퍼, 전조등, 기어, 좌석, 주행거리, 표시등", true, "car"),
+            row("목적지 넣기, 편안한 길, 회전 안내, 제한속도", "NaviHelper SDK", true, "pin"),
+            row("한마디를 남긴 자리에서 들려주기", "FusedLocation SDK · 위치와 진행 방향", true, "pin"),
+            row("음성 안내", "TextToSpeech SDK · 기기 안 합성", true, "speaker"),
+            row("주행 중 화면 제한", "CarUxRestrictions", true, "lock"),
+            row("같은 차를 쓰는 가족·친구끼리 길 건네기, 응원, 일기 올리기", "이 차 안의 운전자 프로필", true, "people"),
+        )))
+        addView(k.section("Pleos에 제안하는 것 (시연용으로 미리 보기)"))
+        addView(k.groupOf(listOf(
+            row("가족·친구 계정 연동", "다른 차를 타는 아빠, 친구와 Pleos 계정으로 이어지기", false, "people"),
+            row("다른 차의 길 받기", "아빠의 그랜저에서 남긴 출근길을 내 아반떼에서 따라 달리기", false, "gift"),
+            row("같이 가기", "앞서 가는 가족·친구의 위치를 동의 아래 함께 보기", false, "car"),
+            row("글레오로 묻고 듣기", "\"오늘 일기 읽어 줘\", \"나 지난주보다 늘었어?\" (앱 스키마 승인 필요)", false, "sparkle"),
+            row("휴대폰 연동", "차 밖에서 일기를 보고 응원 보내기", false, "share"),
+        )))
+        addView(k.gap(16))
+        addView(k.buttons(k.button(if (store.demoOn) "제안 시연 끄기" else "제안 시연 켜기", Kit.Btn.Primary, "people") { store.demoOn = !store.demoOn; render() },
+            k.button("함께 차곡 보기", Kit.Btn.Secondary) { go(MainActivity.TOGETHER) }, stack = false))
+        addView(k.gap(10))
+        addView(k.text("제안 시연에서 보이는 친구, 다른 차의 글, 같이 가기 위치는 모두 가상이며 화면에 '시연용'으로 표시돼요.", Type.Caption, Ink.text3))
     }
 }

@@ -13,6 +13,8 @@ import java.util.Locale
 /** 화면 사이에서 잠깐 들고 있는 값 */
 internal object Session {
     var forecast: Forecast? = null
+    /** 같이 가기 상대 (시연용) */
+    var convoy: Friend? = null
 }
 
 internal fun MainActivity.facts(d: Drive): String {
@@ -59,6 +61,11 @@ internal fun MainActivity.todayScreen(): View {
     })
     carCard()?.let { side.add(it) }
     newsCard()?.let { side.add(it) }
+    if (store.demoOn) side.add(k.card(onClick = { go(MainActivity.TOGETHER) }) {
+        addView(k.row().apply { addView(k.text("친구들의 오늘", Type.Headline), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)) })
+        addView(k.gap(10))
+        Demo.friends.filter { it.id !in store.demoRemoved() }.take(3).forEach { f -> addView(k.row(10).apply { setPadding(0, ui.dp(6), 0, ui.dp(6)); addView(k.avatar(f.name, 32)); addView(k.col().apply { addView(k.text(f.name, Type.BodyStrong)); addView(k.status(f.status, if (f.driving) Ink.go else Ink.text3)) }, k.lp(0, k.WRAP, 1f)) }) }
+    })
     side.add(stampsCard(diaries))
     side.add(learnCard())
 
@@ -170,7 +177,7 @@ private fun MainActivity.newsCard(): View? {
             addView(k.button("응원 보내기", Kit.Btn.Primary, "heart") {
                 val cheers = listOf("잘했어. 다음엔 같이 가자.", "수고했어. 조심히 다녀.", "첫 길 축하해!", "주차까지 해냈구나.")
                 sheets.choose("$from 님에게 응원", null, cheers + "직접 쓰기") { i ->
-                    fun send(t: String) { store.addNews(from, "$d\t${Writer.poss(d)} 응원: “$t”"); store.clearNews(d); toast("응원을 보냈어요. $from 님이 출발할 때 차가 전해 줄 거예요."); render() }
+                    fun send(t: String) { store.setFlag("cheered_$d"); store.addNews(from, "$d\t${Writer.poss(d)} 응원: “$t”"); store.clearNews(d); toast("응원을 보냈어요. $from 님이 출발할 때 차가 전해 줄 거예요."); render() }
                     if (i == cheers.size) sheets.input("응원 한마디", "예: 천천히 해도 괜찮아") { send(it) } else send(cheers[i])
                 }
             })
@@ -349,7 +356,8 @@ internal fun MainActivity.readyScreen(): View {
         if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 자리에서 들려줘요.", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
     }
     return k.col().apply {
-        addView(k.header(g.title, "${Writer.subj(g.owner)} 건네준 ${if (g.kind == "연습") "연습" else "길"} · ${facts(g.drive)}", onBack = { trip.guide = null; back() }))
+        Session.convoy?.let { f -> addView(k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) }); addView(k.gap(12)) }
+        addView(k.header(g.title, "${Writer.subj(g.owner)} 건네준 ${if (g.kind == "연습") "연습" else "길"} · ${facts(g.drive)}", onBack = { trip.guide = null; Session.convoy = null; back() }))
         addView(k.gap(8))
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
         else { addView(left); addView(right) }

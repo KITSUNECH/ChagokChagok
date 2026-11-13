@@ -215,6 +215,31 @@ class Store(ctx: Context) {
     fun setDrivers(names: List<String>) = prefs.edit().putString("drivers", names.distinct().joinToString("|")).apply()
     fun removeDriver(name: String) { setDrivers(drivers - name); if (driver == name) driver = drivers.firstOrNull() ?: "나" }
 
+    /** 한 번이라도 해 본 일 (응원 보내기 등) */
+    fun flag(name: String) = prefs.getBoolean("flag_$name", false)
+    fun setFlag(name: String) = prefs.edit().putBoolean("flag_$name", true).apply()
+    /** 차곡 탑에서 마지막으로 본 블록 수 (새로 쌓인 것만 떨어뜨리려고) */
+    fun stackSeen(name: String) = prefs.getInt("stack_$name", 0)
+    fun setStackSeen(name: String, n: Int) = prefs.edit().putInt("stack_$name", n).apply()
+
+    /** 달리는 중인 기록 (앱이 꺼졌다 켜져도 이어 쓰려고) */
+    var tripSnapshot: String?
+        get() = prefs.getString("trip_snapshot", null)
+        set(v) { prefs.edit().apply { if (v == null) remove("trip_snapshot") else putString("trip_snapshot", v) }.commit() }
+
+    /** Pleos 계정 연동 미리보기 (시연용 가상 친구) */
+    var demoOn: Boolean
+        get() = prefs.getBoolean("demo_on", false)
+        set(v) = prefs.edit().putBoolean("demo_on", v).apply()
+    fun demoAdded(): Set<String> = prefs.getStringSet("demo_added", emptySet()) ?: emptySet()
+    fun demoAdd(id: String) = prefs.edit().putStringSet("demo_added", demoAdded() + id).apply()
+    fun demoRemoved(): Set<String> = prefs.getStringSet("demo_removed", emptySet()) ?: emptySet()
+    fun demoRemove(id: String) = prefs.edit().putStringSet("demo_removed", demoRemoved() + id).putStringSet("demo_added", demoAdded() - id).apply()
+
+    /** 카드에 단 댓글 (이름, 글) */
+    fun comments(id: String): List<Pair<String, String>> = JSONArray(prefs.getString("cm_$id", "[]")).let { a -> (0 until a.length()).map { a.getString(it).let { s -> s.substringBefore("\t") to s.substringAfter("\t") } } }
+    fun addComment(id: String, who: String, text: String) = prefs.edit().putString("cm_$id", JSONArray(comments(id).map { "${it.first}\t${it.second}" } + "$who\t$text").toString()).apply()
+
     /** 함께 차곡에서 저장해 둔 길 */
     fun saved(name: String): Set<String> = prefs.getStringSet("saved_$name", emptySet()) ?: emptySet()
     fun toggleSaved(name: String, guideId: String) { val s = saved(name).toMutableSet(); if (!s.remove(guideId)) s.add(guideId); prefs.edit().putStringSet("saved_$name", s).apply() }
