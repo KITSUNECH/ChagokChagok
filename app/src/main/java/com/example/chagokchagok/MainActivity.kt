@@ -69,7 +69,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         car = Car(this, this)
         trip = Trip(store, car, this)
         voice = Voice(this)
-        places = Places(this) { lat, lng, hd -> trip.onLocation(lat, lng, hd); if (route.name == DRIVE) refreshDrive() }
+        places = Places(this) { lat, lng, hd -> Telemetry.hit("location", String.format("%.4f, %.4f", lat, lng)); trip.onLocation(lat, lng, hd); if (route.name == DRIVE) refreshDrive() }
         limits = Restrictions(this) { onRestricted() }
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
@@ -192,10 +192,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         return k.col().apply {
             setBackgroundColor(Ink.surface)
             setPadding(ui.dp(18), ui.dp(30), ui.dp(18), ui.dp(22))
-            addView(k.row(8).apply {
-                setPadding(ui.dp(10), 0, 0, 0)
-                addView(k.text("차곡車곡", Type.Title))
-            })
+            addView(brand().apply { setPadding(ui.dp(10), 0, 0, 0) })
             addView(k.text("차로 쓰는 성장일기", Type.Caption, Ink.text2).apply { setPadding(ui.dp(10), ui.dp(2), 0, ui.dp(22)) })
             addView(profileButton())
             addView(k.gap(20))
@@ -244,15 +241,11 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     private fun carStatus(): View {
         val k = kit
         val vehicleOk = !car.failures.containsKey("vehicle") && !Car.offline
-        return k.col(8).apply {
-            setPadding(ui.dp(12), ui.dp(14), ui.dp(12), 0)
-            addView(k.eyebrow("연결"))
-            addView(k.status("차량 신호" + if (vehicleOk) "" else " 없음", if (vehicleOk) Ink.go else Ink.text3))
-            addView(k.status("내비" + if (car.naviConnected) "" else " 없음", if (car.naviConnected) Ink.go else Ink.text3))
-            addView(k.status("위치 " + (if (places.lat != null) places.source else "대기"), if (places.lat != null) Ink.go else Ink.text3))
-            addView(k.status("음성 " + voice.engine.ifEmpty { "대기" }, if (voice.ready) Ink.go else Ink.text3))
-            addView(k.text("알파 0.1", Type.Caption, Ink.text3).apply { setPadding(0, ui.dp(6), 0, 0) })
-            setOnClickListener { go(CHECK) }
+        return k.row(10).apply {
+            setPadding(ui.dp(14), ui.dp(12), ui.dp(12), ui.dp(12))
+            addView(k.status(if (vehicleOk) "차량 데이터 ${Telemetry.total}건" else "차량 연결 안 됨", if (vehicleOk) Ink.go else Ink.text3), k.lp(0, k.WRAP, 1f))
+            addView(k.text("α0.1", Type.Micro, Ink.text3))
+            k.pressable(this, null) { go(CHECK) }
         }
     }
 
@@ -275,6 +268,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     // ───────── 차에서 온 신호 ─────────
 
     override fun onCarEvent(type: String, value: String) {
+        Telemetry.hit(type, value)
+        if (route.name == CHECK) render()
         if (route.name == PREP && !trip.active) { onPrep(type, value); return }   // 연습 중 기어 조작은 주행으로 치지 않는다
         val wasActive = trip.active
         trip.onCar(type, value)
@@ -286,7 +281,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         }
     }
 
-    override fun onDistance(km: Float) = trip.onDistance(km)
+    override fun onDistance(km: Float) { Telemetry.hit("odometer", String.format("%.1fkm", km)); trip.onDistance(km) }
     override fun onArrived() = trip.onArrived()
     override fun onNaviLocation(lat: Double, lng: Double) = places.fromNavi(lat, lng)
 

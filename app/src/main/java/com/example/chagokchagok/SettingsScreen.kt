@@ -44,7 +44,7 @@ internal fun MainActivity.settingsScreen(): View {
         addView(k.groupOf(listOf(
             k.toggleItem("Pleos 발전 제안 보기 (시연용)", "친구·가족 계정 연동이 생기면 어떻게 쓸지 가상의 친구로 보여 줘요. 지금 되는 기능과 따로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() },
             k.item("Pleos에 제안하는 것", "지금 되는 것과 앞으로 바라는 것", "sparkle", chevron = true) { go(MainActivity.PROPOSE) },
-            k.item("연결 상태", "차량 신호, 내비, 위치, 음성, 주행 제한", "car", chevron = true) { go(MainActivity.CHECK) },
+            k.item("차량 데이터", "지금 받고 있는 차량 신호와 연결 상태", "car", chevron = true) { go(MainActivity.CHECK) },
             k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
             k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
         )))
@@ -69,7 +69,7 @@ internal fun MainActivity.testSignals() {
         "표시등: 오토 홀드" to { car.setLamps(car.lampsOn + "AUTO_HOLD") }, "표시등: 타이어 공기압" to { car.setLamps(car.lampsOn + "TPMS") }, "표시등 모두 끄기" to { car.setLamps(emptySet()) },
         "기어 D" to { onCarEvent(Evt.GEAR, "D") }, "기어 R" to { onCarEvent(Evt.GEAR, "R") }, "기어 P" to { onCarEvent(Evt.GEAR, "P") },
     )
-    sheets.choose("시험용 신호", "실제 차량 신호가 아니에요. 시연 영상에는 가상 콘솔의 실제 신호를 쓰세요.", items.map { it.first }) { i -> items[i].second() }
+    sheets.choose("시험용 신호", "실제 차량 신호가 아니에요. 차량 데이터 지표에도 세지 않아요.", items.map { it.first }) { i -> Telemetry.muted = true; try { items[i].second() } finally { Telemetry.muted = false } }
 }
 
 // ═══════════════ 함께 쓰는 사람 ═══════════════
@@ -143,8 +143,23 @@ internal fun MainActivity.checkScreen(): View {
     fun ok(b: Boolean) = if (b) Ink.go else Ink.text3
     val vehicleOk = !car.failures.containsKey("vehicle") && !Car.offline
     return k.col().apply {
-        addView(k.header("연결 상태", "앱이 지금 무엇을 받고 있는지 보여 줘요. 시연 전에 확인하세요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
-        addView(k.section("차량 (Vehicle SDK)"))
+        addView(k.header("차량 데이터", "이 앱이 지금 실제로 받고 있는 차량 신호예요. 시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
+        addView(k.gap(16))
+        val mins = ((System.currentTimeMillis() - Telemetry.since) / 60000).coerceAtLeast(1)
+        addView(k.grid(if (ui.wide) 4 else 2, listOf(
+            k.stat("${Telemetry.total}", "받은 신호"),
+            k.stat("${Telemetry.kinds} / ${Telemetry.SIGNALS.size}", "신호 종류"),
+            k.stat("${Telemetry.perMinute()}", "최근 1분"),
+            k.stat("${mins}분", "앱을 켠 뒤"),
+        ), 14))
+        addView(k.section("신호별"))
+        addView(k.groupOf(Telemetry.SIGNALS.map { s ->
+            val n = Telemetry.count[s.key] ?: 0
+            val ago = Telemetry.at[s.key]?.let { ((System.currentTimeMillis() - it) / 1000).let { sec -> if (sec < 60) "${sec}초 전" else "${sec / 60}분 전" } }
+            k.item(s.name, "${s.sdk} SDK" + (Telemetry.last[s.key]?.let { " · 마지막 값 $it" } ?: "") + (ago?.let { " · $it" } ?: ""), s.icon, if (n > 0) Ink.go else Ink.text3,
+                value = if (n > 0) "${n}건" else "아직 없음", valueColor = if (n > 0) Ink.text else Ink.text3)
+        }))
+        addView(k.section("연결 상태 · 차량 (Vehicle SDK)"))
         addView(k.groupOf(listOfNotNull(
             k.item("차량 신호", if (vehicleOk) "연결됨" else "연결 안 됨", "car", ok(vehicleOk)),
             k.item("기어", null, "steering", value = car.gear),

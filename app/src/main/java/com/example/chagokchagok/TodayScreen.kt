@@ -50,28 +50,27 @@ internal fun MainActivity.todayScreen(): View {
     car.refreshNavi()
     // 주인공: 누가 건네준 길이 있으면 그 길, 없으면 내가 가고 싶은 곳
     val hero = if (todaysGuide() != null) heroCard() else myRouteHero()
-    val side = mutableListOf<View>()
-    weekCard()?.let { side.add(it) }
-    starterCard()?.let { side.add(it) }
-    if (!store.prepDone(d)) side.add(k.card(onClick = { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") }) {
+    // 옆 카드는 지금 필요한 것 두 장까지만. 위에 있을수록 먼저 (경고 → 소식 → 운전자 유형에 맞는 것 → 요약)
+    val type = store.typeOf(d)
+    fun small(icon: String, title: String, sub: String, onClick: () -> Unit) = k.card(onClick = onClick) {
         addView(k.row(14).apply {
-            addView(k.icon("steering", Ink.accent, 30))
-            addView(k.col(4).apply {
-                addView(k.text("출발 준비", Type.Headline))
-                addView(k.text("깜빡이, 와이퍼, 전조등, 기어를 한 번씩 해 보면 차가 확인해 줘요.", Type.Sub, Ink.text2))
-            }, k.lp(0, k.WRAP, 1f))
+            addView(k.icon(icon, Ink.accent, 28))
+            addView(k.col(4).apply { addView(k.text(title, Type.Headline)); addView(k.text(sub, Type.Sub, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
             addView(k.icon("chevron", Ink.text3, 20))
         })
-    })
-    carCard()?.let { side.add(it) }
-    newsCard()?.let { side.add(it) }
-    if (store.demoOn) side.add(k.card(onClick = { go(MainActivity.TOGETHER) }) {
-        addView(k.row().apply { addView(k.text("친구들의 오늘", Type.Headline), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)) })
-        addView(k.gap(10))
-        Demo.friends.filter { it.id !in store.demoRemoved() }.take(3).forEach { f -> addView(k.row(10).apply { setPadding(0, ui.dp(6), 0, ui.dp(6)); addView(k.avatar(f.name, 32)); addView(k.col().apply { addView(k.text(f.name, Type.BodyStrong)); addView(k.status(f.status, if (f.driving) Ink.go else Ink.text3)) }, k.lp(0, k.WRAP, 1f)) }) }
-    })
-    side.add(stampsCard(diaries))
-    side.add(learnCard())
+    }
+    val candidates = listOf<() -> View?>(
+        { carCard() },
+        { newsCard() },
+        { if (!store.prepDone(d) && type in listOf("초보", "새 차")) small("steering", "출발 준비", "면허시험 차와 다른 곳을 손으로 익혀요") { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") } else null },
+        { if (type == "오랜만" && !store.flag("law_$d")) small("info", "그동안 바뀐 법규", "빨간불 우회전, 보호구역… 다섯 가지만 보고 가요") { store.setFlag("law_$d"); go(MainActivity.LEARN, "law") } else null },
+        { if (store.demoOn) small("people", "친구들의 오늘", Demo.friends.filter { it.driving }.joinToString { it.name + " 운전 중" }.ifEmpty { "함께 차곡에서 보기" } + " · 시연용") { go(MainActivity.TOGETHER) } else null },
+        { weekCard() },
+        { if (diaries.isEmpty()) starterCard() else null },
+        { if (!store.prepDone(d)) small("steering", "출발 준비", "깜빡이, 와이퍼, 전조등, 기어를 한 번씩") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) } else null },
+    )
+    val side = mutableListOf<View>()
+    for (c in candidates) { if (side.size >= 2) break; c()?.let { side.add(it) } }
 
     return k.col().apply {
         addView(head); addView(k.gap(24))

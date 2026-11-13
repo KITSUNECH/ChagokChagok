@@ -70,7 +70,7 @@ private fun MainActivity.paperPage(d: Diary, guide: Guide?): View {
 }
 
 /** 이 기록의 근거: 무엇을 차가 봤고, 무엇을 사람이 적었고, 무엇을 추정했는지 */
-private fun MainActivity.evidence(d: Diary, guide: Guide?): View {
+private fun MainActivity.evidence(d: Diary, guide: Guide?, all: Boolean = false): View {
     val k = kit; val v = d.drive
     val rows = mutableListOf<View>()
     fun row(title: String, value: String, source: String, icon: String, color: Int = Ink.accent) = rows.add(k.item(title, source, icon, color, value = value))
@@ -89,7 +89,11 @@ private fun MainActivity.evidence(d: Diary, guide: Guide?): View {
     v.place?.let { row("다녀온 곳", it, "내비 목적지", "pin") }
     store.weather(d.id)?.let { row("날씨", it, "Open-Meteo 공개 예보 (도착한 곳)", "cloud") }
     store.feeling(d.id)?.let { row("내 한 줄", it, "내가 적음", "pencil") }
-    return k.groupOf(rows)
+    if (all || rows.size <= 5) return k.groupOf(rows)
+    val more = rows.size - 4
+    return k.groupOf(rows.take(4) + k.item("근거 모두 보기", "${more}가지 더", "list", chevron = true) {
+        sheets.sheet("이 기록의 근거", "차가 본 것, 내가 적은 것, 판단한 기준을 나눠 적었어요.") { _ -> addView(evidence(d, guide, all = true).apply { background = k.rounded(Ink.fill, 18) }) }
+    })
 }
 
 private fun timelineSummary(v: Drive): String {
@@ -99,17 +103,40 @@ private fun timelineSummary(v: Drive): String {
     return parts.joinToString(" · ") + ". 가로축은 출발부터 주차까지예요."
 }
 
-/** 일기 다음에 할 수 있는 일 */
+/** 일기 다음에 할 수 있는 일. 지금 가장 할 만한 세 가지만 앞에 두고 나머지는 '더 보기'에. */
 private fun MainActivity.actions(d: Diary, guide: Guide?): View {
     val k = kit
-    val rows = mutableListOf<View>()
-    rows.add(k.item(store.feeling(d.id)?.let { "내 한 줄: $it" } ?: "오늘 한 줄 남기기", "오늘 운전이 어땠는지", "pencil", chevron = true) {
+    val all = linkedMapOf<String, () -> View>()
+    all["self"] = { k.item("다음의 나에게 한마디", "같은 곳에 다시 갈 때 그 자리에서 들려줘요", "quote", chevron = true) { noteToSelf(d) } }
+    if (guide != null && guide.owner != d.driver) {
+        val sent = store.newsSent(d.id)
+        all["notify"] = { k.item(if (sent) "${guide.owner} 님에게 알렸어요" else "${guide.owner} 님에게 다녀왔다고 알리기", null, "flag", value = if (sent) "보냄" else null) {
+            if (!sent) {
+                store.addNews(guide.owner, "${d.driver}\t" + when (guide.kind) {
+                    "추천" -> "${Writer.subj(d.driver)} 추천해 준 곳에 직접 운전해서 다녀왔어요."
+                    "연습" -> "${Writer.subj(d.driver)} “${guide.title}” 연습을 해 봤어요."
+                    else -> "${Writer.subj(d.driver)} “${guide.title}”을 직접 운전했어요." + if (guide.tips.isNotEmpty()) " 남겨 준 한마디도 길 위에서 들었어요." else ""
+                })
+                store.setNewsSent(d.id); toast("${guide.owner} 님의 홈에 소식을 남겼어요."); render()
+            }
+        } }
+    }
+    all["give"] = { k.item("이 길 건네주기", "가족·친구가 같은 길을 달릴 수 있게", "gift", chevron = true) {
+        giveTitle = d.drive.place ?: ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = if (d.drive.place != null && guide == null) "추천" else "길"
+        go(MainActivity.GIVE, d.id)
+    } }
+    val posted = store.posted(d.id) != null
+    all["post"] = { k.item(if (posted) "함께 차곡에 올렸어요" else "함께 차곡에 올리기", if (posted) "누르면 내릴 수 있어요" else "미리 보고 누구에게 보일지 골라요", "share", chevron = true) {
+        if (posted) sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", danger = true) { store.unpost(d.id); toast("내렸어요."); render() }
+        else postSheet(d)
+    } }
+    all["feel"] = { k.item(store.feeling(d.id)?.let { "내 한 줄: $it" } ?: "오늘 한 줄 남기기", "오늘 운전이 어땠는지", "pencil", chevron = true) {
         val feels = listOf("설렜어", "무서웠지만 해냈어", "생각보다 괜찮았어", "피곤했어", "풍경이 좋았어")
         sheets.choose("오늘 운전은 어땠어요?", null, feels + "직접 쓰기") { i ->
             if (i == feels.size) sheets.input("한 줄", "예: 주차장 들어갈 때 손에 땀이 났다") { store.setFeeling(d.id, it); render() } else { store.setFeeling(d.id, feels[i]); render() }
         }
-    })
-    if (d.drive.passenger) rows.add(k.item("함께 탄 사람의 한마디 적기", "옆자리에서 해 준 말을 이 길에 남겨요", "people", chevron = true) {
+    } }
+    if (d.drive.passenger) all["passenger"] = { k.item("함께 탄 사람의 한마디 적기", "옆자리에서 해 준 말을 이 길에 남겨요", "people", chevron = true) {
         val lines = listOf("잘하고 있어.", "여기서 미리 차선 바꿔 두면 편해.", "여기는 천천히 가도 돼.", "주차장 입구 조심해.")
         sheets.choose("어디쯤에서 한 말인가요?", null, TIP_PLACES.map { it.first }) { where ->
             sheets.choose("함께 탄 사람의 한마디", null, lines + "직접 쓰기") { i ->
@@ -117,38 +144,20 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
                 if (i == lines.size) sheets.input("한마디", "") { keep(it) } else keep(lines[i])
             }
         }
-    })
-    rows.add(k.item("다음의 나에게 한마디", "다음에 같은 곳에 갈 때 그 자리에서 들려줘요", "quote", chevron = true) { noteToSelf(d) })
-    rows.add(k.item("이 길 건네주기", "가족·친구가 같은 길을 달릴 수 있게", "gift", chevron = true) {
-        giveTitle = d.drive.place ?: ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = if (d.drive.place != null && guide == null) "추천" else "길"
-        go(MainActivity.GIVE, d.id)
-    })
-    val posted = store.posted(d.id) != null
-    rows.add(k.item(if (posted) "함께 차곡에 올렸어요" else "함께 차곡에 올리기", if (posted) "누르면 내릴 수 있어요" else "미리 보고 누구에게 보일지 골라요", "share", chevron = true) {
-        if (posted) sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", danger = true) { store.unpost(d.id); toast("내렸어요."); render() }
-        else postSheet(d)
-    })
-    Quizzes.pick(d.drive)?.let { q -> rows.add(k.item("오늘 길 복습", q.question, "info", chevron = true) { quiz(q) }) }
-    if (guide != null && guide.owner != d.driver) {
-        val sent = store.newsSent(d.id)
-        rows.add(k.item(if (sent) "${guide.owner} 님에게 알렸어요" else "${guide.owner} 님에게 다녀왔다고 알리기", null, "flag", value = if (sent) "보냄" else null) {
-            if (sent) return@item
-            store.addNews(guide.owner, "${d.driver}\t" + when (guide.kind) {
-                "추천" -> "${Writer.subj(d.driver)} 추천해 준 곳에 직접 운전해서 다녀왔어요."
-                "연습" -> "${Writer.subj(d.driver)} “${guide.title}” 연습을 해 봤어요."
-                else -> "${Writer.subj(d.driver)} “${guide.title}”을 직접 운전했어요." + if (guide.tips.isNotEmpty()) " 남겨 준 한마디도 길 위에서 들었어요." else ""
-            })
-            store.setNewsSent(d.id); toast("${guide.owner} 님의 홈에 소식을 남겼어요."); render()
-        })
-    }
-    rows.add(k.item("다음 사람에게 한마디", "다음에 이 차를 타는 사람의 홈에 보여요", "car", chevron = true) {
+    } }
+    Quizzes.pick(d.drive)?.let { q -> all["quiz"] = { k.item("오늘 길 복습", q.question, "info", chevron = true) { quiz(q) } } }
+    all["handover"] = { k.item("다음 사람에게 한마디", "다음에 이 차를 타는 사람의 홈에 보여요", "car", chevron = true) {
         val notes = listOf("기름 넣어야 해요.", "워셔액 채워 주세요.", "뒷자리에 짐 있어요.", "주차는 평소 자리에 했어요.")
         sheets.choose("다음에 타는 사람에게", null, notes + "직접 쓰기") { i ->
             if (i == notes.size) sheets.input("한마디", "") { trip.saveHandover(store.driver, it); toast("남겼어요.") } else { trip.saveHandover(store.driver, notes[i]); toast("남겼어요.") }
         }
+    } }
+    // 받은 길이면 알리기가 먼저, 혼자 간 길이면 다음의 나에게가 먼저
+    val firstKeys = (if ("notify" in all) listOf("notify", "self", "give") else listOf("self", "give", "post")).filter { it in all }
+    val rest = all.keys - firstKeys.toSet()
+    return k.groupOf(firstKeys.map { all.getValue(it)() } + k.item("더 보기", rest.size.toString() + "가지 더", "list", chevron = true) {
+        sheets.sheet("더 보기", null) { _ -> addView(k.groupOf(rest.map { all.getValue(it)() }).apply { background = k.rounded(Ink.fill, 18) }) }
     })
-    rows.add(k.item("오늘", null, "today", chevron = true) { go(MainActivity.TODAY) })
-    return k.groupOf(rows)
 }
 
 /** 함께 차곡에 올리기 전 미리 보기와 공개 범위 */

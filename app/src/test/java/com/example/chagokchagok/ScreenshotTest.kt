@@ -87,6 +87,7 @@ class ScreenshotTest {
             a.roadsTab = 2; a.go(MainActivity.ROADS); snap("11_roads")
             a.go(MainActivity.SETTINGS); snap("12_settings")
             a.go(MainActivity.LEARN, "law"); snap("13_learn")
+            listOf(Evt.GEAR to "D", Evt.SIGNAL to "LEFT", Evt.BRAKE to "on", Evt.WIPER to "on", Evt.LIGHT to "on", "location" to "37.4900, 127.0300").forEach { (t, v) -> Telemetry.hit(t, v) }
             a.go(MainActivity.CHECK); snap("14_check")
             a.go(MainActivity.PROPOSE); snap("17_propose")
             a.go(MainActivity.TODAY); a.stackSheet(); snap("18_stack_sheet")

@@ -1,7 +1,7 @@
+<!-- 차곡車곡 앱 아이콘: 초보(파랑) · 주행(초록) · 소셜(주황) 블록이 엇갈려 쌓인 모양 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#24272B" android:pathData="M0,0h108v108h-108z" />
-    <path android:strokeColor="#3C4147" android:strokeWidth="26" android:strokeLineCap="round" android:pathData="M14,70 C40,56 62,84 94,62" />
-    <path android:strokeColor="#F2EFE7" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M14,70 C40,56 62,84 94,62" />
-    <path android:fillColor="#F5BC1D" android:pathData="M72,69m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
-    <path android:strokeColor="#FF8B1F" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M34,44v12M44,46v12" />
+    <path android:fillColor="#FFFFFF" android:pathData="M0,0h108v108h-108z" />
+    <path android:fillColor="#2A78D6" android:pathData="M30,64h44a7,7 0,0 1,7 7v4a7,7 0,0 1,-7 7h-44a7,7 0,0 1,-7 -7v-4a7,7 0,0 1,7 -7z" />
+    <path android:fillColor="#1BAF7A" android:pathData="M36,44h44a7,7 0,0 1,7 7v4a7,7 0,0 1,-7 7h-44a7,7 0,0 1,-7 -7v-4a7,7 0,0 1,7 -7z" />
+    <path android:fillColor="#EB6834" android:pathData="M30,24h44a7,7 0,0 1,7 7v4a7,7 0,0 1,-7 7h-44a7,7 0,0 1,-7 -7v-4a7,7 0,0 1,7 -7z" />
 </vector>

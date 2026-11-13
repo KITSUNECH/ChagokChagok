@@ -161,7 +161,7 @@ internal fun MainActivity.onboardScreen(): View {
     val left = k.col(14).apply {
         setBackgroundColor(Ink.surface)
         setPadding(ui.dp(48), ui.dp(48), ui.dp(48), ui.dp(40))
-        addView(k.text("차곡車곡", Type.Title))
+        addView(brand(34))
         addView(k.text("한 칸씩, 차곡차곡", Type.Sub, Ink.text2))
         addView(FrameLayout(context).apply {
             addView(StackView(context, ui, demo, fresh), FrameLayout.LayoutParams(ui.dp(120), -1, Gravity.CENTER_HORIZONTAL))
