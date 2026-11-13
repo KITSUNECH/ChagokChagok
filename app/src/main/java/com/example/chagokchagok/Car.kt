@@ -55,6 +55,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
         fun onDistance(km: Float) {}
         /** 내비가 목적지에 도착했다고 알렸다. */
         fun onArrived() {}
+        /** 내비가 알려 준 지금 위치 */
+        fun onNaviLocation(lat: Double, lng: Double) {}
     }
 
     // 지금 차의 상태. 화면이 언제든 읽어 간다.
@@ -194,6 +196,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
             ui { listener.onArrived() }
         override fun onCurrentLocationInfo(currentLocationInfo: CurrentLocationInfo) {
             lat = currentLocationInfo.latitude; lng = currentLocationInfo.longitude
+            val la = currentLocationInfo.latitude; val ln = currentLocationInfo.longitude
+            ui { listener.onNaviLocation(la, ln) }
         }
         override fun onDestinationInfo(destinationInfo: DestinationInfo) {
             destLat = destinationInfo.latitude; destLng = destinationInfo.longitude; destName = destinationInfo.name

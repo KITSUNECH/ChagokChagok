@@ -17,60 +17,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.TextView
 
-/** 도로에서 가져온 색. 색마다 뜻이 하나씩 있다. */
-object Ink {
-    val tar = Color.parseColor("#17191C")
-    val asphalt = Color.parseColor("#24272B")
-    val road = Color.parseColor("#2F3338")
-    val kerb = Color.parseColor("#3C4147")
-    val paint = Color.parseColor("#F2EFE7")      // 차선 흰색: 글자
-    val dim = Color.parseColor("#9A9FA6")
-    val center = Color.parseColor("#F5BC1D")     // 중앙선 노랑: 누를 것, 한마디
-    val signal = Color.parseColor("#FF8B1F")     // 방향지시등
-    val brake = Color.parseColor("#E8432E")      // 제동등
-    val rain = Color.parseColor("#4C97EE")       // 와이퍼
-    val go = Color.parseColor("#33A871")         // 확인됨
-    val paper = Color.parseColor("#FBFAF5")
-    val ink = Color.parseColor("#22262B")
-    val grid = Color.parseColor("#E9A79C")
-    val paperRoad = Color.parseColor("#EFEDE6")
-    val paperLine = Color.parseColor("#B9B6AE")
-}
-
-/** 글꼴과 크기 단위를 한곳에서 쓴다. */
-class Ui(val ctx: Context) {
-    val sign: Typeface = ctx.resources.getFont(R.font.dohyeon)        // 표지판 같은 제목 글꼴
-    val batang: Typeface = ctx.resources.getFont(R.font.gowunbatang)  // 일기와 한마디 글꼴
-    private val density = ctx.resources.displayMetrics.density
-    /** 화면이 클수록 조금 더 키운다. 차 화면은 팔 길이에서 본다. */
-    // 기기 화면이 아니라 지금 앱이 받은 창의 크기로 잰다. 내비 옆 절반 창에서는 창이 좁고 세로로 길다.
-    private val w = ctx.resources.configuration.screenWidthDp
-    private val h = ctx.resources.configuration.screenHeightDp
-    /** 창이 세로로 길거나 좁아서 한 줄로 쌓아야 하는지. */
-    val narrow = w < h * 1.15f || w < 700
-    val scale = (if (narrow) minOf(w / 560f, h / 760f) else minOf(w / 900f, h / 600f)).coerceIn(0.62f, 1.4f)
-    fun dp(v: Float) = (v * density * scale).toInt()
-    fun dp(v: Int) = dp(v.toFloat())
-
-    fun text(s: String, size: Float, color: Int = Ink.paint, face: Typeface? = null) = TextView(ctx).apply {
-        text = s; textSize = size * scale; setTextColor(color); if (face != null) typeface = face
-        includeFontPadding = false
-    }
-
-    fun button(s: String, primary: Boolean, onClick: () -> Unit) = TextView(ctx).apply {
-        text = s; textSize = 24f * scale; gravity = Gravity.CENTER
-        typeface = Typeface.DEFAULT_BOLD
-        setTextColor(if (primary) Color.parseColor("#1B1705") else Ink.paint)
-        background = GradientDrawable().apply {
-            cornerRadius = dp(14).toFloat()
-            if (primary) setColor(Ink.center) else { setColor(Color.TRANSPARENT); setStroke(dp(2), Ink.kerb) }
-        }
-        setPadding(dp(28), 0, dp(28), 0)
-        minHeight = dp(76); minimumHeight = dp(76)
-        setOnClickListener { onClick() }
-    }
-}
-
 /** 한 줄의 주행. */
 class Lane(val label: String, val drive: Drive, val tips: List<Tip> = emptyList(), val faded: Boolean = false)
 
@@ -172,7 +118,7 @@ class TraceView(ctx: Context, private val ui: Ui, private val onPaper: Boolean =
         lane.tips.forEachIndexed { i, t ->
             pm.getPosTan(len * t.p.coerceIn(0.02f, 0.98f), pos, tan)
             p.color = Ink.center; c.drawCircle(pos[0], pos[1], band * .27f, p)
-            p.color = Color.parseColor("#1B1705"); p.textSize = band * .34f
+            p.color = Color.WHITE; p.textSize = band * .34f
             c.drawText("${i + 1}", pos[0], pos[1] + band * .12f, p)
         }
         // 누구의 주행인지
@@ -183,42 +129,66 @@ class TraceView(ctx: Context, private val ui: Ui, private val onPaper: Boolean =
     }
 }
 
-/** 원고지. 글을 한 칸에 한 글자씩 넣고, 강조할 문장은 칸을 칠한다. */
+/**
+ * 원고지. 한 칸에 한 글자. 읽기 편하게:
+ * - 칸은 한 줄에 10~14칸이 되도록 크게 잡고, 줄 사이를 조금 띄운다
+ * - 줄 첫 칸에 오는 빈칸은 버리고, 문장부호는 앞 줄 끝 칸에 함께 넣는다 (원고지 쓰는 법)
+ * - 격자는 옅게, 글자는 진하게, 강조할 문장은 칸을 연노랑으로 칠한다
+ */
 class GridText(ctx: Context, private val ui: Ui) : View(ctx) {
     var text: String = ""
         set(v) { field = v; requestLayout(); invalidate() }
     var highlight: String = ""
-    var cols = 14
+    var cols = 12
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private data class Cell(val ch: Char, val idx: Int, val extra: Char? = null)
+
+    /** 글을 줄과 칸으로 나눈다 */
+    private fun layout(): List<List<Cell>> {
+        val lines = mutableListOf<MutableList<Cell>>(mutableListOf())
+        text.forEachIndexed { i, ch ->
+            var cur = lines.last()
+            if (cur.size == cols) {
+                // 줄 첫 칸에 올 문장부호는 앞 줄 마지막 칸에 붙인다
+                if (ch in ".,!?" && cur.isNotEmpty() && cur.last().extra == null) { cur[cur.lastIndex] = cur.last().copy(extra = ch); return@forEachIndexed }
+                cur = mutableListOf(); lines.add(cur)
+            }
+            if (ch == ' ' && cur.isEmpty() && lines.size > 1) return@forEachIndexed   // 줄 첫 칸 빈칸은 버린다
+            cur.add(Cell(ch, i))
+        }
+        return lines
+    }
+
+    private fun gapRatio() = 0.28f
 
     override fun onMeasure(wSpec: Int, hSpec: Int) {
         val w = MeasureSpec.getSize(wSpec)
         val cell = w / cols.toFloat()
-        val rows = ((text.length + cols - 1) / cols).coerceAtLeast(1)
-        setMeasuredDimension(w, (cell * rows).toInt() + 2)
+        val rows = layout().size.coerceAtLeast(1)
+        setMeasuredDimension(w, (rows * cell * (1 + gapRatio()) - cell * gapRatio()).toInt() + 2)
     }
 
     override fun onDraw(c: Canvas) {
         val cell = width / cols.toFloat()
-        val rows = ((text.length + cols - 1) / cols).coerceAtLeast(1)
+        val step = cell * (1 + gapRatio())
         val hlStart = if (highlight.isNotEmpty()) text.indexOf(highlight) else -1
-        // 강조 칸
-        if (hlStart >= 0) {
-            p.style = Paint.Style.FILL; p.color = Color.parseColor("#FCE9B4")
-            for (i in hlStart until hlStart + highlight.length) {
-                val r = i / cols; val col = i % cols
-                c.drawRect(col * cell, r * cell, (col + 1) * cell, (r + 1) * cell, p)
+        val hlRange = if (hlStart >= 0) hlStart until hlStart + highlight.length else IntRange.EMPTY
+        layout().forEachIndexed { r, line ->
+            val top = r * step
+            // 강조 칸
+            p.style = Paint.Style.FILL; p.color = Ink.highlight
+            line.forEachIndexed { col, cl -> if (cl.idx in hlRange) c.drawRect(col * cell, top, (col + 1) * cell, top + cell, p) }
+            // 칸 (옅게)
+            p.style = Paint.Style.STROKE; p.color = Ink.grid; p.strokeWidth = ui.dp(1f).toFloat().coerceAtLeast(1f)
+            c.drawRect(0.5f, top, width - 0.5f, top + cell, p)
+            for (col in 1 until cols) c.drawLine(col * cell, top, col * cell, top + cell, p)
+            // 글자
+            p.style = Paint.Style.FILL; p.color = Ink.ink; p.typeface = ui.batang
+            p.textAlign = Paint.Align.CENTER; p.textSize = cell * .6f
+            line.forEachIndexed { col, cl ->
+                if (cl.ch != ' ') c.drawText(cl.ch.toString(), (col + .5f) * cell, top + cell * .73f, p)
+                if (cl.extra != null) c.drawText(cl.extra.toString(), (col + .88f) * cell, top + cell * .8f, p)
             }
-        }
-        // 칸
-        p.style = Paint.Style.STROKE; p.color = Ink.grid; p.strokeWidth = ui.dp(1.5f).toFloat()
-        for (r in 0..rows) c.drawLine(0f, r * cell, width.toFloat(), r * cell, p)
-        for (col in 0..cols) c.drawLine((col * cell).coerceAtMost(width - 1f), 0f, (col * cell).coerceAtMost(width - 1f), rows * cell, p)
-        // 글자
-        p.style = Paint.Style.FILL; p.color = Ink.ink; p.typeface = ui.batang
-        p.textAlign = Paint.Align.CENTER; p.textSize = cell * .62f
-        text.forEachIndexed { i, ch ->
-            if (ch != ' ') c.drawText(ch.toString(), (i % cols + .5f) * cell, (i / cols + .72f) * cell, p)
         }
     }
 }
@@ -237,9 +207,9 @@ class Telltale(ctx: Context, private val kind: String) : View(ctx) {
         fun x(v: Float) = ox + s * v / 96f
         fun y(v: Float) = oy + s * v / 96f
         val color = when {
-            on -> when (kind) { "signal" -> Ink.signal; "wiper" -> Ink.rain; "light" -> Ink.center; else -> Ink.go }
+            on -> when (kind) { "signal" -> Ink.signal; "wiper" -> Ink.rain; "light" -> Ink.beam; else -> Ink.go }
             waiting -> Ink.center
-            else -> Color.parseColor("#5A6068")
+            else -> Ink.text3
         }
         p.color = color; p.strokeWidth = s * .065f; p.strokeCap = Paint.Cap.ROUND; p.strokeJoin = Paint.Join.ROUND
         when (kind) {

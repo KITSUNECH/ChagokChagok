@@ -89,7 +89,7 @@ class Recorder {
         // 그림에 쓸 표시만 남긴다: 켠 깜빡이, 밟은 브레이크, 와이퍼가 켜지고 꺼진 때.
         val events = raw.filter {
             (it.type == Evt.SIGNAL && it.value != "OFF") || (it.type == Evt.BRAKE && it.value == "on") ||
-                it.type == Evt.WIPER || it.type == Evt.LOST || it.type == Evt.SAY
+                it.type == Evt.WIPER || it.type == Evt.LIGHT || it.type == Evt.LOST || it.type == Evt.SAY
         }.map { Ev(p(it), it.type, it.value) }
 
         return Drive(

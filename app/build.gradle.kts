@@ -11,6 +11,8 @@ val localProps = Properties().apply {
 }
 
 android {
+    // 차의 주행 중 화면 제한(CarUxRestrictions)을 받으려고 플랫폼의 차 라이브러리를 쓴다
+    useLibrary("android.car")
     namespace = "com.example.chagokchagok"
     compileSdk = 34
     defaultConfig {
@@ -33,6 +35,8 @@ android {
 dependencies {
     implementation("ai.pleos.playground:Vehicle:2.3.2")
     implementation("ai.pleos.playground:NaviHelper:3.0.5")
+    implementation("ai.pleos.playground:TextToSpeech:3.3.1")
+    implementation("ai.pleos.playground:FusedLocation:1.1.3")
     implementation("com.anthropic:anthropic-java:3.3.0")   // 일기 문장을 다듬는 데 쓴다 (키가 있을 때만)
     testImplementation("junit:junit:4.13.2")
     // 화면을 이미지로 찍어 보는 테스트 (에뮬레이터 없이 실제 안드로이드 그리기 엔진으로)

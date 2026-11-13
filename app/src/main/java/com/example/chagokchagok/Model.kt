@@ -11,7 +11,12 @@ import org.json.JSONObject
 data class Ev(val p: Float, val type: String, val value: String)
 
 /** 가족이 길 위의 한 지점에 남긴 한마디. */
-data class Tip(val p: Float, val text: String)
+data class Tip(val p: Float, val text: String, val lat: Double? = null, val lng: Double? = null) {
+    val placed get() = lat != null && lng != null
+}
+
+/** 주행 경로 위의 한 점. p 는 그 주행에서의 진행 정도(0~1). */
+data class Pt(val p: Float, val lat: Double, val lng: Double)
 
 /** 주행 한 번의 요약. 일기와 건네준 길이 모두 이것을 재료로 쓴다. */
 data class Drive(
@@ -40,7 +45,9 @@ data class Drive(
     /** 목적지에 도착했거나 받은 길의 거리를 거의 다 달렸는지. 졸업은 이것만 센다. */
     val completed: Boolean = true,
     /** 시연용 모의 주행으로 만든 기록. 졸업·다녀온 곳·성장 숫자에 넣지 않는다. */
-    val sim: Boolean = false
+    val sim: Boolean = false,
+    /** 지나온 길 (이 차 안에만 저장. 건네줄 때는 출발 근처를 빼고 보낸다) */
+    val path: List<Pt> = emptyList()
 )
 
 /** 건네준 길: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -118,6 +125,9 @@ class Store(ctx: Context) {
     fun posted(diaryId: String): String? = prefs.getString("post_$diaryId", null)
     fun post(diaryId: String, caption: String) = prefs.edit().putString("post_$diaryId", caption).apply()
     fun unpost(diaryId: String) = prefs.edit().remove("post_$diaryId").apply()
+    /** 올린 일기를 누구에게 보일지: 모두 / 가족 */
+    fun audience(diaryId: String) = prefs.getString("aud_$diaryId", "모두") ?: "모두"
+    fun setAudience(diaryId: String, a: String) = prefs.edit().putString("aud_$diaryId", a).apply()
     /** 응원(하트)을 누른 사람들. 숫자로 줄 세우지 않고 누가 응원했는지만 보여 준다. */
     fun hearts(id: String): Set<String> = prefs.getStringSet("heart_$id", emptySet()) ?: emptySet()
     fun toggleHeart(id: String, name: String) { val h = hearts(id).toMutableSet(); if (!h.remove(name)) h.add(name); prefs.edit().putStringSet("heart_$id", h).apply() }
@@ -185,6 +195,31 @@ class Store(ctx: Context) {
 
     fun clearAll() = prefs.edit().clear().apply()
 
+    // ── 설정 ──
+    var onboarded: Boolean
+        get() = prefs.getBoolean("onboarded", false)
+        set(v) = prefs.edit().putBoolean("onboarded", v).apply()
+    /** 도착지 날씨를 읽어 올지 (좌표가 Open-Meteo로 간다) */
+    var weatherOn: Boolean
+        get() = prefs.getBoolean("weather_on", true)
+        set(v) = prefs.edit().putBoolean("weather_on", v).apply()
+    /** 위치로 한마디를 그 자리에서 들을지 */
+    var locationOn: Boolean
+        get() = prefs.getBoolean("location_on", true)
+        set(v) = prefs.edit().putBoolean("location_on", v).apply()
+    /** 주행 중 소리로 알려 줄지 */
+    var voiceOn: Boolean
+        get() = prefs.getBoolean("voice_on", true)
+        set(v) = prefs.edit().putBoolean("voice_on", v).apply()
+    /** 운전자 목록을 통째로 바꾼다 (첫 실행) */
+    fun setDrivers(names: List<String>) = prefs.edit().putString("drivers", names.distinct().joinToString("|")).apply()
+    fun removeDriver(name: String) { setDrivers(drivers - name); if (driver == name) driver = drivers.firstOrNull() ?: "나" }
+
+    /** 함께 차곡에서 저장해 둔 길 */
+    fun saved(name: String): Set<String> = prefs.getStringSet("saved_$name", emptySet()) ?: emptySet()
+    fun toggleSaved(name: String, guideId: String) { val s = saved(name).toMutableSet(); if (!s.remove(guideId)) s.add(guideId); prefs.edit().putStringSet("saved_$name", s).apply() }
+    fun removeGuide(id: String) = writeArray("guides", guides().filter { it.id != id }) { json(it) }
+
     // ── JSON 변환 ──
     private fun readArray(key: String): List<JSONObject> {
         val a = JSONArray(prefs.getString(key, "[]"))
@@ -201,6 +236,7 @@ class Store(ctx: Context) {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
         put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }; put("completed", d.completed); put("sim", d.sim)
+        put("path", JSONArray().apply { d.path.forEach { put(JSONArray().put(it.p.toDouble()).put(it.lat).put(it.lng)) } })
         put("events", JSONArray().apply {
             d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
         })
@@ -215,7 +251,8 @@ class Store(ctx: Context) {
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
-            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }, if (o.has("placeLat")) o.getDouble("placeLat") else null, if (o.has("placeLng")) o.getDouble("placeLng") else null, o.optBoolean("completed", true), o.optBoolean("sim", false)
+            o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }, if (o.has("placeLat")) o.getDouble("placeLat") else null, if (o.has("placeLng")) o.getDouble("placeLng") else null, o.optBoolean("completed", true), o.optBoolean("sim", false),
+            o.optJSONArray("path")?.let { a -> (0 until a.length()).map { i -> a.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1), it.getDouble(2)) } } } ?: emptyList()
         )
     }
 
@@ -223,12 +260,12 @@ class Store(ctx: Context) {
         put("id", g.id); put("owner", g.owner); put("title", g.title)
         if (g.lat != null && g.lng != null) { put("lat", g.lat); put("lng", g.lng) }
         put("drive", json(g.drive)); put("times", g.times); put("sample", g.sample); put("kind", g.kind)
-        put("tips", JSONArray().apply { g.tips.forEach { put(JSONObject().put("p", it.p.toDouble()).put("text", it.text)) } })
+        put("tips", JSONArray().apply { g.tips.forEach { t -> put(JSONObject().put("p", t.p.toDouble()).put("text", t.text).apply { if (t.lat != null && t.lng != null) { put("lat", t.lat); put("lng", t.lng) } }) } })
     }
 
     private fun guideOf(o: JSONObject): Guide {
         val a = o.getJSONArray("tips")
-        val tips = (0 until a.length()).map { Tip(a.getJSONObject(it).getDouble("p").toFloat(), a.getJSONObject(it).getString("text")) }
+        val tips = (0 until a.length()).map { a.getJSONObject(it).let { t -> Tip(t.getDouble("p").toFloat(), t.getString("text"), if (t.has("lat")) t.getDouble("lat") else null, if (t.has("lng")) t.getDouble("lng") else null) } }
         return Guide(
             o.getString("id"), o.getString("owner"), o.getString("title"),
             if (o.has("lat")) o.getDouble("lat") else null, if (o.has("lng")) o.getDouble("lng") else null,
@@ -271,11 +308,15 @@ class Store(ctx: Context) {
             Ev(.20f, Evt.SIGNAL, "RIGHT"), Ev(.24f, Evt.BRAKE, "on"), Ev(.52f, Evt.SIGNAL, "LEFT"),
             Ev(.56f, Evt.BRAKE, "on"), Ev(.80f, Evt.SIGNAL, "RIGHT"), Ev(.90f, Evt.BRAKE, "on")
         )
-        val drive = Drive("아빠", System.currentTimeMillis() - 3 * 86400000L, 8.2f, 24, 1440, evs, 3, 3, false, false, 0, 0, 6)
+        // 경로는 저장소의 tools/예시길.gpx 와 같다. 에뮬레이터에서 그 GPX를 재생하면 한마디가 그 자리에서 나온다.
+        val path = Paths.shareable(Paths.of(SampleRoute.points))
+        val full = Paths.of(SampleRoute.points)
+        val drive = Drive("아빠", System.currentTimeMillis() - 3 * 86400000L, 11.2f, 24, 1440, evs, 3, 3, false, false, 0, 0, 6, path = path)
+        fun tip(p: Float, t: String) = Paths.at(full, p).let { Tip(p, t, it?.lat, it?.lng) }
         addGuide(
             Guide(
                 "sample", "아빠", "할머니 댁 가는 길", 37.48544722, 127.03636666, drive,
-                listOf(Tip(.46f, "큰 사거리 지나면 바로 우회전이야. 미리 오른쪽 차로로 가 있어."), Tip(.93f, "주차장 입구가 좁아. 천천히 들어가도 아무도 뭐라 안 해.")),
+                listOf(tip(.46f, "큰 사거리 지나면 바로 우회전이야. 미리 오른쪽 차로로 가 있어."), tip(.93f, "주차장 입구가 좁아. 천천히 들어가도 아무도 뭐라 안 해.")),
                 7, sample = true
             )
         )

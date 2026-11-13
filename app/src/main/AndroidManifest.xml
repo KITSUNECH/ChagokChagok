@@ -10,6 +10,10 @@
     <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
     <!-- 일기 문장을 생성형 AI로 다듬을 때만 쓴다. 주행 요약 글만 나간다. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 음성 안내 (Pleos TextToSpeech) -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+    <!-- 위치: 한마디를 남긴 자리에 가까워졌는지 본다 (Pleos FusedLocation, 실행 중 허락을 받는다) -->
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
     <!-- 내비 연동 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
