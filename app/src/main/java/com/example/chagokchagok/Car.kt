@@ -317,21 +317,24 @@ class Car(private val ctx: Context, private val listener: Listener) {
     /** 시험용·시연용 신호 (실제 차량 신호가 아니다) */
     fun simEvent(type: String, value: String) {
         when (type) { Evt.SIGNAL -> signal = value; Evt.BRAKE -> brake = value == "on" }
-        listener.onCarEvent(type, value)
+        Telemetry.fake { listener.onCarEvent(type, value) }
     }
 
     /** 시험용·시연용 차선 변경: 깜빡이를 켜고 wait 초 뒤 조향, 조금 뒤 끈다. 실제 차량 신호가 아니다. */
     fun simLaneChange(side: String, waitSec: Float, main: android.os.Handler) {
-        signal = side; listener.onCarEvent(Evt.SIGNAL, side)
+        signal = side; Telemetry.fake { listener.onCarEvent(Evt.SIGNAL, side) }
         main.postDelayed({ steering = if (side == "LEFT") -6f else 6f; onSteer?.invoke(steering) }, (waitSec * 1000).toLong())
-        main.postDelayed({ steering = 0f; onSteer?.invoke(0f); signal = "OFF"; listener.onCarEvent(Evt.SIGNAL, "OFF") }, (waitSec * 1000).toLong() + 2500)
+        main.postDelayed({ steering = 0f; onSteer?.invoke(0f); signal = "OFF"; Telemetry.fake { listener.onCarEvent(Evt.SIGNAL, "OFF") } }, (waitSec * 1000).toLong() + 2500)
     }
 
     /** 모의 주행이 앞길 정보를 넣을 때 쓴다. 실제 내비 값이 아니다. */
     fun setAhead(limit: Int, cameraMeters: Int, cameraLimit: Int) {
         speedLimit = limit; this.cameraMeters = cameraMeters; this.cameraLimit = cameraLimit; schoolZone = false
-        listener.onCarEvent(Evt.NAVI, "ahead")
+        Telemetry.fake { listener.onCarEvent(Evt.NAVI, "ahead") }
     }
+
+    /** 모의 주행·시험용 회전 안내 (실제 내비 값이 아니다) */
+    fun simTurn(type: String?, meters: Int) = Telemetry.fake { setTurn(type, meters, "") }
 
     /** 내비의 회전 안내를 우리 말로 바꿔 둔다. 시험용 신호도 이 길로 들어온다. */
     fun setTurn(type: String?, meters: Int, text: String) {

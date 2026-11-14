@@ -15,7 +15,7 @@ internal fun MainActivity.diaryScreen(id: String?): View {
     val d = store.diaries().firstOrNull { it.id == id } ?: return todayScreen()
     val guide = store.guide(d.guideId)
     val prev = previousSame(d)
-    val paper = if (DiaryPrefs.mode == 1) paperPage(d, guide) else readPage(d, guide, prev)
+    val paper = readPage(d, guide, prev)
     val side = k.col().apply {
         addView(k.section("오늘의 숫자"))
         addView(numbers(d))
@@ -39,10 +39,7 @@ internal fun MainActivity.diaryScreen(id: String?): View {
     }
     return k.col().apply {
         addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
-            trailing = k.row(10).apply {
-                addView(k.segmented(listOf("읽기", "원고지"), DiaryPrefs.mode) { DiaryPrefs.mode = it; render() }, k.lp(ui.dp(200), k.WRAP))
-                addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 48) { readAloud(d.title, d.text) })
-            }))
+            trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(store.feeling(d.id), d.text).joinToString(". ")) }))
         addView(k.gap(18))
         // 주차 후 첫 화면: 돌아보기(한마디가 도움이 됐는지, 지난번보다 어땠는지, 돌아볼 만한 순간)가 일기보다 먼저
         arrivalCard(d, prev)?.let { addView(it, k.lp(k.MATCH, k.WRAP)); addView(k.gap(18)) }
@@ -120,7 +117,6 @@ private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
         addView(k.gap(8))
         addView(k.text(d.text, Type.Body).apply { setLineSpacing(0f, 1.6f) })
         if (d.ai) { addView(k.gap(10)); addView(aiNote(d)) }
-        d.stamp?.let { addView(k.gap(14)); addView(k.row().apply { addView(k.fill()); addView(stamp(it, true, 1, 76)) }) }
     }
 }
 
@@ -315,11 +311,9 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
         }
     } }
     // 받은 길이면 알리기가 먼저, 혼자 간 길이면 다음의 나에게가 먼저
-    val firstKeys = (if ("notify" in all) listOf("notify", "self", "give") else listOf("self", "give", "post")).filter { it in all }
-    val rest = all.keys - firstKeys.toSet()
-    return k.groupOf(firstKeys.map { all.getValue(it)() } + k.item("더 보기", rest.size.toString() + "가지 더", "list", chevron = true) {
-        sheets.sheet("더 보기", null) { _ -> addView(k.groupOf(rest.map { all.getValue(it)() }).apply { background = k.rounded(Ink.fill, 18) }) }
-    })
+    val firstKeys = (if ("notify" in all) listOf("notify", "self", "give") else listOf("self", "feel", "give")).filter { it in all }
+    val rest = all.keys - firstKeys.toSet() - setOf("post", "quiz", "handover")
+    return k.groupOf((firstKeys + rest).map { all.getValue(it)() })
 }
 
 /** 함께 차곡에 올리기 전 미리 보기와 공개 범위 */

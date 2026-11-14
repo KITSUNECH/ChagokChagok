@@ -157,7 +157,7 @@ internal fun MainActivity.reviewCard(): View? {
         addView(k.row(14).apply {
             addView(k.icon("flag", Ink.accent, 28))
             addView(k.col(3).apply {
-                addView(k.text("돌아볼 길 ${ds.size}개", Type.Headline))
+                addView(k.text("돌아볼 일기 ${ds.size}장", Type.Headline))
                 addView(k.text(ds.take(2).joinToString(" · ") { "${it.title} ${dateText(it.date, "a h:mm")}" }, Type.Sub, Ink.text2, lines = 2))
             }, k.lp(0, k.WRAP, 1f))
             addView(k.icon("chevron", Ink.text3, 20))

@@ -273,7 +273,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     fun end() {
         if (!active) return
         val wasSim = sim
-        if (sim) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0) }
+        if (sim) { sim = false; car.simTurn(null, 0); car.setAhead(0, 0, 0) }
         main.removeCallbacks(tick)
         store.tripSnapshot = null
         val driver = store.driver
@@ -388,7 +388,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 } else g.tips.forEachIndexed { i, t -> if (i !in heard && at >= t.p) play(i, t) }   // 경로가 없는 길은 진행 정도로
                 val next = turns.firstOrNull { it.p > at }
                 val meters = if (next != null) ((next.p - at) * total * 1000).toInt() else 0
-                if (next != null && meters <= 500) car.setTurn("TURN_" + next.value, meters, "") else car.setTurn(null, 0, "")
+                if (next != null && meters <= 500) car.simTurn("TURN_" + next.value, meters) else car.simTurn(null, 0)
                 if (demoAuto) {
                     // 돌기 전에 깜빡이를 켜고, 지나면 끈다
                     if (next != null && meters in 1..250 && car.signal == "OFF" && !laneBusy) car.simEvent(Evt.SIGNAL, next.value)
@@ -399,7 +399,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 }
                 val cam = ((0.66f - at) * total * 1000).toInt()
                 car.setAhead(50, if (cam in 1..600) cam else 0, 50)
-                if (at >= 1f) { simDone = true; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0); arrived = true; host.say("도착했어요. 기어를 P에 놓으면 일기를 쓸게요."); host.tripChanged() }
+                if (at >= 1f) { simDone = true; car.simTurn(null, 0); car.setAhead(0, 0, 0); arrived = true; host.say("도착했어요. 기어를 P에 놓으면 일기를 쓸게요."); host.tripChanged() }
                 else main.postDelayed(this, 500)
             }
         }, 500)

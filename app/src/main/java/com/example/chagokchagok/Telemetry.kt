@@ -25,8 +25,13 @@ internal object Telemetry {
     var muted = false
     val since = System.currentTimeMillis()
 
+    /** 시연·시험으로 만든 신호 수 (실제 차량 신호와 섞지 않고 따로 보여 준다) */
+    var simulated = 0; private set
+    /** 이 안에서 생긴 신호는 실제 차량 신호가 아니다 */
+    inline fun fake(block: () -> Unit) { val was = muted; muted = true; try { block() } finally { muted = was } }
+
     fun hit(key: String, value: String) {
-        if (muted) return
+        if (muted) { simulated++; return }
         val now = System.currentTimeMillis()
         count[key] = (count[key] ?: 0) + 1; last[key] = value; at[key] = now
         recent.addLast(now); while (recent.isNotEmpty() && now - recent.first() > 60_000) recent.removeFirst()

@@ -38,12 +38,7 @@ internal fun MainActivity.todaysGuide(): Guide? {
 internal fun MainActivity.todayScreen(): View {
     val k = kit; val d = store.driver
     val diaries = store.diariesOf(d)
-    val greeting = when (store.typeOf(d)) {
-        "초보" -> "아는 길부터 같이 가요. 오늘 주행도 차가 적어 둘게요."
-        "오랜만" -> "오랜만이에요. 손이 기억하고 있을 거예요."
-        "새 차" -> "이 차는 처음이죠. 출발 준비에서 손부터 익혀 봐요."
-        else -> "평소처럼 달리면 돼요. 그 길이 누군가의 첫 길이 돼요."
-    }
+    val greeting = "오늘 주행도 차가 적어 둘게요."
     val head = k.header(if (d == "나") "안녕하세요" else "$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · $greeting",
         trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
 
@@ -66,19 +61,12 @@ internal fun MainActivity.todayScreen(): View {
         { reviewCard() },
         { if (!guideHero) todaysGuide()?.let { g -> small("road", "${Writer.subj(g.owner)} 건네준 길", g.title + " · 한마디 ${g.tips.size}개") { depart(g) } } else null },
         { newsCard() },
-        { if (!store.prepDone(d) && type in listOf("초보", "새 차")) small("steering", "출발 준비", shifterLine() ?: "면허시험 차와 다른 곳을 손으로 익혀요") { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") } else null },
-        { if (store.demoOn) small("people", "친구들의 오늘", Demo.friends.filter { it.driving }.joinToString { it.name + " 운전 중" }.ifEmpty { "함께 차곡에서 보기" } + " · 시연용") { go(MainActivity.TOGETHER) } else null },
         { if (diaries.isEmpty()) loopCard() else null },
-        { if (diaries.isEmpty()) starterCard() else null },
-        { if (!store.prepDone(d)) small("steering", "출발 준비", "깜빡이, 와이퍼, 전조등, 기어 자리") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) } else null },
-        { lawCard() },
     )
     val side = mutableListOf<View>()
-    for (c in candidates) { if (side.size >= 2) break; c()?.let { side.add(it) } }
-    // 옆 묶음의 맨 아래는 성장 바의 다음 한 칸. 남는 높이를 이 카드가 채워 큰 카드와 밑단을 맞춘다.
-    nextBlockCard()?.let { side.add(it) }
+    for (c in candidates) { if (side.size >= 3) break; c()?.let { side.add(it) } }
     // 아래 줄: 이번 주의 나 (있을 때, 전체 폭)
-    val bottom = listOfNotNull(weekCard(), tipStrip())
+    val bottom = listOfNotNull(weekCard())
 
     return k.col().apply {
         addView(head); addView(k.gap(24))
@@ -92,7 +80,7 @@ internal fun MainActivity.todayScreen(): View {
                     addView(startCard(if (guideHero) todaysGuide() else null), k.lp(k.MATCH, k.WRAP))
                     addView(hero, k.lp(k.MATCH, 0, 1f))
                 }, k.lp(0, k.MATCH, 1.55f))
-                if (side.isNotEmpty()) addView(k.col(16).apply { side.forEachIndexed { i, v -> addView(v, if (i == side.lastIndex) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.MATCH, 1f))
+                if (side.isNotEmpty()) addView(k.col(16).apply { side.forEach { v -> addView(v, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
             })
             bottom.forEach { addView(k.gap(20)); addView(it, k.lp(k.MATCH, k.WRAP)) }
         } else addView(k.col(16).apply {
@@ -469,7 +457,7 @@ internal fun MainActivity.tellDeparture(g: Guide) {
 internal fun MainActivity.loopCard(): View {
     val k = kit
     return k.card(pad = 20) {
-        addView(k.text("이렇게 쌓여요", Type.Headline))
+        addView(k.text("이렇게 써요", Type.Headline))
         addView(k.gap(8))
         LOOP_STEPS.forEachIndexed { i, (ic, t, s) ->
             addView(k.row(12).apply {

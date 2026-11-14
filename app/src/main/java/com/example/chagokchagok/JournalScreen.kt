@@ -6,7 +6,7 @@ import android.view.Gravity
 import android.view.View
 import java.util.Locale
 
-internal fun MainActivity.analysisScreen(): View { journalTab = 1; return journalScreen() }
+internal fun MainActivity.analysisScreen(): View { journalTab = 2; return journalScreen() }
 
 internal fun MainActivity.journalScreen(): View {
     val k = kit; val me = store.driver
@@ -14,21 +14,47 @@ internal fun MainActivity.journalScreen(): View {
     return k.col().apply {
         addView(k.header("일기장", if (all.isEmpty()) "아직 일기가 없어요" else "${all.size}번 달렸어요 · 첫 일기 ${dateText(all.first().date, "M월 d일")}"))
         addView(k.gap(18))
-        addView(k.segmented(listOf("일기", "기록 분석"), journalTab) { journalTab = it; render() }, k.lp(if (ui.wide) ui.dp(420) else k.MATCH, k.WRAP))
+        addView(k.segmented(listOf("길별", "날짜순", "평소의 나"), journalTab) { journalTab = it; render() }, k.lp(if (ui.wide) ui.dp(520) else k.MATCH, k.WRAP))
         addView(k.gap(18))
-        if (journalTab == 0) addView(diaryList(all)) else addView(analysis(all))
+        addView(when (journalTab) { 0 -> roadList(all); 1 -> diaryList(all); else -> analysis(all) })
+    }
+}
+
+/** 길별: 일기는 길에 쌓인다. 같은 곳에 다녀온 일기를 한 묶음으로, 최근에 간 곳부터 */
+private fun MainActivity.roadList(all: List<Diary>): View {
+    val k = kit
+    if (all.isEmpty()) return diaryList(all)
+    val roads = all.filter { it.drive.place != null }.groupBy { it.drive.place!! }.entries.sortedByDescending { it.value.last().date }
+    val loose = all.filter { it.drive.place == null }
+    val cards = roads.map { (place, ds) ->
+        val last = ds.last(); val j = Growth.judge(all, last)
+        val note = store.selfGuide(store.driver, place)?.tips?.firstOrNull()?.text
+        k.card(pad = 22, onClick = { go(if (ds.size >= 2) MainActivity.ROAD else MainActivity.DIARY, last.id) }) {
+            addView(k.row(10).apply {
+                addView(k.icon("pin", Ink.accent, 22))
+                addView(k.text(place, Type.Headline, lines = 1), k.lp(0, k.WRAP, 1f))
+                if (j != null && !j.early) addView(k.tag(j.verdict.word, when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> Ink.text2; Verdict.DOWN -> Ink.warn }))
+            })
+            addView(k.gap(6))
+            addView(k.text("일기 ${ds.size}장 · 지난번 ${dateText(last.date, "M월 d일")}", Type.Sub, Ink.text2))
+            if (note != null) { addView(k.gap(8)); addView(k.voice("“$note”", 17f, Ink.text2).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }) }
+        }
+    }
+    return k.col().apply {
+        if (cards.isNotEmpty()) addView(k.grid(if (ui.wide) 2 else 1, cards, 16))
+        else addView(k.card { addView(k.text("목적지를 내비에 넣고 달리거나, 주차 후 그곳에 이름을 붙이면 길별로 묶여요.", Type.Sub, Ink.text2)) })
+        if (loose.isNotEmpty()) { addView(k.section("이름 없는 길")); addView(diaryList(loose)) }
     }
 }
 
 private fun MainActivity.diaryList(all: List<Diary>): View {
     val k = kit
-    if (all.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면, 차가 오늘 주행을 일기로 써 줘요.")) }
+    if (all.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면 일기 한 장이 생겨요.")) }
     val cards = all.reversed().map { d ->
         k.card(pad = 22, onClick = { go(MainActivity.DIARY, d.id) }) {
             addView(k.row(8).apply {
                 addView(k.text(dateText(d.date, "M월 d일 E요일"), Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f))
                 if (d.drive.sim) addView(k.tag("모의", Ink.warn))
-                if (store.posted(d.id) != null) addView(k.tag("올림", Ink.go))
             })
             addView(k.gap(6))
             addView(k.row(12).apply {
@@ -37,7 +63,6 @@ private fun MainActivity.diaryList(all: List<Diary>): View {
                     addView(k.text(d.title, Type.Headline))
                     addView(k.voice(d.text, 17f, Ink.text2).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
                 }, k.lp(0, k.WRAP, 1f))
-                d.stamp?.let { addView(stamp(it, true, 2, 56)) }
             })
             addView(k.gap(8)); addView(k.text(facts(d.drive), Type.Caption, Ink.text3))
         }
@@ -55,11 +80,10 @@ private fun MainActivity.analysis(all: List<Diary>): View {
     val labels = ds.map { dateText(it.date, "M/d") }
     val km = ds.sumOf { it.drive.distKm.toDouble() }
     val list = k.col(16)
-    list.addView(k.grid(if (ui.wide) 4 else 2, listOf(
+    list.addView(k.grid(if (ui.wide) 3 else 1, listOf(
         k.stat("${ds.size}번", "달린 횟수"),
         k.stat(String.format(Locale.KOREA, "%.1fkm", km), "모두 달린 거리"),
-        k.stat("${ds.count { it.stamp != null }}개", "받은 도장"),
-        k.stat("${store.places(store.driver).size}곳", "혼자 가 본 곳"),
+        k.stat("${store.places(store.driver).size}곳", "다녀온 곳"),
     ), 14))
     list.addView(k.row(10).apply {
         addView(k.icon("info", Ink.text2, 18))

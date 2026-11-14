@@ -38,7 +38,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         const val TODAY = "today"; const val JOURNAL = "journal"; const val TOGETHER = "together"; const val ROADS = "roads"; const val SETTINGS = "settings"
         const val PREP = "prep"; const val READY = "ready"; const val DIARY = "diary"; const val GIVE = "give"; const val LEARN = "learn"
         const val PEOPLE = "people"; const val ONBOARD = "onboard"; const val DRIVE = "drive"; const val ANALYSIS = "analysis"; const val CHECK = "check"; const val PROPOSE = "propose"; const val ROAD = "road"
-        val TABS = listOf(TODAY, JOURNAL, TOGETHER, ROADS, SETTINGS)
+        val TABS = listOf(TODAY, JOURNAL, SETTINGS)
         /** 주차 중에만 여는 화면 */
         val PARKED_ONLY = setOf(ROAD, PREP, READY, DIARY, GIVE, LEARN, PEOPLE, JOURNAL, TOGETHER, ROADS, SETTINGS, ANALYSIS, CHECK, PROPOSE)
         const val REQ_LOCATION = 7
@@ -210,11 +210,9 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             addView(sidebar(), k.lp(ui.dp(268), k.MATCH))
             addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(1), k.MATCH))
             addView(body, k.lp(0, k.MATCH, 1f))
-            addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(1), k.MATCH))
-            addView(stackRail(), k.lp(ui.dp(84), k.MATCH))
         }
         return k.col().apply {
-            addView(k.row().apply { gravity = Gravity.TOP; addView(body, k.lp(0, k.MATCH, 1f)); addView(stackRail(), k.lp(ui.dp(56), k.MATCH)) }, k.lp(k.MATCH, 0, 1f))
+            addView(body, k.lp(k.MATCH, 0, 1f))
             addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(k.MATCH, ui.dp(1)))
             addView(tabBar(), k.lp(k.MATCH, k.WRAP))
         }
@@ -254,7 +252,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             addView(k.avatar(d, 42))
             addView(k.col(2).apply {
                 addView(k.text(d, Type.BodyStrong))
-                addView(k.text("${store.typeOf(d)} · 운전석", Type.Caption, Ink.text2))
+                addView(k.text("운전석", Type.Caption, Ink.text2))
             }, k.lp(0, k.WRAP, 1f))
             addView(k.icon("down", Ink.text3, 18))
             k.pressable(this, k.rounded(Ink.fill, 16)) { switchDriver() }
@@ -275,7 +273,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         val names = store.drivers
         sheets.sheet("누가 운전하나요?", "운전석에 앉은 사람의 기록과 받은 길이 보여요.") { close ->
             addView(kit.groupOf(names.map { n ->
-                kit.item(n, "${store.relation(n)} · ${store.typeOf(n)}", trailing = if (n == store.driver) kit.icon("check", Ink.accent, 20) else kit.avatar(n, 32)) {
+                kit.item(n, store.relation(n), trailing = if (n == store.driver) kit.icon("check", Ink.accent, 20) else kit.avatar(n, 32)) {
                     close(); store.driver = n; chosenGuide = null; go(TODAY); toast("$n 님의 운전석으로 바꿨어요.")
                     if (store.locationOn && store.locationConsent(n) == null) askLocationConsent(n)
                 }

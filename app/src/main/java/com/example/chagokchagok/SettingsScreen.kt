@@ -29,20 +29,15 @@ internal fun MainActivity.settingsScreen(): View {
         addView(k.header("설정"))
         addView(k.section("운전석"))
         addView(k.groupOf(listOf(
-            k.item(me, "${store.relation(me)} · ${store.typeOf(me)} · 지금 운전석", trailing = k.avatar(me, 40)) { switchDriver() },
+            k.item(me, "지금 운전석", trailing = k.avatar(me, 40)) { switchDriver() },
             k.item("이 차를 쓰는 방식", if (store.drivers.size > 1) store.drivers.joinToString(", ") else "다음의 나에게 길을 남겨요", "people", value = if (store.drivers.size > 1) "함께" else "혼자", chevron = true) { changeSharing() },
-            k.item("운전 경험", null, "steering", value = store.typeOf(me), chevron = true) {
-                sheets.choose("운전 경험", "말로 알려 주는 양과 홈에서 먼저 보일 것이 바뀌어요.", DRIVER_TYPES.map { it.second }, selected = DRIVER_TYPES.indexOfFirst { it.first == store.typeOf(me) }) { t -> store.setType(me, DRIVER_TYPES[t].first); render() }
-            },
-            k.item("면허 딴 해", "그 뒤로 바뀐 법규만 보여 줘요", "scale", value = store.licenseYear(me)?.let { "${it}년" } ?: "모름", chevron = true) { pickLicenseYear() },
-        )))
-        addView(k.section("이 차"))
-        addView(k.groupOf(listOf(
-            k.item("차종", "기어 쓰는 법과 안전 조작을 맞춰 보여 줘요", "car", value = store.carModel ?: Shifters.byId(store.shifter)?.name ?: "고르지 않음", chevron = true) { prepTab = 1; go(MainActivity.PREP) },
         )))
         addView(k.section("안내"))
         addView(k.groupOf(listOf(
             k.toggleItem("소리로 알려 주기", "한마디, 회전 전 깜빡이, 도착을 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
+            k.item("말 거는 정도", "달리는 동안 차가 얼마나 자주 말을 걸지", "quote", value = TALK.first { it.first == talkOf(me) }.second, chevron = true) {
+                sheets.choose("말 거는 정도", "운전이 익숙해지면 줄여도 돼요. 경고는 언제나 알려 줘요.", TALK.map { it.second + " · " + it.third }, selected = TALK.indexOfFirst { it.first == talkOf(me) }) { i -> store.setType(me, TALK[i].first); render() }
+            },
             k.item("목소리 들어 보기", voice.status, "play", chevron = true) { speak("안녕하세요. 차곡차곡이에요. 오늘도 같이 가요.") },
             k.item("일기 말투", "다음 일기부터 바뀌어요", "pencil", value = store.tone(me), chevron = true) {
                 sheets.choose("일기 말투", null, listOf("담백하게", "다정하게"), selected = if (store.tone(me) == "다정하게") 1 else 0) { i -> store.setTone(me, listOf("담백하게", "다정하게")[i]); render() }
@@ -56,7 +51,6 @@ internal fun MainActivity.settingsScreen(): View {
                 render()
             },
             k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
-            k.toggleItem("내 기록을 가족에게 보여 주기", "켜면 가족 일기장에 내 요즘 운전이 보여요", store.shares(me), "eye") { store.setShares(me, it) },
             k.item("일기 문장 다듬기 (생성형 AI)", if (AiDiary.enabled) "일기 초안만 Anthropic API로 가요" else "키를 넣으면 켜져요. 키는 이 차에만 암호화해 둬요", "sparkle", value = if (AiDiary.enabled) "켜짐" else "꺼짐", chevron = true) {
                 if (AiDiary.enabled) sheets.confirm("AI 다듬기를 끌까요?", "넣어 둔 키를 이 차에서 지워요.", "끄기", true) { store.aiKey = null; AiDiary.key = null; toast("AI 다듬기를 껐어요. 키를 지웠어요."); render() }
                 else sheets.input("Anthropic API 키", "sk-ant-…", ok = "저장") { v -> store.aiKey = v; AiDiary.key = v; toast("키를 암호화해 저장했어요. 다음 일기부터 다듬어요."); render() }
@@ -91,15 +85,19 @@ internal fun MainActivity.testSignals() {
         "깜빡이 왼쪽" to { onCarEvent(Evt.SIGNAL, "LEFT") }, "깜빡이 오른쪽" to { onCarEvent(Evt.SIGNAL, "RIGHT") }, "깜빡이 끄기" to { onCarEvent(Evt.SIGNAL, "OFF") },
         "브레이크" to { onCarEvent(Evt.BRAKE, "on") }, "와이퍼 켜기" to { onCarEvent(Evt.WIPER, "on") }, "와이퍼 끄기" to { onCarEvent(Evt.WIPER, "off") },
         "전조등 켜기" to { onCarEvent(Evt.LIGHT, "on") }, "안전벨트 매기" to { onCarEvent("belt", "on") }, "동승자 탑승" to { onCarEvent(Evt.SEAT, "on") },
-        "내비: 150m 앞 우회전" to { car.setTurn("TURN_RIGHT", 150, "") }, "내비: 80m 앞 우회전" to { car.setTurn("TURN_RIGHT", 80, "") }, "내비: 회전 지남" to { car.setTurn(null, 0, "") },
+        "내비: 150m 앞 우회전" to { car.simTurn("TURN_RIGHT", 150) }, "내비: 80m 앞 우회전" to { car.simTurn("TURN_RIGHT", 80) }, "내비: 회전 지남" to { car.simTurn(null, 0) },
         "표시등: 오토 홀드" to { car.setLamps(car.lampsOn + "AUTO_HOLD") }, "표시등: 타이어 공기압" to { car.setLamps(car.lampsOn + "TPMS") }, "표시등 모두 끄기" to { car.setLamps(emptySet()) },
         "차선 변경 (깜빡이 켜고 8초 뒤)" to { car.simLaneChange("LEFT", 8f, android.os.Handler(mainLooper)) },
         "기어 D" to { onCarEvent(Evt.GEAR, "D") }, "기어 R" to { onCarEvent(Evt.GEAR, "R") }, "기어 P" to { onCarEvent(Evt.GEAR, "P") },
     )
-    sheets.choose("시험용 신호", "실제 차량 신호가 아니에요. 차량 데이터 지표에도 세지 않아요.", items.map { it.first }) { i -> Telemetry.muted = true; try { items[i].second() } finally { Telemetry.muted = false } }
+    sheets.choose("시험용 신호", "실제 차량 신호가 아니에요. ‘받은 신호’에 세지 않고 따로 세요.", items.map { it.first }) { i -> Telemetry.muted = true; try { items[i].second() } finally { Telemetry.muted = false } }
 }
 
 // ═══════════════ 함께 쓰는 사람 ═══════════════
+
+/** 말 거는 정도 (저장은 예전 '운전 경험' 값 그대로: 초보 = 자주, 오랜만·새 차 = 필요할 때, 익숙 = 경고만) */
+internal val TALK = listOf(Triple("초보", "자주", "돌기 전 깜빡이, 잘한 것까지"), Triple("오랜만", "필요할 때", "한마디와 경고"), Triple("익숙", "경고만", "꼭 필요한 것만"))
+internal fun MainActivity.talkOf(n: String) = when (store.typeOf(n)) { "초보" -> "초보"; "익숙" -> "익숙"; else -> "오랜만" }
 
 internal val DRIVER_TYPES = listOf("초보" to "면허를 딴 지 얼마 안 됐어요", "오랜만" to "오랜만에 다시 운전해요", "새 차" to "운전은 하는데 이 차가 처음이에요", "익숙" to "운전이 익숙해요")
 
@@ -109,7 +107,7 @@ internal fun MainActivity.peopleScreen(): View {
         addView(k.header("함께 쓰는 사람", "이 차를 함께 쓰는 가족과 친구예요. 운전석에 앉은 사람마다 받은 길과 일기가 따로 쌓여요.", onBack = { back() }))
         addView(k.gap(18))
         addView(k.groupOf(store.drivers.map { n ->
-            k.item(n, "${store.relation(n)} · ${store.typeOf(n)}" + if (n == store.driver) " · 지금 운전석" else "", trailing = k.avatar(n, 36)) { editPerson(n) }
+            k.item(n, store.relation(n) + if (n == store.driver) " · 지금 운전석" else "", trailing = k.avatar(n, 36)) { editPerson(n) }
         } + k.item("사람 추가", icon = "plus") { addPerson() }))
         addView(k.gap(14))
         addView(k.text("다른 차를 쓰는 가족·친구와 잇는 기능은 계정 연동이 필요해 아직 없어요. 지금은 이 차 안에서 운전석을 바꿔 가며 써요.", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
@@ -252,7 +250,7 @@ internal fun MainActivity.checkScreen(): View {
     fun ok(b: Boolean) = if (b) Ink.go else Ink.text3
     val vehicleOk = !car.failures.containsKey("vehicle") && !Car.offline
     return k.col().apply {
-        addView(k.header("차량 연결 상태", "이 앱이 지금 실제로 받고 있는 차량 신호예요. 시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
+        addView(k.header("차량 연결 상태", "이 앱이 실제로 받은 차량 신호예요." + if (Telemetry.simulated > 0) " 시연·시험으로 만든 신호 ${Telemetry.simulated}번은 여기에 세지 않았어요." else " 시연·시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
         addView(k.gap(16))
         // 공모전 시연 도구 (마켓판에는 없음)
         if (BuildConfig.DEMOS) {

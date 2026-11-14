@@ -20,7 +20,9 @@ internal object Onboard {
     var gaugeShown = 0
     /** 홈에서 압축 모션을 보여 줄 칸 수 (한 번 쓰면 0) */
     var squeeze = 0
-    const val LAST = 6
+    const val LAST = 2
+    /** 보여 주는 화면: 소개 · 이름 · 위치와 소리 (운전 경험·면허·함께 쓰는 사람은 묻지 않는다) */
+    val PAGES = intArrayOf(0, 1, 5)
 }
 
 /** 운전 경험별로 달라지는 것. 처음 설정의 비교표와 설계 자료에 같은 값을 쓴다. */
@@ -105,10 +107,10 @@ internal fun MainActivity.onboardScreen(): View {
     var anchor: View? = null
     fun side(v: View) = aside.addView(v, k.lp(k.MATCH, k.WRAP))
     val content = k.col(18).apply {
-        when (O.step) {
+        when (Onboard.PAGES[O.step.coerceIn(0, Onboard.LAST)]) {
             0 -> {
                 addView(k.text("차로 쓰는\n성장일기", Type.Display))
-                addView(k.text("차가 내 운전을 기억했다가, 같은 길을 다시 달릴 때 내가 늘었다는 걸 보여 줘요.", Type.Body, Ink.text2))
+                addView(k.text("내 운전을 아는 차가 달리는 동안 말을 걸어 주고, 같은 길에서 내가 늘었는지 보여 줘요.", Type.Body, Ink.text2))
                 addView(k.gap(6))
                 val pillars = LOOP_STEPS
                 side(k.col(10).apply { pillars.forEach { (ic, t, s) ->
@@ -221,7 +223,8 @@ internal fun MainActivity.onboardScreen(): View {
                     k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
                 )))
                 side(k.row(10).apply { gravity = Gravity.TOP; addView(k.icon("lock", Ink.text2, 18)); addView(k.text("일기와 지나온 길은 이 차 안에만 저장돼요. 누구에게 보여 줄지는 일기마다 직접 골라요.", Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f)) })
-                onNext = { if (store.locationOn && !places.permitted()) askLocation(); next() }
+                nextLabel = "시작하기"
+                onNext = { if (store.locationOn && !places.permitted()) askLocation(); finishOnboarding(false) }
             }
             else -> {
                 addView(k.text(if (O.name == "나") "준비됐어요" else "준비됐어요,\n${O.name} 님", Type.Large))
@@ -248,7 +251,7 @@ internal fun MainActivity.onboardScreen(): View {
     }
 
     // 아래 단추 줄
-    val prepFirst = if (O.step == Onboard.LAST && O.type in listOf("초보", "새 차")) k.button("출발 준비부터", Kit.Btn.Secondary, "steering") { finishOnboarding(true) } else null
+    val prepFirst = if (false) k.button("출발 준비부터", Kit.Btn.Secondary, "steering") { finishOnboarding(true) } else null
     val barRow = k.row(12).apply {
         if (O.step > 0) addView(k.button("뒤로", Kit.Btn.Plain, "back") { prev() })
         addView(k.fill())
@@ -284,29 +287,9 @@ internal fun MainActivity.onboardScreen(): View {
         addView(k.gap(16))
         addView(bar, k.lp(k.MATCH, k.WRAP))
     }
-    // 오른쪽: 13칸 성장 게이지. 홈의 성장 바와 같은 자리, 같은 폭에 둬서
-    // 처음 설정을 마치면 같은 자리에서 그대로 압축되며 홈의 바로 이어진다.
-    val cap = Gauge.cap(levelOf(O.type))
-    val target = if (O.step == Onboard.LAST) cap else 0
-    val from = O.gaugeShown; O.gaugeShown = target
-    val labelW = 0   // 단계 이름표 없이 막대만 (홈의 성장 바와 같은 폭)
-    val rail = k.col(10).apply {
-        // 홈 바(stackRail)와 같은 안쪽 여백: 위 24 · 옆 14 · 아래 20
-        setPadding(ui.dp(14), ui.dp(24), ui.dp(14), ui.dp(20))
-        setBackgroundColor(Ink.surface)
-        // 숫자와 '칸'은 한 낱말로 붙인다. 아직 채우지 않은 동안에는 자리만 지킨다.
-        addView(k.text("${target}칸", if (ui.wide) Type.Title else Type.Headline).apply { gravity = Gravity.CENTER; maxLines = 1; visibility = if (target > 0) View.VISIBLE else View.INVISIBLE })
-        addView(GaugeView(context, ui, from, target, labelW), k.lp(k.MATCH, 0, 1f))
-    }
-    val railW = labelW + ui.dp(if (ui.wide) 84 else 56)
     if (ui.wide) right.addView(k.row(12).apply { addView(brand(30)); addView(k.fill()) }, 0)
     if (ui.wide) right.addView(k.gap(26), 1)
-    return k.row().apply {
-        setBackgroundColor(Ink.bg)
-        addView(right, k.lp(0, k.MATCH, 1f))
-        addView(View(context).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(1), k.MATCH))
-        addView(rail, k.lp(railW, k.MATCH))
-    }
+    return right.apply { setBackgroundColor(Ink.bg) }
 }
 
 private fun MainActivity.finishOnboarding(prepFirst: Boolean) {
@@ -323,6 +306,5 @@ private fun MainActivity.finishOnboarding(prepFirst: Boolean) {
     O.step = 0; O.gaugeShown = 0; O.licenseTouched = false
     speak(if (type == "초보") "안녕하세요. 면허 따고 처음은 낯설 수 있어요. 함께 확인해 봐요." else "안녕하세요. 오늘도 같이 가요.")
     if (prepFirst) { prepDone.clear(); prepSeen.clear(); go(MainActivity.TODAY) }
-    O.squeeze = Gauge.cap(levelOf(type))
     go(if (prepFirst) MainActivity.PREP else MainActivity.TODAY)
 }

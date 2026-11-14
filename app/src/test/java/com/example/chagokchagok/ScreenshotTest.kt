@@ -53,19 +53,11 @@ class ScreenshotTest {
             fun find(v: View): android.widget.ScrollView? = if (v is android.widget.ScrollView) v else (v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { find(g.getChildAt(it)) } }
             idle(); find(a.window.decorView)?.scrollBy(0, px)
         }
-        Onboard.step = 0; Onboard.gaugeShown = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
-        Onboard.step = 1; a.go(MainActivity.ONBOARD); snap("00a2_onboard_name")
-        Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00b_onboard_type")
-        Onboard.step = 3; a.go(MainActivity.ONBOARD); snap("00c2_onboard_license")
-        Onboard.step = 4; Onboard.solo = false; Onboard.others.add("아빠"); a.go(MainActivity.ONBOARD); snap("00c_onboard_who")
-        Onboard.step = 5; a.go(MainActivity.ONBOARD); snap("00c3_onboard_settings")
-        Onboard.step = 6; a.go(MainActivity.ONBOARD); snap("00d_onboard_ready"); Onboard.others.clear()
+        Onboard.step = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
+        Onboard.step = 1; a.go(MainActivity.ONBOARD); snap("00b_onboard_name")
+        Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00c_onboard_settings")
         val store = a.store
         store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setLocationConsent("나", true); store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true
-        Onboard.squeeze = Gauge.cap(2); store.setType("나", "오랜만"); a.go(MainActivity.TODAY)
-        // 압축 모션 중간과 끝 (시계를 앞으로 돌려 본다)
-        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1250)); snap("01a_squeeze_mid")
-        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1200)); snap("01a_squeeze_end")
         store.setType("나", "초보")
         a.go(MainActivity.TODAY); snap("01_today_empty")
         store.addSampleGuide(); store.addSampleFriend()
@@ -96,15 +88,15 @@ class ScreenshotTest {
             val dd = Writer.write(again, store.diariesOf("나"), null, 0); store.addDiary(dd)
             a.go(MainActivity.DIARY, dd.id); snap("06b_diary_compare")
             a.noteToSelf(dd); snap("06c_tip_ideas"); a.onBackPressed()
-            DiaryPrefs.mode = 1; a.go(MainActivity.DIARY, dd.id); snap("06d_diary_paper"); DiaryPrefs.mode = 0
             a.go(MainActivity.ROAD, dd.id); snap("06e_road")
             a.go(MainActivity.TODAY); snap("02b_today_review")
         }
         if (!short) {
             val last = store.diariesOf("나").last()
             a.giveTitle = ""; a.giveKind = "길"; a.go(MainActivity.GIVE, last.id); snap("07_give")
-            a.journalTab = 0; a.go(MainActivity.JOURNAL); snap("08_journal")
-            a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("09_analysis")
+            a.journalTab = 0; a.go(MainActivity.JOURNAL); snap("08_journal_roads")
+            a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("08b_journal_dates")
+            a.journalTab = 2; a.go(MainActivity.JOURNAL); snap("09_analysis")
             a.go(MainActivity.TOGETHER); snap("10_together")
             store.demoOn = true; a.go(MainActivity.TOGETHER); snap("15_social_demo")
             a.convoyWith(Demo.friends[0], store.guide("sample")); a.trip.start(); snap("16_convoy_drive"); a.onCarEvent(Evt.GEAR, "P"); store.demoOn = false
@@ -114,8 +106,6 @@ class ScreenshotTest {
             listOf(Evt.GEAR to "D", Evt.SIGNAL to "LEFT", Evt.BRAKE to "on", Evt.WIPER to "on", Evt.LIGHT to "on", "location" to "37.4900, 127.0300").forEach { (t, v) -> Telemetry.hit(t, v) }
             a.go(MainActivity.CHECK); snap("14_check")
 
-            a.go(MainActivity.TODAY); a.stackSheet(); snap("18_stack_sheet")
-            a.sheets.closeAll()
             // 시연: 회사 가는 길, 네 번째 출근 (예시 3개 + 모의 주행)
             DemoCommute.start(a); a.sheets.closeAll(); snap("20_demo_ready")
             a.trip.startSim()
@@ -127,7 +117,7 @@ class ScreenshotTest {
             val dj = Growth.judge(store.diariesOf("나"), demoDiary)
             org.junit.Assert.assertEquals(Verdict.UP, dj?.verdict); org.junit.Assert.assertEquals(1, demoDiary.drive.lanes().size); org.junit.Assert.assertTrue(store.heardTips(demoDiary.id).isNotEmpty()); org.junit.Assert.assertTrue(demoDiary.drive.sim)
             DemoCommute.clear(a)
-        } else { a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("09_analysis") }
+        } else { a.journalTab = 0; a.go(MainActivity.JOURNAL); snap("08_journal_roads") }
         ctrl.pause().stop().destroy()
     }
 }
