@@ -108,14 +108,10 @@ internal fun MainActivity.onboardScreen(): View {
         when (O.step) {
             0 -> {
                 addView(k.text("차로 쓰는 성장일기", Type.Micro, Ink.accent))
-                addView(k.text("내가 가는 길이\n차곡이 돼요", Type.Display))
-                addView(k.text("가고 싶은 곳으로 운전하면 차가 본 그대로 일기를 써 줘요. 해낸 일은 한 칸씩 쌓여요.", Type.Body, Ink.text2))
+                addView(k.text("차가 기억했다가,\n다시 갈 때 꺼내 줘요", Type.Display))
+                addView(k.text("차가 내 운전을 기억했다가, 같은 길을 다시 달릴 때 내가 늘었다는 걸 보여 줘요.", Type.Body, Ink.text2))
                 addView(k.gap(6))
-                val pillars = listOf(
-                    Triple("book", "차가 쓰는 일기", "깜빡이, 브레이크, 와이퍼… 차 신호가 그대로 근거가 돼요"),
-                    Triple("quote", "그 자리의 한마디", "지난번의 나, 함께 쓰는 가족이 남긴 말을 그 근처에서"),
-                    Triple("speaker", "달릴 때는 말로만", "화면은 한눈에, 나머지는 주차한 뒤에"),
-                )
+                val pillars = LOOP_STEPS
                 side(k.col(10).apply { pillars.forEach { (ic, t, s) ->
                     addView(k.row(16).apply {
                         setPadding(ui.dp(18), ui.dp(16), ui.dp(18), ui.dp(16)); background = k.rounded(Ink.surface, 18, 1, Ink.line)

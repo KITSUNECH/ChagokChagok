@@ -5,7 +5,7 @@
 // 주차 후에 돌아보고, 다음에 그 구간에 들어서기 전에 미리 알려 준다. 같은 구간에서 기다린 시간이 줄면 그게 늘었다는 근거가 된다.
 //
 // 판정 (추정):
-//  · 깜빡이(LEFT/RIGHT)가 켜질 때 내비가 150m 안의 회전을 안내 중이면 회전이지 차선 변경이 아니다.
+//  · 깜빡이(LEFT/RIGHT)가 켜질 때 내비가 300m 안의 회전을 안내 중이면 회전이지 차선 변경이 아니다.
 //  · 조향각(Vehicle SDK SteeringWheelAngle)을 받으면: 기준에서 4° 넘게 움직인 때를 "바꾸기 시작"으로 본다.
 //    30° 넘게 돌면 교차로 회전으로 보고 차선 변경에서 뺀다.
 //  · 조향각을 못 받으면: 내비 경로 안내 중이고 회전 안내가 없을 때만, 깜빡이를 켜 둔 시간을 기다린 시간으로 본다.
@@ -35,7 +35,7 @@ internal fun Drive.laneWaitMedian(): Float? {
 }
 
 /** 주행 중에 깜빡이와 조향각을 보고 차선 변경을 찾는다 */
-internal class LaneWatch(private val now: () -> Long = System::currentTimeMillis) {
+internal class LaneWatch(private val now: () -> Long = { android.os.SystemClock.elapsedRealtime() }) {
     private var side: String? = null
     private var onAt = 0L
     private var movedAt = 0L

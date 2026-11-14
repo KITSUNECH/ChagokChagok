@@ -113,6 +113,18 @@ class ScreenshotTest {
             a.go(MainActivity.CHECK); snap("14_check")
 
             a.go(MainActivity.TODAY); a.stackSheet(); snap("18_stack_sheet")
+            a.sheets.closeAll()
+            // 시연: 회사 가는 길, 네 번째 출근 (예시 3개 + 모의 주행)
+            DemoCommute.start(a); a.sheets.closeAll(); snap("20_demo_ready")
+            a.trip.startSim()
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(46)); snap("21_demo_drive")
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(50))
+            a.onCarEvent(Evt.GEAR, "P"); a.sheets.closeAll(); snap("22_demo_arrival")
+            val demoDiary = store.diariesOf("나").last { it.drive.place == DemoCommute.PLACE && it.drive.sim }
+            a.go(MainActivity.ROAD, demoDiary.id); snap("23_demo_road")
+            val dj = Growth.judge(store.diariesOf("나"), demoDiary)
+            org.junit.Assert.assertEquals(Verdict.UP, dj?.verdict); org.junit.Assert.assertEquals(1, demoDiary.drive.lanes().size); org.junit.Assert.assertTrue(store.heardTips(demoDiary.id).isNotEmpty()); org.junit.Assert.assertTrue(demoDiary.drive.sim)
+            DemoCommute.clear(a)
         } else { a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("09_analysis") }
         ctrl.pause().stop().destroy()
     }

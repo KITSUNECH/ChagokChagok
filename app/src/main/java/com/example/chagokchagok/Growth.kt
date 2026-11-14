@@ -5,7 +5,7 @@
 //  · 같은 길(같은 목적지·같은 받은 길)을 끝까지 다녀온 실제 주행끼리만 비교한다.
 //  · 기준은 직전 한 번이 아니라 처음 몇 번(최대 3번)의 평균. 오늘과 조건(시간대·비·밤)이 다른 기록은 무게를 절반으로.
 //  · 지표마다 무게가 다르다: 길 상황(막힘·신호)에 덜 흔들리는 습관 지표일수록 무겁다. 걸린 시간은 판정에서 뺀다.
-//  · 변화는 -1..+1 로 맞춘다: (나아진 쪽으로) 차이 ÷ 둘 중 큰 값. 0에서 0은 변화 없음.
+//  · 변화는 -1..+1 로 맞춘다: (나아진 쪽으로) 차이 ÷ 둘 중 큰 값(횟수는 1 이상). 0에서 0은 변화 없음.
 //  · 무게대로 합쳐 +0.10 이상 "늘었어요", -0.10 이하 "쉽지 않았어요", 그 사이 "비슷해요".
 //  · 확신도는 지난 기록 수: 1번 "참고", 2–3번 "보통", 4번 이상 "믿을 만해요".
 // 운전자의 답("더 편했어요/비슷했어요/더 긴장됐어요")과 합쳐 최종 한 줄을 만든다. 둘이 다르면 그 이유를 짚는다.
@@ -44,12 +44,12 @@ internal object Metrics {
     val all = listOf(
         Metric("signal", "돌기 전 깜빡이", "%", 3f, true, false) { d -> if (d.turns > 0) 100f * d.turnsSignaled / d.turns else null },
         Metric("lane", "차선 변경 전 기다림", "초", 3f, false, false) { d -> d.laneWaitMedian() },
-        Metric("lost", "경로 재탐색", "번", 2f, false, false) { d -> d.lostWay.toFloat() },
-        Metric("park", "주차할 때 기어 바꿈", "번", 2f, false, false) { d -> if (d.completed) d.parkMoves.toFloat() else null },
+        Metric("lost", "경로 재탐색", "번", 2f, false, false) { d -> if (d.sim) null else d.lostWay.toFloat() },
+        Metric("park", "주차할 때 기어 바꿈", "번", 2f, false, false) { d -> if (d.completed && !d.sim) d.parkMoves.toFloat() else null },
         Metric("calm", "천천히를 청함", "번", 0f, false, false) { d -> d.calm.toFloat() },
         Metric("brake", "1km마다 브레이크", "번", 1f, false, true) { d -> if (d.distKm > 0.3f) d.brakes / d.distKm else null },
         Metric("eco", "연비", "", 1f, true, true) { d -> d.economy },
-        Metric("time", "걸린 시간", "분", 0f, false, true) { d -> max(d.minutes.toFloat(), d.seconds / 60f) },
+        Metric("time", "걸린 시간", "분", 0f, false, true) { d -> if (d.sim) null else max(d.minutes.toFloat(), d.seconds / 60f) },
     )
     /** "이 길의 나" 그래프에 그릴 지표 */
     val charted = listOf("signal", "lane", "brake", "eco", "time")
@@ -112,7 +112,9 @@ internal object Growth {
             if (sw == 0f) return@mapNotNull null
             val b = sv / sw
             val diff = if (m.higherBetter) now - b else b - now
-            val score = if (b == 0f && now == 0f) 0f else (diff / max(abs(b), abs(now))).coerceIn(-1f, 1f)
+            // 횟수 지표는 1번보다 작은 차이를 크게 부풀리지 않게 분모를 1 이상으로 (0.3번 → 0번이 -100%가 되지 않게)
+            val floor = if (m.unit == "번") 1f else 0f
+            val score = if (b == 0f && now == 0f) 0f else (diff / maxOf(abs(b), abs(now), floor)).coerceIn(-1f, 1f)
             // 길 상황에 흔들리는 지표는 조건이 다를 때 무게를 더 줄인다
             val w = m.weight * if (m.traffic && condDiffers) .5f else 1f
             Change(m, b, now, score, w)
@@ -249,7 +251,7 @@ internal fun MainActivity.roadScreen(anchorId: String?): View {
     }
     val rows = visits.reversed().map { v ->
         val j = Growth.judge(all, v); val ans = store.answer(v.id, Q_VS_LAST)
-        k.item("${dateText(v.date, "M월 d일 a h:mm")} · ${v.drive.cond().label()}",
+        k.item("${dateText(v.date, "M월 d일 a h:mm")} · ${v.drive.cond().label()}" + (if (store.isSample(v.id)) " · 예시" else "") + if (v.drive.sim) " · 시연" else "",
             listOfNotNull(j?.let { "차: ${it.verdict.word}" }, ans?.takeIf { it != "답하지 않음" }?.let { "나: $it" }).joinToString(" · ").ifEmpty { "첫 기록" },
             if (Growth.bothUp(j, ans)) "checkCircle" else "circle", if (Growth.bothUp(j, ans)) Ink.go else Ink.text3, chevron = true) { go(MainActivity.DIARY, v.id) }
     }

@@ -38,7 +38,7 @@ internal fun MainActivity.diaryScreen(id: String?): View {
         addView(actions(d, guide))
     }
     return k.col().apply {
-        addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + if (d.drive.sim) " · 모의 주행" else "", onBack = { back() },
+        addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
             trailing = k.row(10).apply {
                 addView(k.segmented(listOf("읽기", "원고지"), DiaryPrefs.mode) { DiaryPrefs.mode = it; render() }, k.lp(ui.dp(200), k.WRAP))
                 addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 48) { readAloud(d.title, d.text) })

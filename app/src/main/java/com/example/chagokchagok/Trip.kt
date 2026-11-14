@@ -32,6 +32,10 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     var guide: Guide? = null
     var routeSent = false
     var sim = false; private set
+    /** 시연(회사 가는 길): 모의 주행이 깜빡이·차선 변경·브레이크·연비까지 흉내 낸다. 모두 시연용 */
+    var demoAuto = false
+    /** 모의 주행이 목적지에 닿아 움직임을 멈췄다 (기록은 여전히 모의 주행이다) */
+    private var simDone = false
     var prompt: String? = null; private set          // 지금 할 한 가지 (예: 오른쪽 깜빡이)
     var currentTip: String? = null; private set      // 방금 들려준 한마디
     var nextTipMeters: Int? = null; private set       // 다음 한마디까지 거리
@@ -94,7 +98,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         // 앱이 내비에 직접 요청한 재탐색(천천히 → 편안한 경로)은 운전자가 길을 벗어난 것이 아니므로 기록하지 않는다
         if (type == Evt.LOST && System.currentTimeMillis() < ownRerouteUntil) return
         if (active && type == Evt.SIGNAL) {
-            val near = car.turn in listOf("LEFT", "RIGHT", "UTURN") && car.turnMeters in 1..150
+            val near = car.turn in listOf("LEFT", "RIGHT", "UTURN") && car.turnMeters in 1..300
             lanes.signal(value, near, car.routeStarted || routeSent || sim, car.wiper, car.lowBeam, freshFix()?.let { it.first to it.second })
         }
         // 돌아볼 만한 사건(재탐색·브레이크)은 그 순간의 위치를 함께 적는다 (위치 동의한 운전자만 lastFix 가 있다)
@@ -281,12 +285,15 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             val km = if (d.distKm < 0.05f && route.size > 1) Paths.lengthKm(route) else d.distKm
             val placed = when {
                 again != null -> d.copy(place = again.title, placeLat = again.lat, placeLng = again.lng)
+                // 지난번의 내가 남긴 길로 다시 간 날도 같은 곳으로 적어야 지난 기록과 비교된다
+                g != null && g.kind == "나" -> d.copy(place = g.title, placeLat = g.lat ?: route.lastOrNull()?.lat, placeLng = g.lng ?: route.lastOrNull()?.lng)
                 g == null && !car.destName.isNullOrBlank() -> d.copy(place = car.destName, placeLat = car.destLat ?: route.lastOrNull()?.lat, placeLng = car.destLng ?: route.lastOrNull()?.lng)
                 else -> d
             }
             val far = g != null && g.drive.distKm > 0.05f && km >= g.drive.distKm * 0.9f
             placed.copy(distKm = km, path = route, completed = g == null || arrived || far || wasSim, sim = wasSim, economy = car.economy, economyUnit = car.economyUnit)
         }
+        if (demoAuto) { demoAuto = false; car.simEconomy(null) }
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")
         main.postDelayed({ saveHandover(driver, store.handover()?.takeIf { it.from == driver }?.note ?: "") }, 1500) // 차 상태 값이 조금 늦게 온다
@@ -352,7 +359,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
 
     fun startSim() {
         val g = guide ?: return
-        sim = true; simStep = 0
+        sim = true; simDone = false; simStep = 0
         if (!active) start()
         val base = car.odometerKm ?: 0f
         recorder.distance(base)
@@ -360,9 +367,11 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val full = g.drive.path
         val turns = g.drive.events.filter { it.type == Evt.SIGNAL && (it.value == "LEFT" || it.value == "RIGHT") }
         val steps = 180      // 0.5초마다 한 걸음, 90초쯤
+        var laneDone = false; var laneBusy = false; val braked = mutableSetOf<Int>()
+        if (demoAuto) car.simEconomy(14.1f)
         main.postDelayed(object : Runnable {
             override fun run() {
-                if (!sim || !active) return
+                if (!sim || !active || simDone) return
                 simStep++
                 val at = simStep / steps.toFloat()
                 recorder.distance(base + total * at)
@@ -378,9 +387,17 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 val next = turns.firstOrNull { it.p > at }
                 val meters = if (next != null) ((next.p - at) * total * 1000).toInt() else 0
                 if (next != null && meters <= 500) car.setTurn("TURN_" + next.value, meters, "") else car.setTurn(null, 0, "")
+                if (demoAuto) {
+                    // 돌기 전에 깜빡이를 켜고, 지나면 끈다
+                    if (next != null && meters in 1..250 && car.signal == "OFF" && !laneBusy) car.simEvent(Evt.SIGNAL, next.value)
+                    if (car.signal != "OFF" && !laneBusy && (next == null || meters > 250)) car.simEvent(Evt.SIGNAL, "OFF")
+                    // 합류 구간: 깜빡이를 켜고 6초 만에 차선 변경 (지난번 12~15초)
+                    if (!laneDone && at >= .50f) { laneDone = true; laneBusy = true; car.simLaneChange("LEFT", 6f, main); main.postDelayed({ laneBusy = false }, 9_000) }
+                    listOf(.30f, .70f).forEachIndexed { bi, bp -> if (at >= bp && braked.add(bi)) { car.simEvent(Evt.BRAKE, "on"); main.postDelayed({ car.simEvent(Evt.BRAKE, "off") }, 800) } }
+                }
                 val cam = ((0.66f - at) * total * 1000).toInt()
                 car.setAhead(50, if (cam in 1..600) cam else 0, 50)
-                if (at >= 1f) { sim = false; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0); arrived = true; host.say("도착했어요. 기어를 P에 놓으면 일기를 씁니다."); host.tripChanged() }
+                if (at >= 1f) { simDone = true; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0); arrived = true; host.say("도착했어요. 기어를 P에 놓으면 일기를 씁니다."); host.tripChanged() }
                 else main.postDelayed(this, 500)
             }
         }, 500)

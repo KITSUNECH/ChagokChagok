@@ -8,12 +8,21 @@ import android.view.View
 
 internal data class AppTip(val id: String, val title: String, val body: String, val icon: String, val whenUseful: MainActivity.() -> Boolean = { true })
 
+/** 차곡차곡이 하는 일 네 단계 (첫 화면, 홈, 팁, 기획서가 같은 말을 쓴다) */
+internal val LOOP_STEPS = listOf(
+    Triple("play", "D · 차가 기억해요", "깜빡이·브레이크·차선 변경·내비 재탐색을 그 자리와 함께. 누를 것은 없어요"),
+    Triple("flag", "P · 돌아봐요", "차가 본 순간을 보고 기억해 둘 말을 남겨요. 바쁘면 나중에"),
+    Triple("quote", "다시 갈 때 · 그 근처에서", "지난번의 나와 가족이 남긴 한마디를 소리로 들려줘요"),
+    Triple("chart", "늘었는지 · 차와 내가 함께", "같은 길의 변화를 그래프로, 내 느낌과 합쳐서 보여 줘요"),
+)
+
 internal val APP_TIPS = listOf(
+    AppTip("loop", "차곡차곡은 이렇게 써요", "D로 달리면 차가 기억하고, P에서 돌아보고, 다시 갈 때 그 근처에서 들려주고, 늘었는지는 차와 내가 함께 봐요.", "layers") { store.diariesOf(store.driver).size < 2 },
     AppTip("no_dest", "목적지가 없어도 기록돼요", "기어를 D에 놓으면 기록이 시작되고, P에 놓으면 일기가 생겨요.", "play") { store.diariesOf(store.driver).isEmpty() },
     AppTip("prep_gear", "이 차의 기어부터 익혀요", "출발 준비에서 차종을 고르면 기어 쓰는 법과 안전 조작을 보여 줘요.", "gear") { !store.prepDone(store.driver) },
     AppTip("split", "내비 옆에 띄워 두세요", "Pleos 분할 화면으로 내비 옆에 두면, 달리는 동안 다음 회전과 한마디가 함께 보여요.", "navi"),
     AppTip("growth", "오른쪽 성장 바를 눌러 보세요", "무엇을 하면 다음 칸이 쌓이는지 단계별로 보여 줘요.", "layers"),
-    AppTip("again", "같은 곳에 다시 가 보세요", "같은 목적지로 다시 가면 일기에서 지난번의 나와 나란히 비교해 줘요.", "compare") { store.diariesOf(store.driver).any { it.drive.place != null } },
+    AppTip("again", "같은 곳에 다시 가 보세요", "같은 목적지로 다시 가면 차가 본 변화를 판단하고, ‘이 길의 나’에서 그래프로 보여 줘요.", "compare") { store.diariesOf(store.driver).any { it.drive.place != null } },
     AppTip("self_note", "다음의 나에게 한마디", "일기에서 남기면, 같은 곳에 다시 갈 때 그 근처에서 들려줘요.", "quote") { store.diariesOf(store.driver).isNotEmpty() },
     AppTip("seat", "운전석을 바꿀 수 있어요", "함께 쓰는 차라면 이름을 눌러 운전석을 바꿔요. 기록은 사람마다 따로 쌓여요.", "people") { store.drivers.size > 1 },
     AppTip("give", "다니는 길을 건네주세요", "일기에서 ‘이 길 건네주기’를 누르면 함께 쓰는 사람이 같은 길을 달리며 남긴 곳 근처에서 한마디를 들어요.", "gift") { store.diariesOf(store.driver).isNotEmpty() },

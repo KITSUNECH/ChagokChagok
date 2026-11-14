@@ -68,6 +68,7 @@ internal fun MainActivity.todayScreen(): View {
         { newsCard() },
         { if (!store.prepDone(d) && type in listOf("초보", "새 차")) small("steering", "출발 준비", shifterLine() ?: "면허시험 차와 다른 곳을 손으로 익혀요") { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") } else null },
         { if (store.demoOn) small("people", "친구들의 오늘", Demo.friends.filter { it.driving }.joinToString { it.name + " 운전 중" }.ifEmpty { "함께 차곡에서 보기" } + " · 시연용") { go(MainActivity.TOGETHER) } else null },
+        { if (diaries.isEmpty()) loopCard() else null },
         { if (diaries.isEmpty()) starterCard() else null },
         { if (!store.prepDone(d)) small("steering", "출발 준비", "깜빡이, 와이퍼, 전조등, 기어 자리") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) } else null },
         { lawCard() },
@@ -462,4 +463,21 @@ internal fun MainActivity.tellDeparture(g: Guide) {
     val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text)
     if (send.resolveActivity(packageManager) != null) startActivity(android.content.Intent.createChooser(send, "출발 알리기"))
     else toast("${g.owner} 님의 홈에 출발 소식을 남겼어요. 이 차에는 메시지 앱이 없어 밖으로는 보내지 않았어요.")
+}
+
+/** 처음 쓰는 사람에게: 차곡차곡이 하는 일 네 단계 */
+internal fun MainActivity.loopCard(): View {
+    val k = kit
+    return k.card(pad = 20) {
+        addView(k.text("이렇게 쌓여요", Type.Headline))
+        addView(k.gap(8))
+        LOOP_STEPS.forEachIndexed { i, (ic, t, s) ->
+            addView(k.row(12).apply {
+                setPadding(0, ui.dp(6), 0, ui.dp(6))
+                addView(k.text("${i + 1}", Type.Title, Ink.accent), k.lp(ui.dp(22), k.WRAP))
+                addView(k.icon(ic, Ink.accent, 22))
+                addView(k.col(1).apply { addView(k.text(t, Type.BodyStrong)); addView(k.text(s, Type.Caption, Ink.text2, lines = 2)) }, k.lp(0, k.WRAP, 1f))
+            })
+        }
+    }
 }

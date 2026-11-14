@@ -314,6 +314,12 @@ class Car(private val ctx: Context, private val listener: Listener) {
     /** 놀란 운전자를 위해 내비 경로를 편안한 길로 바꾼다. */
     fun comfortable(): Boolean = naviConnected && attempt("navi") { navi.changeRouteOption(ai.pleos.playground.navi.constants.RouteOption.COMFORTABLE) }
 
+    /** 시험용·시연용 신호 (실제 차량 신호가 아니다) */
+    fun simEvent(type: String, value: String) {
+        when (type) { Evt.SIGNAL -> signal = value; Evt.BRAKE -> brake = value == "on" }
+        listener.onCarEvent(type, value)
+    }
+
     /** 시험용·시연용 차선 변경: 깜빡이를 켜고 wait 초 뒤 조향, 조금 뒤 끈다. 실제 차량 신호가 아니다. */
     fun simLaneChange(side: String, waitSec: Float, main: android.os.Handler) {
         signal = side; listener.onCarEvent(Evt.SIGNAL, side)

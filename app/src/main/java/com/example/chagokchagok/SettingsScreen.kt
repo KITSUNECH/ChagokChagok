@@ -259,6 +259,10 @@ internal fun MainActivity.checkScreen(): View {
             addView(k.section("시연 도구 · 공모전판"))
             addView(k.groupOf(listOf(
                 k.toggleItem("다른 차의 친구와 함께 · 미리 보기", "Pleos 계정 연동이 생기면 어떻게 쓸 수 있는지 가상의 친구로 보여 줘요. 화면에 시연용으로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() },
+                k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@checkScreen) },
+                k.item("시연 기록 지우기", "예시 출근 기록과 시연으로 달린 모의 주행을 지워요", "trash", chevron = true) {
+                    sheets.confirm("시연 기록을 지울까요?", "예시 출근 기록 3개, 남겨 둔 한마디, 시연으로 달린 모의 주행이 지워져요.", "지우기", danger = true) { DemoCommute.clear(this@checkScreen); toast("시연 기록을 지웠어요."); render() }
+                },
                 k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
                 k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
             )))

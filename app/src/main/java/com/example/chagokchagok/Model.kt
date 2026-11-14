@@ -290,6 +290,9 @@ class Store(ctx: Context) {
     fun saved(name: String): Set<String> = prefs.getStringSet("saved_$name", emptySet()) ?: emptySet()
     fun toggleSaved(name: String, guideId: String) { val s = saved(name).toMutableSet(); if (!s.remove(guideId)) s.add(guideId); prefs.edit().putStringSet("saved_$name", s).apply() }
     fun removeGuide(id: String) = writeArray("guides", guides().filter { it.id != id }) { json(it) }
+    fun removeDiary(id: String) = writeArray("diaries", diaries().filter { it.id != id }) { json(it) }
+    /** 시연용 예시 기록 (화면에 "예시"로 표시하고, 시연 정리에서 지운다) */
+    fun isSample(diaryId: String) = flag("sample_d_$diaryId")
 
     // ── JSON 변환 ──
     private fun readArray(key: String): List<JSONObject> {
