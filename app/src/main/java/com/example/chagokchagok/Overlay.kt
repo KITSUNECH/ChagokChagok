@@ -104,24 +104,30 @@ class Overlay(private val host: FrameLayout, private val kitOf: () -> Kit) {
 
     /** 화면 위쪽에 잠깐 떴다 사라지는 띠. 차가 하는 말이면 icon=speaker */
     /** 짧은 알림. undo 가 있으면 "되돌리기" 단추를 함께 보여 준다 (지운 뒤 알림) */
+    /** 주행 중인지 (MainActivity 가 채운다). 주행 중에는 한 줄로만 */
+    var driving: () -> Boolean = { false }
+
     fun toast(s: String, icon: String = "info", undo: (() -> Unit)? = null) {
         val k = kitOf(); val ui = k.ui
         banner?.let { host.removeView(it) }
         val bar = k.row(12).apply {
             setPadding(ui.dp(20), ui.dp(14), ui.dp(if (undo != null) 12 else 24), ui.dp(14))
-            background = GradientDrawable().apply { setColor(if (Ink.night) Ink.fill else Color.parseColor("#1D1D1F")); cornerRadius = ui.dp(22).toFloat() }
+            // 밤에도 바탕과 구분되게: 밤에는 밝은 알림, 낮에는 어두운 알림
+            val fg = if (Ink.night) Color.parseColor("#0B1A2C") else Color.WHITE
+            background = GradientDrawable().apply { setColor(if (Ink.night) Color.parseColor("#F3EFEC") else Color.parseColor("#1D1D1F")); cornerRadius = ui.dp(22).toFloat() }
             elevation = ui.dp(8).toFloat()
-            addView(k.icon(icon, Color.WHITE, 22))
-            addView(k.text(s, Type.Sub, Color.WHITE).apply { maxLines = 3 })
-            if (undo != null) addView(k.text("되돌리기", Type.BodyStrong, Ink.alpha(Color.parseColor("#7FD8F0"), 1f)).apply {
+            addView(k.icon(icon, fg, 22))
+            addView(k.text(s, Type.Sub, fg).apply { maxLines = if (driving()) 1 else 3; ellipsize = android.text.TextUtils.TruncateAt.END })
+            if (undo != null) addView(k.text("되돌리기", Type.BodyStrong, if (Ink.night) Color.parseColor("#005B73") else Color.parseColor("#7FD8F0")).apply {
                 setPadding(ui.dp(16), ui.dp(10), ui.dp(12), ui.dp(10))
                 setOnClickListener { banner?.let { b -> host.removeView(b) }; banner = null; undo() }
             })
         }
         // 아래 가운데: 제목과 겹치지 않게. 좁은 창은 탭 막대 위로.
-        host.addView(bar, FrameLayout.LayoutParams(k.WRAP, k.WRAP, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = ui.dp(if (ui.wide) 28 else 96); leftMargin = ui.dp(24); rightMargin = ui.dp(24) })
+        // 오른쪽 위: 시작 단추·숨 고르기 같은 주요 단추를 가리지 않는 자리 (성장 바 왼쪽)
+        host.addView(bar, FrameLayout.LayoutParams(k.WRAP, k.WRAP, Gravity.TOP or Gravity.END).apply { topMargin = ui.dp(18); rightMargin = ui.dp(if (ui.wide) 104 else 72); leftMargin = ui.dp(24) })
         banner = bar
-        bar.alpha = 0f; bar.translationY = ui.dp(12).toFloat(); bar.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+        bar.alpha = 0f; bar.translationY = -ui.dp(12).toFloat(); bar.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
         bar.postDelayed({ if (banner === bar) { bar.animate().alpha(0f).setDuration(200).withEndAction { host.removeView(bar) }.start(); banner = null } }, if (undo != null) 6500 else 4200)
     }
 }

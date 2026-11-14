@@ -43,12 +43,14 @@ class GleoReceiver : BroadcastReceiver() {
                 if (a == null || !a.trip.active) { reply(context, action, "fail", "Notes can be saved only during a drive."); return }
                 val placed = a.trip.voiceNote(note)
                 reply(context, action, "success", if (placed) "The note was saved at the current position and will be played here on the next drive to this destination." else "The note was saved, but the current position is unknown, so it will be played along the route instead.",
-                    JSONArray().put(JSONObject().put("note", note).put("placedAtPosition", placed)))
+                    JSONArray().put(JSONObject().put("placedAtPosition", placed)))
             }
             "READ_LATEST_DIARY" -> {
                 val d = store.diariesOf(store.driver).lastOrNull()
                 if (d == null) reply(context, action, "success", "There is no diary entry yet.")
-                else reply(context, action, "success", "The latest driving diary entry was found.", JSONArray().put(JSONObject().put("title", d.title).put("diary", d.text)))
+                // 일기 본문은 방송으로 내보내지 않는다 (보안 가이드). 앱이 직접 읽어 주고 글레오는 조용히, 데이터에는 제목만.
+                else if (a != null) { a.speak(d.title + ". " + d.text); reply(context, action, "success", "The app is reading the latest diary aloud.", JSONArray().put(JSONObject().put("title", d.title)), mode = "silent") }
+                else reply(context, action, "success", "The latest diary entry was found. Open the app to read it.", JSONArray().put(JSONObject().put("title", d.title)))
             }
             else -> reply(context, action, "fail", "This function is not supported.")
         }

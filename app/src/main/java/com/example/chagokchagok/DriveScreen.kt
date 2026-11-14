@@ -35,6 +35,7 @@ internal object DriveViews {
     var statsSub: TextView? = null
     var limitCard: View? = null
     var statsCard: View? = null
+    fun clear() { status = null; turnIcon = null; turnText = null; turnSub = null; turnCard = null; tip = null; tipWho = null; trace = null; nextTip = null; limit = null; limitBox = null; ahead = null; turnBar = null; tipCard = null; tipNow = null; stats = null; statsSub = null; limitCard = null; statsCard = null }
 }
 
 /** 줄어드는 막대 (회전까지 남은 거리) */
@@ -127,7 +128,8 @@ internal fun MainActivity.driveScreen(): View {
     // 달리는 동안은 말로: "차곡차곡, 숨 고를래" (Gleo AI → GleoReceiver TAKE_A_BREATH)
     val breathe = k.button(if (moving) "말로: 차곡차곡, 숨 고를래" else "숨 고르기", Kit.Btn.Secondary, "breath", enabled = !moving) { trip.breathe() }
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
-    val stop = if (car.failures.containsKey(Evt.GEAR)) k.button("기록 멈추기", Kit.Btn.Danger, "stop") { trip.end() } else null
+    // 멈춰 있을 때는 언제나 "기록 끝내기"를 둔다 (기어 신호가 없거나 P로 바뀌지 않아도 빠져나올 수 있게)
+    val stop = if (!limits.restricted) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
 
     val view = if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
@@ -152,21 +154,22 @@ internal fun MainActivity.driveScreen(): View {
 internal fun MainActivity.refreshDrive() {
     val V = DriveViews; val g = trip.guide
     val sec = trip.recorder.secondsNow(); val km = trip.recorder.kmNow()
-    V.status?.text = "기록 중 · ${sec / 60}:${String.format(Locale.US, "%02d", sec % 60)}" + if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else ""
+    V.status?.text = "기록 중 · ${sec / 60}분" + if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else ""   // 초가 계속 움직이지 않게 분 단위
 
     // 다음 회전
     val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }
     val prompt = trip.prompt
     when {
-        prompt != null -> { V.turnIcon?.set(if (prompt.startsWith("왼")) "turnLeft" else "turnRight", Ink.signal); V.turnText?.text = "지금 $prompt"; V.turnSub?.text = if (side != null) "${car.turnMeters}m 앞 $side" else "" }
-        side != null && car.turnMeters > 0 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "${car.turnMeters}m 앞 $side"; V.turnSub?.text = "내비 안내" }
+        prompt != null -> { V.turnIcon?.set(if (prompt.startsWith("왼")) "turnLeft" else "turnRight", Ink.signal); V.turnText?.text = "지금 $prompt"; V.turnSub?.text = "돌기 전에 미리" }
+        // 길 안내는 내비의 몫이다 (Pleos Single Route Policy). 여기서는 거리·방향을 다시 말하지 않고 깜빡이 코칭만 한다.
+        side != null && car.turnMeters in 1..300 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "곧 돌아요"; V.turnSub?.text = "깜빡이를 미리 켜 두면 편해요" }
         trip.arrived -> { V.turnIcon?.set("flag", Ink.go); V.turnText?.text = "도착했어요"; V.turnSub?.text = "기어를 P에 놓으면 일기를 써요" }
-        else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "이대로 쭉"; V.turnSub?.text = if (trip.routeSent) "내비 안내를 따라가요" else "조용히 적고 있어요" }
+        else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "편하게 가요"; V.turnSub?.text = if (trip.routeSent) "길 안내는 내비를 따라가요" else "조용히 적고 있어요" }
     }
 
     // 회전까지 남은 거리 막대 (300m부터 줄어든다), 깜빡이 안내 중이면 신호 색
     val meters = if (side != null) car.turnMeters else 0
-    V.turnBar?.apply { color = if (prompt != null) Ink.signal else Ink.accent; value = if (meters in 1..300) 1f - meters / 300f else 0f; visibility = if (meters in 1..300) View.VISIBLE else View.INVISIBLE }
+    V.turnBar?.visibility = View.GONE   // 거리 막대는 내비와 겹치는 길 안내라 쓰지 않는다
     // 일이 없을 때는 조용히
     V.turnText?.setTextColor(if (prompt == null && side == null && !trip.arrived) Ink.text2 else Ink.text)
 

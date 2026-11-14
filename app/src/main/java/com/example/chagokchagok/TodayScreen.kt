@@ -82,14 +82,18 @@ internal fun MainActivity.todayScreen(): View {
             addView(k.row(20).apply {
                 gravity = Gravity.TOP
                 // 왼쪽: 큰 카드 + 큰 시작 단추(남는 높이를 채운다). 오른쪽 묶음과 밑단이 맞는다.
+                // 시작 단추를 맨 위에: 처음 쓰는 사람도 스크롤 없이 바로 찾는다. 아래 큰 카드가 남는 높이를 채운다.
                 addView(k.col(16).apply {
-                    addView(hero, k.lp(k.MATCH, k.WRAP))
-                    addView(startCard(todaysGuide()), k.lp(k.MATCH, 0, 1f))
+                    addView(startCard(todaysGuide()), k.lp(k.MATCH, k.WRAP))
+                    addView(hero, k.lp(k.MATCH, 0, 1f))
                 }, k.lp(0, k.MATCH, 1.55f))
                 if (side.isNotEmpty()) addView(k.col(16).apply { side.forEachIndexed { i, v -> addView(v, if (i == side.lastIndex) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.MATCH, 1f))
             })
             bottom.forEach { addView(k.gap(20)); addView(it, k.lp(k.MATCH, k.WRAP)) }
-        } else addView(k.col(16).apply { addView(hero); addView(startCard(todaysGuide())); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
+        } else addView(k.col(16).apply {
+            // 좁은 창(분할 화면): 시작 단추를 맨 위에 두어 스크롤하지 않아도 보이게
+            addView(startCard(todaysGuide())); addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) }
+        })
     }
 }
 
@@ -162,19 +166,19 @@ private fun MainActivity.heroCard(): View {
             if (others.size > 1) addView(k.text("받은 길 ${others.size}개", Type.Sub, Ink.accent).apply { setOnClickListener { pickGuide() } })
         })
         addView(k.gap(14))
-        addView(k.text(g.title, Type.Display))
+        addView(k.text(g.title, Type.Large))
         addView(k.gap(8))
         val meta = mutableListOf(facts(g.drive), "한마디 ${g.tips.size}개")
         if (g.kind == "길") meta.add(if (store.graduated(d, g.id)) "졸업한 길" else "따라 달린 횟수 $followed/$GRADUATE")
         addView(k.text(meta.joinToString("  ·  "), Type.Sub, Ink.text2))
         addView(k.gap(18))
-        addView(TraceView(this@heroCard, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips)) }, k.lp(k.MATCH, ui.dp(120)))
+        addView(TraceView(this@heroCard, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips)) }, k.lp(k.MATCH, ui.dp(92)))
         g.tips.firstOrNull()?.let {
             addView(k.gap(10))
             addView(k.row(12).apply {
                 gravity = Gravity.TOP
                 addView(k.icon("quote", Ink.accent, 22))
-                addView(k.voice(it.text, 21f), k.lp(0, k.WRAP, 1f))
+                addView(k.voice(it.text, 21f).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, k.lp(0, k.WRAP, 1f))
             })
         }
         addView(k.gap(18))
@@ -311,7 +315,7 @@ internal fun MainActivity.prepScreen(): View {
         addView(k.header("출발 준비", "주차한 채로 해요. 기어를 바꿔도 주행으로 치지 않아요.", onBack = { back() },
             trailing = k.button(if (all) "홈으로" else "나중에", if (all) Kit.Btn.Primary else Kit.Btn.Secondary) { back() }))
         addView(k.gap(18))
-        addView(k.segmented(listOf("손에 익히기 $done/${PREP_REQUIRED.size}", "이 차의 기어", "안전 조작"), prepTab) { prepTab = it; render() }, k.lp(k.MATCH, ui.dp(60)))
+        addView(k.segmented(if (ui.wide) listOf("손에 익히기 $done/${PREP_REQUIRED.size}", "이 차의 기어", "안전 조작") else listOf("익히기 $done/${PREP_REQUIRED.size}", "기어", "안전"), prepTab) { prepTab = it; render() }, k.lp(k.MATCH, k.WRAP))
         addView(k.gap(18))
         when (prepTab) {
             0 -> {
@@ -369,7 +373,7 @@ internal fun MainActivity.depart(g: Guide) {
     car.refreshCondition()
     trip.routeSent = g.kind != "연습" && car.requestRoute(g.title, g.lat, g.lng, comfortable = store.typeOf(store.driver) in listOf("초보", "오랜만"))
     Session.forecast = null
-    if (store.weatherOn && g.lat != null && g.lng != null) Weather.at(g.lat, g.lng) { f -> Session.forecast = f; if (route.name == MainActivity.READY && f != null) render() }
+    if (store.weatherOn && g.lat != null && g.lng != null) Weather.at(Math.round(g.lat * 100) / 100.0, Math.round(g.lng * 100) / 100.0) { f -> Session.forecast = f; if (route.name == MainActivity.READY && f != null) render() }
     go(MainActivity.READY)
 }
 

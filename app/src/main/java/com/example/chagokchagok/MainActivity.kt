@@ -78,7 +78,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         voice = Voice(this)
         places = Places(this) { lat, lng, hd -> Telemetry.hit("location", String.format("%.4f, %.4f", lat, lng)); trip.onLocation(lat, lng, hd); if (route.name == DRIVE) refreshDrive() }
         limits = Restrictions(this) { onRestricted() }
-        sheets.keyboardBlocked = { limits.noKeyboard }
+        sheets.keyboardBlocked = { limits.noKeyboard || trip.active }
+        sheets.driving = { driving }   // 기록 중에는 글자 입력을 받지 않는다 (도로교통법 제49조)
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
         // 효과음: 알림음 용도(SONIFICATION)로 만들고, 울릴 때마다 잠깐 포커스를 받아 다른 소리를 줄인다 (Pleos 오디오 가이드)
@@ -103,6 +104,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     override fun onDestroy() {
         if (Live.activity?.get() === this) Live.activity = null
+        trip.release(); DriveViews.clear()
         trip.save(force = true)
         car.stop(); voice.release(); places.stop(); limits.stop(); sound?.release()
         super.onDestroy()
@@ -305,7 +307,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
                 addView(k.col(4).apply {
                     gravity = Gravity.CENTER_HORIZONTAL; setPadding(0, ui.dp(8), 0, ui.dp(6))
                     addView(k.icon(icon, if (on) Ink.accent else Ink.text3, 26))
-                    addView(k.text(label, Type.Micro, if (on) Ink.accent else Ink.text2))
+                    addView(k.text(label, Type.Micro, if (on) Ink.accent else Ink.text2).apply { gravity = Gravity.CENTER }, k.lp(k.MATCH, k.WRAP))
+                    minimumHeight = ui.touch(64)
                     k.pressable(this, null) { go(t) }
                 }, k.lp(0, k.WRAP, 1f))
             }
@@ -317,7 +320,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     override fun onCarEvent(type: String, value: String) {
         Telemetry.hit(type, value)
         if (route.name == CHECK) render()
-        if (route.name == PREP && !trip.active) { onPrep(type, value); return }   // 연습 중 기어 조작은 주행으로 치지 않는다
+        // 연습 중 기어 조작(R·P)은 주행으로 치지 않는다. D에 놓으면 실제 출발로 보고 기록을 시작한다.
+        if (route.name == PREP && !trip.active && !(type == Evt.GEAR && value == "D")) { onPrep(type, value); return }
         val wasActive = trip.active
         trip.onCar(type, value)
         if (wasActive != trip.active) return   // 시작/끝은 tripStarted/tripEnded 가 화면을 바꾼다
@@ -340,7 +344,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     // ───────── TripHost ─────────
 
     override fun speak(text: String) { if (store.voiceOn) voice.say(text) }
-    override fun say(text: String) { speak(text); sheets.toast(text, "speaker") }
+    /** 말로 알리고, 주행 중이 아니거나 소리를 꺼 두었으면 글로도 (주행 중에는 화면을 가리지 않게 말로만) */
+    override fun say(text: String) { speak(text); if (!driving || !store.voiceOn) sheets.toast(text, "speaker") }
     override fun chime() {
         val f = chimeFocus; f?.take()
         sound?.play(chimeId, 1f, 1f, 1, 0, 1f)
@@ -354,6 +359,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     }
     override fun tripChanged() { if (route.name == DRIVE) refreshDrive() }
     override fun tripEnded(d: Diary) { places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
+    override fun tripDiscarded() { places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); go(TODAY) }
     override fun diaryUpdated(d: Diary) { if (route.name == DIARY && route.arg == d.id) render() }
     override fun lampsChanged() { if (route.name == TODAY) render() }
 

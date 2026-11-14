@@ -18,10 +18,16 @@ import ai.pleos.playground.tts.listener.OnInitializeListener
  * 오디오 포커스 (Pleos 오디오 가이드): 소리를 내기 전에 AudioAttributes 와 함께 포커스를 요청하고,
  * 짧은 안내라 AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK 로 다른 소리(음악·내비)는 잠깐 줄이기만 한다. 끝나면 돌려준다.
  */
-internal class Focus(ctx: Context, attrs: AudioAttributes) {
+internal class Focus(ctx: Context, attrs: AudioAttributes, private val onLoss: () -> Unit = {}, private val onGain: () -> Unit = {}) {
     private val am = ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    // 문서(오디오 포커스): 포커스 변화를 반드시 처리한다. 잃으면(글레오가 말하거나 전화 등) 곧바로 멈추고, 다시 받으면 이어 말한다.
     private val req = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-        .setAudioAttributes(attrs).setOnAudioFocusChangeListener { }.build()
+        .setAudioAttributes(attrs).setOnAudioFocusChangeListener { change ->
+            when (change) {
+                android.media.AudioManager.AUDIOFOCUS_LOSS, android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> onLoss()
+                android.media.AudioManager.AUDIOFOCUS_GAIN -> onGain()
+            }
+        }.build()
     fun take(): Boolean = try { am.requestAudioFocus(req) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED } catch (_: Throwable) { true }
     fun give() { try { am.abandonAudioFocusRequest(req) } catch (_: Throwable) {} }
 }
@@ -41,7 +47,7 @@ class Voice(private val ctx: Context) {
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
 
-    private val focus by lazy { Focus(ctx.applicationContext, attrs) }
+    private val focus by lazy { Focus(ctx.applicationContext, attrs, onLoss = { main.post { stop() } }, onGain = { main.post { flush() } }) }
 
     fun start() {
         if (Car.offline) { status = "꺼짐 (화면 확인용)"; return }
@@ -63,8 +69,8 @@ class Voice(private val ctx: Context) {
     private val events = object : EventListener {
         override fun onStart() {}
         override fun onReady() {}
-        override fun onDone() {}
-        override fun onStop() {}
+        override fun onDone() { focus.give() }
+        override fun onStop() { focus.give() }
         override fun onUpdatedRms(rms: Double) {}
         override fun onError(errorType: ErrorType) {
             // 이번 문장만 기본 음성으로 다시 읽는다
@@ -103,7 +109,6 @@ class Voice(private val ctx: Context) {
     /** 기본 음성: 포커스를 받고, 앞에 180ms 무음(문서 권장 150–200ms)을 둔 뒤 읽는다 */
     private fun systemSay(text: String) {
         val t = system ?: return
-        focus.take()
         t.playSilentUtterance(180, android.speech.tts.TextToSpeech.QUEUE_FLUSH, "pre")
         t.speak(text, android.speech.tts.TextToSpeech.QUEUE_ADD, null, "chagok")
     }
@@ -111,8 +116,17 @@ class Voice(private val ctx: Context) {
     fun say(text: String) {
         last = text
         if (!ready) { pending = text; return }
+        // 포커스를 받지 못하면(다른 음성이 말하는 중) 말하지 않고, 포커스가 돌아오면 이어 말한다
+        if (!focus.take()) { pending = text; return }
         val p = pleos
-        if (p != null) { try { p.stop(); p.speak(text, true); return } catch (e: Throwable) { status = "Pleos 음성 오류: ${e.message}" } }
+        if (p != null) {
+            try {
+                p.stop()
+                // 문서(음성 안내 프리롤): 소리가 잘리지 않게 150–200ms 쉬고 말한다
+                main.postDelayed({ try { p.speak(text, true) } catch (e: Throwable) { status = "Pleos 음성 오류: ${e.message}"; focus.give() } }, 180)
+                return
+            } catch (e: Throwable) { status = "Pleos 음성 오류: ${e.message}" }
+        }
         systemSay(text)
     }
 

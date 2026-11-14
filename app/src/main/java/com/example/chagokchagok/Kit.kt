@@ -45,6 +45,8 @@ class Kit(val ctx: Context, val ui: Ui) {
 
     // ── 글자 ──
     fun text(s: CharSequence, type: Type = Type.Body, color: Int = Ink.text, lines: Int = 0) = TextView(ctx).apply {
+        // 한국어 줄바꿈을 어절 단위로 ("처/벌"처럼 낱말 중간에서 끊기지 않게, Android 13+)
+        if (android.os.Build.VERSION.SDK_INT >= 33) lineBreakWordStyle = android.graphics.text.LineBreakConfig.LINE_BREAK_WORD_STYLE_PHRASE
         text = s; textSize = ui.sp(type.size); setTextColor(color); typeface = ui.face(type.weight)
         letterSpacing = type.tracking; includeFontPadding = false
         setLineSpacing(0f, if (type.size >= 26) 1.12f else 1.35f)
@@ -67,7 +69,7 @@ class Kit(val ctx: Context, val ui: Ui) {
         val bgColor = when (kind) { Btn.Primary -> Ink.accent; Btn.Secondary -> Ink.fill; Btn.Tinted -> Ink.accentSoft; Btn.Danger -> Ink.alpha(Ink.danger, .10f); Btn.Plain -> Color.TRANSPARENT }
         return row(8).apply {
             gravity = Gravity.CENTER
-            minimumHeight = ui.dp(64)
+            minimumHeight = ui.touch(64)
             setPadding(ui.dp(if (kind == Btn.Plain) 10 else 24), 0, ui.dp(if (kind == Btn.Plain) 10 else 24), 0)
             if (icon != null) addView(icon(icon, fg, 22))
             addView(text(label, Type.BodyStrong, fg).apply { gravity = Gravity.CENTER; maxLines = 1 })
@@ -105,7 +107,7 @@ class Kit(val ctx: Context, val ui: Ui) {
 
     /** 목록 한 줄: [아이콘] 제목/설명 ……… 오른쪽 값 › */
     fun item(title: String, sub: String? = null, icon: String? = null, iconColor: Int = Ink.accent, value: String? = null, valueColor: Int = Ink.text2, chevron: Boolean = false, trailing: View? = null, onClick: (() -> Unit)? = null) = row(14).apply {
-        minimumHeight = ui.dp(72)
+        minimumHeight = ui.touch(72)
         setPadding(ui.dp(20), ui.dp(14), ui.dp(18), ui.dp(14))
         if (icon != null) addView(FrameLayout(ctx).apply {
             background = rounded(Ink.alpha(iconColor, .14f), 10)
@@ -129,7 +131,7 @@ class Kit(val ctx: Context, val ui: Ui) {
 
     // ── 칩과 분할 선택 ──
     fun chip(label: String, selected: Boolean = false, icon: String? = null, onClick: () -> Unit) = row(6).apply {
-        minimumHeight = ui.dp(56); setPadding(ui.dp(20), 0, ui.dp(20), 0); gravity = Gravity.CENTER   // 차 안에서 손가락으로 누르기 쉬운 크기
+        minimumHeight = ui.touch(56); setPadding(ui.dp(20), 0, ui.dp(20), 0); gravity = Gravity.CENTER   // 차 안에서 손가락으로 누르기 쉬운 크기
         val fg = if (selected) Ink.onAccent else Ink.text
         if (icon != null) addView(icon(icon, fg, 18))
         addView(text(label, Type.Body, fg).apply { typeface = ui.semibold })
@@ -143,7 +145,7 @@ class Kit(val ctx: Context, val ui: Ui) {
         setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)); background = rounded(Ink.fill, 14)
         options.forEachIndexed { i, o ->
             addView(text(o, Type.Body, if (i == selected) Ink.text else Ink.text2).apply {
-                gravity = Gravity.CENTER; typeface = ui.semibold; minHeight = ui.dp(52)   // 차 안에서 누르기 쉬운 높이
+                gravity = Gravity.CENTER; typeface = ui.semibold; minHeight = ui.touch(52)   // 차 안에서 누르기 쉬운 높이
                 if (i == selected) { background = rounded(Ink.surface, 11); elevation = ui.dp(1).toFloat() }
                 setOnClickListener { onPick(i) }
             }, lp(0, WRAP, 1f))
@@ -175,8 +177,8 @@ class Kit(val ctx: Context, val ui: Ui) {
     fun header(title: String, sub: String? = null, onBack: (() -> Unit)? = null, trailing: View? = null) = col(6).apply {
         addView(row(4).apply {
             if (onBack != null) addView(row(2).apply {
-                addView(icon("back", Ink.accent, 22)); addView(text("뒤로", Type.Sub, Ink.accent))
-                setPadding(0, ui.dp(8), ui.dp(12), ui.dp(8)); setOnClickListener { onBack() }
+                addView(icon("back", Ink.accent, 26)); addView(text("뒤로", Type.BodyStrong, Ink.accent))
+                minimumHeight = ui.touch(56); setPadding(0, 0, ui.dp(20), 0); setOnClickListener { onBack() }
             })
             addView(fill())
             if (trailing != null) addView(trailing)

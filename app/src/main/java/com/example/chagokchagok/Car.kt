@@ -95,7 +95,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var vin: String? = null; private set
     var isEv: Boolean? = null; private set
     /** 신호별로 마지막에 실패한 이유. 화면의 점검 칸에서 보여 준다. */
-    val failures = mutableMapOf<String, String>()
+    val failures: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()   // SDK 콜백 스레드에서도 쓴다
 
     private val main = Handler(Looper.getMainLooper())
     private fun ui(block: () -> Unit) { main.post(block) }
@@ -232,7 +232,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt(Evt.GEAR) {
             val c = android.car.Car.createCar(ctx); carApi = c
             val pm = c.getCarManager(android.car.Car.PROPERTY_SERVICE) as android.car.hardware.property.CarPropertyManager; props = pm
-            pm.registerCallback(gearCb, android.car.VehiclePropertyIds.GEAR_SELECTION, android.car.hardware.property.CarPropertyManager.SENSOR_RATE_ONCHANGE)
+            if (!pm.registerCallback(gearCb, android.car.VehiclePropertyIds.GEAR_SELECTION, android.car.hardware.property.CarPropertyManager.SENSOR_RATE_ONCHANGE))
+                failures[Evt.GEAR] = "GEAR_SELECTION 을 지원하지 않음"
         }
         refreshCondition()
         cap("vin", { ok, no -> vehicle.getCarInfo().checkVINInfoCapabilities(ok, no) }) { vehicle.getCarInfo().getVINInfo({ v -> ui { vin = v?.trim()?.takeIf { it.length >= 10 }; listener.onCarEvent(Evt.NAVI, "vin") } }, { e -> failures["vin"] = e.message ?: "실패" }) }
@@ -262,11 +263,12 @@ class Car(private val ctx: Context, private val listener: Listener) {
     }
 
     /** 다음 사람에게 전할 차 상태를 다시 읽는다. 답은 조금 뒤에 따로 온다. */
+    // SDK 응답은 다른 스레드에서 오므로 상태는 화면 스레드에서 바꾼다
     fun refreshCondition() {
-        attempt("fuel") { vehicle.getFuel().getFuelPercent({ v -> if (v != null) energy = v }, { e -> failures["fuel"] = e.message ?: "실패" }) }
-        attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> if (v != null) { isEv = true; if (energy == null) energy = v } }, { e -> failures["battery"] = e.message ?: "실패" }) }
-        attempt("seatPos") { vehicle.getSeat().getCurrentSeatForeAftPosition(driverSeat, { v -> if (v != null) seatPos = v }, { e -> failures["seatPos"] = e.message ?: "실패" }) }
-        attempt("washer") { vehicle.getSafety().hasLowWasherFluidWarning({ v -> washerLow = v == true; washerKnown = true }, { e -> failures["washer"] = e.message ?: "실패" }) }
+        attempt("fuel") { vehicle.getFuel().getFuelPercent({ v -> ui { if (v != null) energy = v } }, { e -> failures["fuel"] = e.message ?: "실패" }) }
+        attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> ui { if (v != null) { isEv = true; if (energy == null) energy = v } } }, { e -> failures["battery"] = e.message ?: "실패" }) }
+        attempt("seatPos") { vehicle.getSeat().getCurrentSeatForeAftPosition(driverSeat, { v -> ui { if (v != null) seatPos = v } }, { e -> failures["seatPos"] = e.message ?: "실패" }) }
+        attempt("washer") { vehicle.getSafety().hasLowWasherFluidWarning({ v -> ui { washerLow = v == true; washerKnown = true } }, { e -> failures["washer"] = e.message ?: "실패" }) }
         // 공개 API(CAR_SAFETY)로 읽는 실제 경고: 엔진오일·브레이크액 수준. 낮으면 표시등처럼 알린다.
         fun level(key: String, lamp: String, get: ((ai.pleos.playground.vehicle.constant.control.OilLevelState?) -> Unit, (Exception) -> Unit) -> Unit) =
             attempt(key) { get({ v -> ui { val low = v == ai.pleos.playground.vehicle.constant.control.OilLevelState.LOW || v == ai.pleos.playground.vehicle.constant.control.OilLevelState.CRITICALLY_LOW

@@ -18,6 +18,8 @@ interface TripHost {
     fun tripEnded(d: Diary)
     fun diaryUpdated(d: Diary)
     fun lampsChanged()
+    /** 너무 짧아 일기로 남기지 않은 주행 */
+    fun tripDiscarded() {}
 }
 
 class Trip(private val store: Store, private val car: Car, private val host: TripHost) {
@@ -96,7 +98,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (type == Evt.LAMP) onLamp(value)
         if (active) roadside(type, value)
         if (type == Evt.GEAR) {
-            if ((value == "D" || value == "R") && !active) start()
+            // 기록은 D에서만 시작한다 (주차하려고 R만 넣었다 빼는 것은 주행이 아니다). 처음 설정을 마치기 전에는 시작하지 않는다.
+            if (value == "D" && !active && store.onboarded) start()
             else if (value == "P" && active) end()
         }
         if (active) { host.tripChanged(); save() }
@@ -138,7 +141,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             if (i in heard || !t.placed) return@forEachIndexed
             val d = Places.meters(lat, lng, t.lat!!, t.lng!!)   // 화면의 "다음 한마디까지" 거리
             if (nearest == null || d < nearest!!) nearest = d
-            if (if (bySdk) i in inZone else d <= 150) {
+            // SDK 근접 알림이 오거나, 앱이 잰 거리가 150m 안이면 (근접 알림이 늦거나 실패해도 놓치지 않게)
+            if ((bySdk && i in inZone) || d <= 150) {
                 // 반대 방향으로 지나가는 중이면 들려주지 않는다 (아주 가까우면 방향과 상관없이)
                 val toward = heading == null || d < 50 || angle(heading.toDouble(), Places.bearing(lat, lng, t.lat, t.lng)) < 100
                 if (toward) play(i, t)
@@ -233,6 +237,9 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
 
     private val tick = object : Runnable { override fun run() { if (active) { host.tripChanged(); main.postDelayed(this, 1000) } } }
 
+    /** 화면이 사라질 때 1초 타이머를 멈춘다 (새 화면이 기록을 이어받는다) */
+    fun release() { main.removeCallbacks(tick) }
+
     fun end() {
         if (!active) return
         val wasSim = sim
@@ -265,6 +272,13 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             val tips = (old?.tips.orEmpty() + voiceNotes.map { Tip((it.at.toFloat() / last).coerceIn(0f, 1f), it.text, it.lat, it.lng) }).distinctBy { it.text }.sortedBy { it.p }
             store.addGuide(Guide(old?.id ?: "self_${driver}_${dest.hashCode()}", driver, dest, drive.placeLat ?: old?.lat, drive.placeLng ?: old?.lng, drive, tips, (old?.times ?: 0) + 1, kind = "나"))
         }
+        // 주차하려고 잠깐 움직인 정도(15초 미만, 50m 미만, 깜빡이·브레이크 같은 조작도 없음)는 일기로 남기지 않는다
+        val acted = drive.events.any { it.type != Evt.GEAR }
+        if (!wasSim && !arrived && drive.seconds < 15 && drive.distKm < 0.05f && !acted && voiceNotes.isEmpty()) {
+            guide = null; routeSent = false
+            host.tripDiscarded(); host.say("잠깐 움직여서 일기로 남기지 않았어요.")
+            return
+        }
         val written = Writer.write(drive, store.diariesOf(driver), g, heard.size, store.tone(driver), seasoned = store.typeOf(driver) == "익숙")
         // 처음이라면(길잡이) 중 이번에 해낸 것이 있으면 일기에 적는다
         val courses = store.newlyDoneCourses(driver, drive)
@@ -277,7 +291,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         // 일기 머리의 날씨는 도착한 곳의 실제 날씨로 (설정에서 끌 수 있다)
         val end = route.lastOrNull()
         val la = car.lat ?: end?.lat; val ln = car.lng ?: end?.lng
-        if (store.weatherOn && la != null && ln != null) Weather.at(la, ln) { f -> if (f != null) { store.setWeather(d.id, "${f.sky} ${f.tempC}°"); host.diaryUpdated(d) } }
+        // 날씨: 위치에 동의한 운전자만, 좌표는 소수 둘째 자리(약 1km)로 줄여 보낸다
+        if (store.weatherOn && store.locationConsent(driver) == true && la != null && ln != null) Weather.at(Math.round(la * 100) / 100.0, Math.round(ln * 100) / 100.0) { f -> if (f != null) { store.setWeather(d.id, "${f.sky} ${f.tempC}°"); host.diaryUpdated(d) } }
         // 키가 있으면 같은 사실로 문장만 다듬는다. 실패하면 규칙으로 쓴 글을 그대로 둔다.
         if (AiDiary.enabled) AiDiary.polish(d, g, store.tone(driver), store.diariesOf(driver).dropLast(1), store.typeOf(driver)) { text, reason ->
             aiStatus = reason
