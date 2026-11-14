@@ -57,7 +57,7 @@ internal fun MainActivity.settingsScreen(): View {
         if (BuildConfig.DEMOS) {
             addView(k.section("시연 (공모전 심사용)"))
             addView(k.groupOf(listOf(
-                k.item("네 번째 출근 보기", "예시 출근 기록 3개를 넣고, 모의 주행으로 ‘늘었어요’ 화면까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@settingsScreen) },
+                k.item("출근길 시연 보기", "지난 출근 기록(예시)을 넣고, 모의 주행으로 ‘늘었어요’ 화면까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@settingsScreen) },
                 k.item("시연 도구", "시연 기록 지우기, 시험용 신호, 아이디어 시연", "list", chevron = true) { go(MainActivity.DEMO) },
             )))
         }
@@ -311,7 +311,7 @@ internal fun MainActivity.demoScreen(): View {
             addView(k.groupOf(listOf(
                 k.toggleItem("아이디어 시연: 다른 차의 가족·친구와 잇기", "지금 Pleos에는 차와 차를 잇는 기능이 없어요. 그 기능이 열린다면 이렇게 쓰겠다는 생각을 가상의 친구로만 보여 줘요. 실제 기능이 아니에요.", store.demoOn, "people") { store.demoOn = it; render() },
                 *(if (store.demoOn) arrayOf(k.item("아이디어 시연 열기", "함께 차곡 · 화면에 모두 시연용으로 표시돼요", "people", chevron = true) { go(MainActivity.TOGETHER) }) else emptyArray()),
-                k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@demoScreen) },
+                k.item("출근길 시연 다시 넣기", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@demoScreen) },
                 k.item("시연 기록 지우기", "예시 출근 기록과 시연으로 달린 모의 주행을 지워요", "trash", chevron = true) {
                     sheets.confirm("시연 기록을 지울까요?", "예시 출근 기록 3개, 남겨 둔 한마디, 시연으로 달린 모의 주행이 지워져요.", "지우기", danger = true) { DemoCommute.clear(this@demoScreen); toast("시연 기록을 지웠어요."); render() }
                 },

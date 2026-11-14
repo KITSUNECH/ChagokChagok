@@ -435,7 +435,7 @@ internal fun MainActivity.readyScreen(): View {
             addView(k.row(14).apply {
                 addView(k.icon("steering", Ink.accent, 28))
                 addView(k.col(2).apply {
-                    addView(k.text(if (demoRoad0) "아래 ‘모의 주행 시작’을 누르면 네 번째 출근을 끝까지 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요", Type.Headline))
+                    addView(k.text(if (demoRoad0) "아래 ‘모의 주행 시작’을 누르면 출근길을 끝까지 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요", Type.Headline))
                     addView(k.text(if (demoRoad0) "실제로 달릴 때는 기어를 D에 놓으면 기록을 시작해요." else "달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요.", Type.Sub, Ink.text2))
                 }, k.lp(0, k.WRAP, 1f))
             })
