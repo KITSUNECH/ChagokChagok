@@ -87,7 +87,7 @@ private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
             addView(k.gap(16))
             addView(k.row(10).apply { addView(k.icon("pencil", Ink.accent, 18)); addView(k.text("내 한 줄 · $it", Type.BodyStrong, Ink.accent)) })
         }
-        if (d.ai) { addView(k.gap(10)); addView(k.text("문장은 생성형 AI가 다듬었어요. 사실은 차량 기록 그대로예요.", Type.Caption, Ink.text3)) }
+        if (d.ai) { addView(k.gap(10)); addView(aiNote(d)) }
         d.stamp?.let { addView(k.gap(14)); addView(k.row().apply { addView(k.fill()); addView(stamp(it, true, 1, 76)) }) }
     }
 }
@@ -140,6 +140,23 @@ private fun MainActivity.compareCard(a: Diary, b: Diary): View {
     }
 }
 
+/** AI가 다듬은 문장 표시 + 원래 문장으로 되돌리기 + 신고 (Pleos 심사: AI 생성 콘텐츠의 필터와 신고) */
+private fun MainActivity.aiNote(d: Diary): View {
+    val k = kit
+    return k.row(10).apply {
+        addView(k.icon("sparkle", Ink.text3, 16))
+        addView(k.text("생성형 AI가 다듬은 문장이에요. 사실은 차량 기록 그대로예요.", Type.Caption, Ink.text3), k.lp(0, k.WRAP, 1f))
+        val orig = store.originalText(d.id)
+        if (orig != null) addView(k.button("원래 문장", Kit.Btn.Plain) { store.addDiary(d.copy(text = orig, ai = false)); render() })
+        addView(k.button("신고", Kit.Btn.Plain) {
+            val why = listOf("사실과 달라요", "어색하거나 불쾌해요", "기타")
+            sheets.choose("이 문장을 신고할까요?", "신고하면 원래 문장으로 되돌리고, 이 차에 기록해 둬요.", why) { i ->
+                store.addAiReport(d.id, why[i]); orig?.let { store.addDiary(d.copy(text = it, ai = false)) }; toast("신고했어요. 원래 문장으로 되돌렸어요."); render()
+            }
+        })
+    }
+}
+
 /** 원고지 보기: 종이 한 장 (날짜와 날씨, 그림 칸, 원고지, 도장) */
 private fun MainActivity.paperPage(d: Diary, guide: Guide?): View {
     val k = kit
@@ -162,7 +179,7 @@ private fun MainActivity.paperPage(d: Diary, guide: Guide?): View {
             }, k.lp(k.MATCH, ui.dp(if (lanes.size > 1) 190 else 120)))
             addView(GridText(context, ui).apply { cols = if (ui.wide) 13 else 11; highlight = d.highlight; text = d.text })
             store.feeling(d.id)?.let { addView(k.voice("— 내 한 줄: $it", 19f, Ink.ink)) }
-            if (d.ai) addView(k.text("문장은 생성형 AI가 다듬었어요. 사실은 차량 기록 그대로예요.", Type.Caption, Ink.paperLine))
+            if (d.ai) addView(aiNote(d))
         }, FrameLayout.LayoutParams(-1, -2))
         d.stamp?.let { addView(stamp(it, true, 1, 84), FrameLayout.LayoutParams(ui.dp(84), ui.dp(84), Gravity.BOTTOM or Gravity.END).apply { rightMargin = ui.dp(18); bottomMargin = ui.dp(14) }) }
     }

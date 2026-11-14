@@ -31,6 +31,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     private lateinit var stage: FrameLayout
     private var sound: SoundPool? = null
     private var chimeId = 0
+    private var chimeFocus: Focus? = null
 
     data class Route(val name: String, val arg: String? = null)
     companion object {
@@ -66,14 +67,20 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         root.addView(stage, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
         sheets = Overlay(root) { kit }
+        AiDiary.key = store.aiKey
         car = Car(this, this)
         trip = Trip(store, car, this)
         voice = Voice(this)
         places = Places(this) { lat, lng, hd -> Telemetry.hit("location", String.format("%.4f, %.4f", lat, lng)); trip.onLocation(lat, lng, hd); if (route.name == DRIVE) refreshDrive() }
         limits = Restrictions(this) { onRestricted() }
+        sheets.keyboardBlocked = { limits.noKeyboard }
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
-        sound = SoundPool.Builder().setMaxStreams(2).build().also { chimeId = it.load(this, R.raw.confirm, 1) }
+        // 효과음: 알림음 용도(SONIFICATION)로 만들고, 울릴 때마다 잠깐 포커스를 받아 다른 소리를 줄인다 (Pleos 오디오 가이드)
+        val chimeAttrs = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+        chimeFocus = Focus(this, chimeAttrs)
+        sound = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(chimeAttrs).build().also { chimeId = it.load(this, R.raw.confirm, 1) }
         if (store.onboarded && trip.resume { id -> store.guide(id) ?: if (id == Demo.dadCommute.id) Demo.dadCommute else null }) {
             tripStarted(); say("끊겼던 기록을 이어 갈게요.")
         } else if (store.onboarded) {
@@ -116,6 +123,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         if (requestCode == REQ_LOCATION && places.permitted()) places.listen()
+        else if (requestCode == REQ_LOCATION) places.showBlocked()   // 문서 권장: 위치가 막히면 Pleos 안내 팝업
         if (route.name == SETTINGS || route.name == ONBOARD) render()
     }
 
@@ -324,10 +332,19 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     override fun speak(text: String) { if (store.voiceOn) voice.say(text) }
     override fun say(text: String) { speak(text); sheets.toast(text, "speaker") }
-    override fun chime() { sound?.play(chimeId, 1f, 1f, 1, 0, 1f) }
-    override fun tripStarted() { sheets.closeAll(); route = Route(DRIVE); stack.clear(); stack.add(route); render() }
+    override fun chime() {
+        val f = chimeFocus; f?.take()
+        sound?.play(chimeId, 1f, 1f, 1, 0, 1f)
+        window.decorView.postDelayed({ f?.give() }, 700)   // 효과음 길이만큼 지난 뒤 돌려준다
+    }
+    override fun tripStarted() {
+        // 한마디 자리마다 FusedLocation 근접 알림을 건다 (동의한 운전자, 모의 주행이 아닐 때)
+        val pts = trip.guide?.tips.orEmpty().mapIndexedNotNull { i, t -> if (t.placed) Triple(i, t.lat!!, t.lng!!) else null }
+        trip.sdkZones = !trip.sim && store.locationOn && store.locationConsent(store.driver) == true && places.watch(pts) { i -> trip.onTipZone(i) }
+        sheets.closeAll(); route = Route(DRIVE); stack.clear(); stack.add(route); render()
+    }
     override fun tripChanged() { if (route.name == DRIVE) refreshDrive() }
-    override fun tripEnded(d: Diary) { Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
+    override fun tripEnded(d: Diary) { places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
     override fun diaryUpdated(d: Diary) { if (route.name == DIARY && route.arg == d.id) render() }
     override fun lampsChanged() { if (route.name == TODAY) render() }
 

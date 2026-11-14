@@ -8,6 +8,10 @@
     <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
     <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />
     <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <!-- 차대번호 (CarInfo.getVINInfo) -->
+    <uses-permission android:name="pleos.car.permission.CAR_INFO" />
+    <!-- 기어: AAOS 표준 GEAR_SELECTION 속성 (Pleos 문서 권장, Vehicle SDK Gear는 지원 중단) -->
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
     <!-- 일기 문장을 생성형 AI로 다듬을 때만 쓴다. 주행 요약 글만 나간다. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 음성 안내 (Pleos TextToSpeech) -->
@@ -17,6 +21,8 @@
     <!-- 내비 연동 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+    <!-- 내비 화면 열기 (NaviHelper.requestNavigationScreen) -->
+    <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP" />
 
     <!-- 기기에 깔린 음성 읽기 엔진을 찾을 수 있게 한다. 이 선언이 없으면 엔진이 있어도 보이지 않는다. -->
     <queries>

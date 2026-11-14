@@ -120,15 +120,25 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         tipsNear(lat, lng, heading)
     }
 
+    /** FusedLocation 근접 알림을 쓰는 중인지 (true면 150m 안에 들어왔는지는 SDK가 알려 준다) */
+    var sdkZones = false
+    private val inZone = mutableSetOf<Int>()
+    private var lastFix: Triple<Double, Double, Float?>? = null
+
+    /** SDK가 "한마디 자리 반경 안에 들어왔다"고 알렸다 */
+    fun onTipZone(i: Int) { inZone.add(i); lastFix?.let { (la, ln, hd) -> tipsNear(la, ln, hd) } }
+
     private fun tipsNear(lat: Double, lng: Double, heading: Float?) {
         val g = guide ?: return
         if (!store.locationOn) return
+        lastFix = Triple(lat, lng, heading)
+        val bySdk = sdkZones && !sim
         var nearest: Double? = null
         g.tips.forEachIndexed { i, t ->
             if (i in heard || !t.placed) return@forEachIndexed
-            val d = Places.meters(lat, lng, t.lat!!, t.lng!!)
+            val d = Places.meters(lat, lng, t.lat!!, t.lng!!)   // 화면의 "다음 한마디까지" 거리
             if (nearest == null || d < nearest!!) nearest = d
-            if (d <= 150) {
+            if (if (bySdk) i in inZone else d <= 150) {
                 // 반대 방향으로 지나가는 중이면 들려주지 않는다 (아주 가까우면 방향과 상관없이)
                 val toward = heading == null || d < 50 || angle(heading.toDouble(), Places.bearing(lat, lng, t.lat, t.lng)) < 100
                 if (toward) play(i, t)
@@ -184,7 +194,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.lowBeam) recorder.add(Evt.LIGHT, "on")
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
-        heard.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
+        heard.clear(); inZone.clear(); lastFix = null; currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
         praised = 0; spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
         // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
         support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
@@ -251,6 +261,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (AiDiary.enabled) AiDiary.polish(d, g, store.tone(driver), store.diariesOf(driver).dropLast(1), store.typeOf(driver)) { text, reason ->
             aiStatus = reason
             if (text != null) {
+                store.setOriginalText(d.id, d.text)   // 되돌리기·신고 때 쓰는 원래 문장
                 val better = d.copy(text = text, highlight = if (d.highlight.isNotEmpty() && d.highlight in text) d.highlight else "", ai = true)
                 store.addDiary(better); host.diaryUpdated(better)
             }

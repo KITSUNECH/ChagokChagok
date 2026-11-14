@@ -175,12 +175,12 @@ internal fun MainActivity.refreshDrive() {
         trip.currentTip != null -> "${Writer.poss(g.owner)} 한마디"
         else -> "${Writer.poss(g.owner)} 길"
     }
-    V.tip?.text = trip.currentTip ?: when {
+    V.tip?.text = limits.fit(trip.currentTip ?: when {
         g == null -> "오늘 주행을 조용히 적고 있어요."
         g.tips.any { it.placed } && store.locationOn -> "남긴 자리에 가까워지면 들려줄게요."
         g.tips.isNotEmpty() -> "출발 전에 들은 한마디를 기억해 둬요."
         else -> "같은 길을 달리고 있어요."
-    }
+    })
 
     // 한마디가 나오는 동안만 밝게
     val speaking = trip.currentTip != null

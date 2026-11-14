@@ -102,7 +102,8 @@ object Evt {
 
 /** 앱의 모든 기록을 읽고 쓰는 곳. */
 class Store(ctx: Context) {
-    private val prefs = ctx.getSharedPreferences("chagok", Context.MODE_PRIVATE)
+    /** 일기·지나온 길·키를 담는 저장소. 기기 안에서 암호화한다 (Pleos 보안 가이드: 민감 데이터 암호화). */
+    private val prefs: android.content.SharedPreferences = SecurePrefs.open(ctx)
 
     /** 이 차를 함께 쓰는 사람들. 가족이나 친구를 더할 수 있다. */
     val drivers: List<String>
@@ -233,6 +234,15 @@ class Store(ctx: Context) {
     var shifter: String?
         get() = prefs.getString("shifter", null)
         set(v) = prefs.edit().putString("shifter", v).apply()
+    /** 생성형 AI 키: 앱에 넣어 배포하지 않고(하드코딩 금지), 사용자가 설정에서 넣으면 암호화 저장소에만 둔다 */
+    var aiKey: String?
+        get() = prefs.getString("ai_key", null)?.takeIf { it.isNotBlank() }
+        set(v) = prefs.edit().apply { if (v.isNullOrBlank()) remove("ai_key") else putString("ai_key", v.trim()) }.apply()
+    /** 생성형 AI가 다듬기 전 원래 문장 (되돌리기용) */
+    fun originalText(diaryId: String): String? = prefs.getString("orig_$diaryId", null)
+    fun setOriginalText(diaryId: String, t: String) = prefs.edit().putString("orig_$diaryId", t).apply()
+    /** AI 문장 신고 기록 (기기 안에만) */
+    fun addAiReport(diaryId: String, why: String) = prefs.edit().putString("aireport_$diaryId", why).apply()
     /** 운전자가 고른 이 차의 차종 이름 (Shifters.models) */
     var carModel: String?
         get() = prefs.getString("carModel", null)

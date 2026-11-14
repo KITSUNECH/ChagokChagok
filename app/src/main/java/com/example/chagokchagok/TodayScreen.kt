@@ -394,7 +394,7 @@ internal fun MainActivity.readyScreen(): View {
         check(car.energy?.let { it >= 20 }, "연료 ${car.energy}%", "연료 ${car.energy}% · 가는 길에 넣어요", "연료는 계기판에서 확인해 주세요", "fuel"),
         check(if (car.washerKnown) !car.washerLow else null, "워셔액 충분", "워셔액이 부족해요", "워셔액은 읽지 못했어요", "info"),
         check(car.belt, "안전벨트를 맸어요", "안전벨트를 매 주세요", "", "seat"),
-        check(if ("TPMS" in car.lampsOn) false else if (car.tires.isNotEmpty()) true else null, "타이어 공기압 경고 없음", "공기압이 낮은 타이어가 있어요", "타이어는 읽지 못했어요", "car"),
+        check(if ("ENGINE_OIL_LEVEL" in car.lampsOn || "BRAKE_FLUID_LEVEL" in car.lampsOn) false else if (!car.failures.containsKey("oil")) true else null, "엔진오일·브레이크액 정상", "엔진오일이나 브레이크액이 적어요", "엔진오일·브레이크액은 읽지 못했어요", "car"),
         store.seat(d)?.let { mine -> car.seatPos?.let { now -> check(now == mine, "의자가 지난번 내 자리 그대로예요", "의자가 지난번 내 자리와 달라요", "", "seat") } },
         Session.forecast?.let { f -> check(f.rainChance < 50, "도착지 ${f.sky} ${f.tempC}°", "도착지 ${f.sky} ${f.tempC}° · 3시간 안 비 올 확률 ${f.rainChance}%", "", "cloud") },
     ) + car.lampsOn.mapNotNull { Lamps.warn(it) }.map { check(false, "", "${it.name} 표시등이 켜져 있어요", "", "warning")!! }

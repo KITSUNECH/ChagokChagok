@@ -1,7 +1,6 @@
 // 차곡車곡 – 차와 내비에 연결하는 곳
 // Vehicle SDK 와 NaviHelper SDK 의 콜백을 받아 지금 상태를 보관하고,
 // 값이 바뀔 때마다 화면 스레드에서 Listener 를 불러 준다.
-@file:Suppress("DEPRECATION")
 
 package com.example.chagokchagok
 
@@ -22,21 +21,16 @@ import ai.pleos.playground.vehicle.constant.area.TurnSignalValue
 import ai.pleos.playground.vehicle.constant.area.WindowValue
 import ai.pleos.playground.vehicle.constant.control.CruiseControl
 import ai.pleos.playground.vehicle.constant.control.LightState
-import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import ai.pleos.playground.vehicle.constant.control.WiperState
 import ai.pleos.playground.vehicle.listener.BrakePedalStatusListener
 import ai.pleos.playground.vehicle.listener.CruiseControlStateListener
 import ai.pleos.playground.vehicle.listener.DistanceDrivenListener
-import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import ai.pleos.playground.vehicle.listener.LightStateListener
 import ai.pleos.playground.vehicle.listener.SeatBeltBuckledStateListener
 import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
 import ai.pleos.playground.vehicle.listener.SeatForeAftPositionListener
-import ai.pleos.playground.vehicle.listener.TelltaleInfoListener
-import ai.pleos.playground.vehicle.api.model.telltale.Telltales
-import ai.pleos.playground.vehicle.api.model.area.WheelArea
-import ai.pleos.playground.vehicle.constant.area.WheelValue
-import ai.pleos.playground.vehicle.constant.telltale.TelltaleState
+import ai.pleos.playground.vehicle.api.model.capability.AccessType
+import ai.pleos.playground.vehicle.api.model.capability.CapabilityConfig
 import ai.pleos.playground.vehicle.listener.SteeringWheelAngleListener
 import ai.pleos.playground.vehicle.listener.TurnSignalStateListener
 import ai.pleos.playground.vehicle.listener.WiperStateListener
@@ -75,10 +69,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var washerKnown = false; private set
     /** 내비가 경로 안내를 시작했다고 알려 왔는지 (요청만 보낸 것과 구분) */
     var routeStarted = false; private set
-    /** 지금 켜져 있는 표시등 종류 */
+    /** 지금 켜져 있는 경고 (엔진오일·브레이크액 수준은 실제 API, 그 밖의 표시등은 설정의 시험용 신호로만) */
     val lampsOn = mutableSetOf<String>()
-    /** 바퀴별 공기압 (차가 주는 단위 그대로) */
-    val tires = mutableMapOf<String, Float>()
     /** 운전석 앞뒤 위치 */
     var seatPos: Int? = null; private set
     // 내비가 알려 준 앞길. 없으면 null 이거나 0.
@@ -130,15 +122,19 @@ class Car(private val ctx: Context, private val listener: Listener) {
         override fun onSteeringWheelAngleUpdated(angle: Float?) { steering = angle ?: 0f }
         override fun onFailed(e: Exception) { failures["steering"] = e.message ?: "실패" }
     }
-    private val gearL = object : GearSelectionListener {
-        override fun onSelected(gear: VehicleGear?) = ui {
-            this@Car.gear = when (gear) {
-                VehicleGear.GEAR_DRIVE -> "D"; VehicleGear.GEAR_REVERSE -> "R"
-                VehicleGear.GEAR_NEUTRAL -> "N"; VehicleGear.GEAR_PARK -> "P"; else -> this@Car.gear
+    // 기어: Pleos 문서는 Vehicle SDK의 Gear(지원 중단)를 쓰지 말고 AAOS 표준 GEAR_SELECTION 속성을 쓰라고 한다.
+    private var carApi: android.car.Car? = null
+    private var props: android.car.hardware.property.CarPropertyManager? = null
+    private val gearCb = object : android.car.hardware.property.CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: android.car.hardware.CarPropertyValue<*>) = ui {
+            val g = when (value.value as? Int) {
+                android.car.VehicleGear.GEAR_DRIVE -> "D"; android.car.VehicleGear.GEAR_REVERSE -> "R"
+                android.car.VehicleGear.GEAR_NEUTRAL -> "N"; android.car.VehicleGear.GEAR_PARK -> "P"
+                else -> if ((value.value as? Int ?: 0) >= 16) "D" else this@Car.gear   // 16 이상은 수동 1~9단(GEAR_FIRST…) = 앞으로
             }
-            listener.onCarEvent(Evt.GEAR, this@Car.gear)
+            if (g != gear) { gear = g; listener.onCarEvent(Evt.GEAR, g) }
         }
-        override fun onFailed(e: Exception) { failures[Evt.GEAR] = e.message ?: "실패" }
+        override fun onErrorEvent(propId: Int, zone: Int) { failures[Evt.GEAR] = "GEAR_SELECTION 오류" }
     }
     private val wiperL = object : WiperStateListener {
         override fun onWiperStateUpdated(state: WiperState?) = ui {
@@ -170,13 +166,6 @@ class Car(private val ctx: Context, private val listener: Listener) {
             if (occupied == true && !passenger) { passenger = true; listener.onCarEvent(Evt.SEAT, "on") }
         }
         override fun onFailed(e: Exception) { failures[Evt.SEAT] = e.message ?: "실패" }
-    }
-    private val telltaleL = object : TelltaleInfoListener {
-        override fun onTelltaleInfoUpdated(telltales: Telltales?) = ui {
-            val now = (telltales?.telltales ?: emptyList()).filter { it.state != TelltaleState.OFF }.map { it.type.name }.toSet()
-            setLamps(now)
-        }
-        override fun onFailed(e: Exception) { failures["telltale"] = e.message ?: "실패" }
     }
     private val seatPosL = object : SeatForeAftPositionListener {
         override fun onSeatForeAftPositionUpdated(position: Int?) = ui { if (position != null) seatPos = position }
@@ -226,21 +215,27 @@ class Car(private val ctx: Context, private val listener: Listener) {
     fun start() {
         if (offline) return
         attempt("vehicle") { vehicle = Vehicle(ctx); vehicle.initialize() }
+        // Pleos 문서대로: 신호마다 먼저 checkXxxCapabilities 로 지원 여부를 보고, 읽을 수 있을 때만 등록한다.
         // 하나가 지원되지 않아도 나머지는 계속 등록되도록 각각 감싼다.
-        attempt(Evt.SIGNAL) { vehicle.getTurnSignal().registerTurnSignalState(signalL) }
-        attempt(Evt.BRAKE) { vehicle.getBrake().registerBrakePedalStatus(brakeL) }
-        attempt("steering") { vehicle.getSteeringWheel().registerSteeringWheelAngle(steeringL) }
-        attempt(Evt.GEAR) { vehicle.getGear().registerGearSelection(gearL) }
-        attempt(Evt.WIPER) { vehicle.getWiper().registerWiperState(frontWindow, wiperL) }
-        attempt(Evt.LIGHT) { vehicle.getLight().registerLowBeamLightState(lightL) }
-        attempt("belt") { vehicle.getSeat().registerSeatBeltBuckledState(driverSeat, beltL) }
-        attempt("distance") { vehicle.getOdometer().registerDistanceDriven(distanceL) }
-        attempt(Evt.CRUISE) { vehicle.getDrivingMode().registerCruiseControlState(cruiseL) }
-        passengerSeats.forEach { seat -> attempt(Evt.SEAT) { vehicle.getSeat().registerSeatOccupancy(seat, seatL) } }
-        attempt("telltale") { vehicle.getSafety().registerTelltales(telltaleL) }
+        cap(Evt.SIGNAL, { ok, no -> vehicle.getTurnSignal().checkTurnSignalStateCapabilities(ok, no) }) { vehicle.getTurnSignal().registerTurnSignalState(signalL) }
+        cap(Evt.BRAKE, { ok, no -> vehicle.getBrake().checkBrakePedalStatusCapabilities(ok, no) }) { vehicle.getBrake().registerBrakePedalStatus(brakeL) }
+        cap("steering", { ok, no -> vehicle.getSteeringWheel().checkSteeringWheelAngleCapabilities({ c, _ -> ok(c) }, no) }) { vehicle.getSteeringWheel().registerSteeringWheelAngle(steeringL) }
+        cap(Evt.WIPER, { ok, no -> vehicle.getWiper().checkWiperStateCapabilities({ c, _ -> ok(c) }, no) }) { vehicle.getWiper().registerWiperState(frontWindow, wiperL) }
+        cap(Evt.LIGHT, { ok, no -> vehicle.getLight().checkLowBeamLightSwitchCapabilities({ c, _ -> ok(c) }, no) }) { vehicle.getLight().registerLowBeamLightState(lightL) }
+        cap("belt", { ok, no -> vehicle.getSeat().checkSeatBeltBuckledCapabilities({ c, _ -> ok(c) }, no) }) { vehicle.getSeat().registerSeatBeltBuckledState(driverSeat, beltL) }
+        cap("distance", { ok, no -> vehicle.getOdometer().checkCurrentDistanceDrivenCapabilities(ok, no) }) { vehicle.getOdometer().registerDistanceDriven(distanceL) }
+        cap(Evt.CRUISE, { ok, no -> vehicle.getDrivingMode().checkCruiseControlStateCapabilities(ok, no) }) { vehicle.getDrivingMode().registerCruiseControlState(cruiseL) }
+        cap(Evt.SEAT, { ok, no -> vehicle.getSeat().checkSeatOccupancyCapabilities({ c, _ -> ok(c) }, no) }) { passengerSeats.forEach { seat -> vehicle.getSeat().registerSeatOccupancy(seat, seatL) } }
         attempt("seatPos") { vehicle.getSeat().registerSeatForeAftPosition(driverSeat, seatPosL) }
+        // 표시등(Telltales)과 바퀴별 공기압은 PRIVATE 권한(써드파티 앱 불가)이라 쓰지 않는다. 설정의 시험용 신호로만 화면을 확인한다.
+        // 기어: AAOS CarPropertyManager GEAR_SELECTION (권한 android.car.permission.CAR_POWERTRAIN)
+        attempt(Evt.GEAR) {
+            val c = android.car.Car.createCar(ctx); carApi = c
+            val pm = c.getCarManager(android.car.Car.PROPERTY_SERVICE) as android.car.hardware.property.CarPropertyManager; props = pm
+            pm.registerCallback(gearCb, android.car.VehiclePropertyIds.GEAR_SELECTION, android.car.hardware.property.CarPropertyManager.SENSOR_RATE_ONCHANGE)
+        }
         refreshCondition()
-        attempt("vin") { vehicle.getCarInfo().getVINInfo({ v -> ui { vin = v?.trim()?.takeIf { it.length >= 10 }; listener.onCarEvent(Evt.NAVI, "vin") } }, { e -> failures["vin"] = e.message ?: "실패" }) }
+        cap("vin", { ok, no -> vehicle.getCarInfo().checkVINInfoCapabilities(ok, no) }) { vehicle.getCarInfo().getVINInfo({ v -> ui { vin = v?.trim()?.takeIf { it.length >= 10 }; listener.onCarEvent(Evt.NAVI, "vin") } }, { e -> failures["vin"] = e.message ?: "실패" }) }
 
         navi = NaviHelper(ctx.applicationContext)
         navi.initialize(
@@ -254,14 +249,13 @@ class Car(private val ctx: Context, private val listener: Listener) {
         attempt("") { vehicle.getTurnSignal().unregisterTurnSignalState(signalL) }
         attempt("") { vehicle.getBrake().unregisterBrakePedalStatus(brakeL) }
         attempt("") { vehicle.getSteeringWheel().unregisterSteeringWheelAngle(steeringL) }
-        attempt("") { vehicle.getGear().unregisterGearSelection(gearL) }
+        attempt("") { props?.unregisterCallback(gearCb); carApi?.disconnect() }
         attempt("") { vehicle.getWiper().unregisterWiperState(frontWindow, wiperL) }
         attempt("") { vehicle.getLight().unregisterLowBeamLightState(lightL) }
         attempt("") { vehicle.getSeat().unregisterSeatBeltBuckledState(driverSeat, beltL) }
         attempt("") { vehicle.getOdometer().unregisterDistanceDriven(distanceL) }
         attempt("") { vehicle.getDrivingMode().unregisterCruiseControlState(cruiseL) }
         passengerSeats.forEach { seat -> attempt("") { vehicle.getSeat().unregisterSeatOccupancy(seat, seatL) } }
-        attempt("") { vehicle.getSafety().unregisterTelltales(telltaleL) }
         attempt("") { vehicle.getSeat().unregisterSeatForeAftPosition(driverSeat, seatPosL) }
         attempt("") { vehicle.release() }
         attempt("") { navi.removeListener(naviL); navi.release() }
@@ -271,11 +265,14 @@ class Car(private val ctx: Context, private val listener: Listener) {
     fun refreshCondition() {
         attempt("fuel") { vehicle.getFuel().getFuelPercent({ v -> if (v != null) energy = v }, { e -> failures["fuel"] = e.message ?: "실패" }) }
         attempt("battery") { vehicle.getEvBattery().getEvBatteryStateOfCharge({ v -> if (v != null) { isEv = true; if (energy == null) energy = v } }, { e -> failures["battery"] = e.message ?: "실패" }) }
-        listOf(WheelValue.LEFT_FRONT, WheelValue.RIGHT_FRONT, WheelValue.LEFT_REAR, WheelValue.RIGHT_REAR).forEach { w ->
-            attempt("tire") { vehicle.getTire().getTirePressure(WheelArea(w), { v -> if (v != null) tires[w.name] = v }, { e -> failures["tire"] = e.message ?: "실패" }) }
-        }
         attempt("seatPos") { vehicle.getSeat().getCurrentSeatForeAftPosition(driverSeat, { v -> if (v != null) seatPos = v }, { e -> failures["seatPos"] = e.message ?: "실패" }) }
         attempt("washer") { vehicle.getSafety().hasLowWasherFluidWarning({ v -> washerLow = v == true; washerKnown = true }, { e -> failures["washer"] = e.message ?: "실패" }) }
+        // 공개 API(CAR_SAFETY)로 읽는 실제 경고: 엔진오일·브레이크액 수준. 낮으면 표시등처럼 알린다.
+        fun level(key: String, lamp: String, get: ((ai.pleos.playground.vehicle.constant.control.OilLevelState?) -> Unit, (Exception) -> Unit) -> Unit) =
+            attempt(key) { get({ v -> ui { val low = v == ai.pleos.playground.vehicle.constant.control.OilLevelState.LOW || v == ai.pleos.playground.vehicle.constant.control.OilLevelState.CRITICALLY_LOW
+                setLamps(if (low) lampsOn + lamp else lampsOn - lamp) } }, { e -> failures[key] = e.message ?: "실패" }) }
+        level("oil", "ENGINE_OIL_LEVEL") { ok, no -> vehicle.getSafety().getEngineOilLevelState(ok, no) }
+        level("brakeFluid", "BRAKE_FLUID_LEVEL") { ok, no -> vehicle.getSafety().getBrakeFluidLevelState(ok, no) }
     }
     fun resetPassenger() { passenger = false }
 
@@ -331,6 +328,14 @@ class Car(private val ctx: Context, private val listener: Listener) {
                     routeOption = if (comfortable) ai.pleos.playground.navi.constants.RouteOption.COMFORTABLE else ai.pleos.playground.navi.constants.RouteOption.RECOMMENDED
                 )
             )
+        }
+    }
+
+    /** 문서대로 지원 여부(AccessType READ/READ_WRITE)를 먼저 확인하고 등록한다. 지원하지 않으면 이유를 남긴다. */
+    private fun cap(key: String, check: (ok: (CapabilityConfig) -> Unit, no: (Exception) -> Unit) -> Unit, register: () -> Unit) {
+        attempt(key) {
+            check({ c -> if (c.accessType == AccessType.READ || c.accessType == AccessType.READ_WRITE) attempt(key) { register() } else failures[key] = "지원하지 않음 (${c.accessType})" },
+                { e -> failures[key] = "지원 확인 실패: " + (e.message ?: e.javaClass.simpleName) })
         }
     }
 

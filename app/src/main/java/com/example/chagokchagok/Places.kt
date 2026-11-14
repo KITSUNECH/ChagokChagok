@@ -10,6 +10,10 @@ import android.os.Looper
 import ai.pleos.playground.location.fused.FusedLocation
 import ai.pleos.playground.location.fused.listener.FusedLocationListener
 import ai.pleos.playground.location.fused.model.LocationData
+import ai.pleos.playground.location.fused.listener.ProximityAlertListener
+import ai.pleos.playground.location.fused.model.ProximityAlertEvent
+import ai.pleos.playground.location.fused.model.ProximityAlertRequest
+import ai.pleos.playground.location.fused.model.ProximityTransition
 
 class Places(private val ctx: Context, private val onMove: (lat: Double, lng: Double, heading: Float?) -> Unit) {
     companion object {
@@ -78,7 +82,40 @@ class Places(private val ctx: Context, private val onMove: (lat: Double, lng: Do
         onMove(lat, lng, this.heading)
     }
 
+    // ── 근접 알림 (FusedLocation SDK 공식 API) ──
+    // 한마디를 남긴 자리마다 반경 150m ENTER 알림을 건다. 방향 조건은 SDK에 없어 들어온 뒤 앱이 확인한다.
+    private val alertIds = mutableMapOf<String, Int>()
+    var alerts = 0; private set
+
+    /** 자리마다 근접 알림을 건다. SDK를 쓸 수 없으면 false (그때는 앱이 거리로 판단한다). */
+    /** points: (한마디 번호, 위도, 경도) */
+    fun watch(points: List<Triple<Int, Double, Double>>, onEnter: (Int) -> Unit): Boolean {
+        val f = fused ?: return false
+        if (!permitted() || points.isEmpty()) return false
+        clearWatch()
+        return try {
+            points.forEach { (i, la, ln) ->
+                f.addProximityAlert(ProximityAlertRequest(la, ln, 150f, setOf(ProximityTransition.ENTER)), object : ProximityAlertListener {
+                    override fun onRegistered(alertId: String) { main.post { alertIds[alertId] = i; alerts = alertIds.size } }
+                    override fun onTransition(event: ProximityAlertEvent) { if (event.transition == ProximityTransition.ENTER) main.post { alertIds[event.alertId]?.let(onEnter) } }
+                    override fun onError(exception: Exception) { main.post { status = "근접 알림 오류: ${exception.message}" } }
+                })
+            }
+            true
+        } catch (e: Throwable) { status = "근접 알림을 걸지 못함: ${e.javaClass.simpleName}"; false }
+    }
+
+    fun clearWatch() {
+        val f = fused
+        alertIds.keys.forEach { id -> try { f?.removeProximityAlert(id) } catch (_: Throwable) {} }
+        alertIds.clear(); alerts = 0
+    }
+
+    /** 위치 권한이 막혔을 때 Pleos가 주는 안내 팝업 (문서 권장) */
+    fun showBlocked() { try { fused?.showLocationAccessBlockedPopup() } catch (_: Throwable) {} }
+
     fun stop() {
+        clearWatch()
         try { fused?.unregisterFusedLocationCallback(listener); fused?.release() } catch (_: Throwable) {}
     }
 }

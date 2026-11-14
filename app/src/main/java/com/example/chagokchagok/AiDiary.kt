@@ -15,13 +15,23 @@ import com.anthropic.models.messages.StopReason
 import java.util.concurrent.Executors
 
 object AiDiary {
-    /** 키는 local.properties 에서 빌드 때 들어온다. 비어 있으면 AI를 쓰지 않는다. */
-    val enabled get() = BuildConfig.ANTHROPIC_API_KEY.isNotBlank()
+    /**
+     * 키는 앱에 넣어 배포하지 않는다(Pleos 보안 가이드: 비밀값 하드코딩 금지).
+     * 사용자가 설정에서 넣은 키를 암호화 저장소에서 읽어 MainActivity 가 여기에 건넨다. 비어 있으면 AI를 쓰지 않는다.
+     */
+    @Volatile var key: String? = null
+        set(v) { field = v?.trim()?.takeIf { it.isNotEmpty() }; client = null }
+    val enabled get() = key != null
 
     private val pool = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
-    private val client: AnthropicClient by lazy {
-        AnthropicOkHttpClient.builder().apiKey(BuildConfig.ANTHROPIC_API_KEY).build()
+    @Volatile private var client: AnthropicClient? = null
+    private fun client(): AnthropicClient = client ?: AnthropicOkHttpClient.builder().apiKey(key ?: "").build().also { client = it }
+
+    /** 필터 (Pleos 심사: AI 생성 콘텐츠 필터): 초안에 없는 숫자를 만들어 냈으면 쓰지 않는다 */
+    internal fun factsKept(draft: String, out: String): Boolean {
+        val nums = Regex("\\d+(?:\\.\\d+)?").findAll(draft).map { it.value }.toSet()
+        return Regex("\\d+(?:\\.\\d+)?").findAll(out).all { it.value in nums }
     }
 
     private const val SYSTEM = """너는 '차곡車곡'이라는 차량용 앱에서 일기를 쓴다. 글쓴이는 자동차이고, 읽는 사람은 그 차를 모는 초보 운전자다. 운전이 무서워서 시작을 망설이던 사람이라, 이 일기는 평가가 아니라 "오늘 이런 일이 있었고 네가 늘고 있다"는 기록이어야 한다.
@@ -56,14 +66,18 @@ object AiDiary {
                     .system(SYSTEM)
                     .addUserMessage("초안:\n${d.text}$context$keep$style$known")
                     .build()
-                val response = client.messages().create(params)
+                val response = client().messages().create(params)
                 // 응답이 거절이거나 비어 있으면 규칙으로 쓴 글을 그대로 쓴다.
                 if (response.stopReason().orElse(null) == StopReason.REFUSAL) null to "거절됨 (규칙으로 씀)"
                 else {
                     val out = StringBuilder()
                     response.content().forEach { block -> block.text().ifPresent { out.append(it.text()) } }
                     val clean = out.toString().replace("\n", " ").trim().trim('"', '“', '”')
-                    if (clean.length in 20..240) clean to "다듬음" else null to "글 길이가 맞지 않음 (규칙으로 씀)"
+                    when {
+                        clean.length !in 20..240 -> null to "글 길이가 맞지 않음 (규칙으로 씀)"
+                        !factsKept(d.text, clean) -> null to "초안에 없는 숫자가 있어 쓰지 않음 (규칙으로 씀)"
+                        else -> clean to "다듬음"
+                    }
                 }
             } catch (e: RateLimitException) {
                 null to "요청 한도 초과 (규칙으로 씀)"

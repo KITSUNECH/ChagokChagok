@@ -21,7 +21,6 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "ANTHROPIC_API_KEY", "\"${localProps.getProperty("anthropic.api.key", "")}\"")
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
@@ -37,6 +36,7 @@ dependencies {
     implementation("ai.pleos.playground:NaviHelper:3.0.5")
     implementation("ai.pleos.playground:TextToSpeech:3.3.1")
     implementation("ai.pleos.playground:FusedLocation:1.1.3")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")   // 기록과 키를 기기 안에서 암호화해 저장 (Pleos 보안 가이드)
     implementation("com.anthropic:anthropic-java:3.3.0")   // 일기 문장을 다듬는 데 쓴다 (키가 있을 때만)
     testImplementation("junit:junit:4.13.2")
     // 화면을 이미지로 찍어 보는 테스트 (에뮬레이터 없이 실제 안드로이드 그리기 엔진으로)

@@ -99,6 +99,8 @@ data class Lamp(val name: String, val level: String, val what: String)
 
 object Lamps {
     val all = mapOf(
+        "ENGINE_OIL_LEVEL" to Lamp("엔진오일 부족", "노랑", "엔진오일이 적어요. 가까운 날에 정비소에서 오일을 확인하세요."),
+        "BRAKE_FLUID_LEVEL" to Lamp("브레이크액 부족", "빨강", "브레이크액이 적어요. 브레이크가 덜 들 수 있으니 안전한 곳에 세우고 점검을 받으세요."),
         "ENGINE_OIL_PRESSURE" to Lamp("엔진오일 압력", "빨강", "엔진오일이 모자라거나 압력이 낮습니다. 안전한 곳에 세우고 시동을 끈 뒤 점검을 받으세요."),
         "ENGINE_TEMPERATURE" to Lamp("냉각수 온도", "빨강", "엔진이 너무 뜨겁습니다. 안전한 곳에 세우고 식힌 뒤 냉각수를 확인하세요."),
         "LOW_VOLT_BATTERY" to Lamp("충전 경고", "빨강", "배터리가 충전되지 않고 있습니다. 전기 장치를 줄이고 가까운 정비소로 가세요."),

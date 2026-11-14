@@ -48,7 +48,12 @@ internal fun MainActivity.settingsScreen(): View {
             },
             k.toggleItem("도착지 날씨", "목적지 좌표를 공개 예보(Open-Meteo)에 보내 날씨를 읽어 와요", store.weatherOn, "cloud") { store.weatherOn = it },
             k.toggleItem("내 기록을 가족에게 보여 주기", "켜면 가족 프로필 일기장에 내 요즘 운전이 보여요", store.shares(me), "eye") { store.setShares(me, it) },
-            k.item("일기 문장 다듬기 (생성형 AI)", if (AiDiary.enabled) "켜짐 · 일기 초안과 장소 이름이 Anthropic API로 가요" else "꺼짐 · 차량 기록으로 규칙에 따라 써요", "sparkle", value = trip.aiStatus),
+            k.item("일기 문장 다듬기 (생성형 AI)", if (AiDiary.enabled) "켜짐 · 일기 초안만 Anthropic API로 가요. 사실과 다른 숫자는 걸러요" else "꺼짐 · 키를 넣으면 켜져요. 키는 앱에 들어 있지 않고 이 차에만 암호화해 둬요", "sparkle", value = trip.aiStatus.ifEmpty { if (AiDiary.enabled) "켜짐" else "꺼짐" }, chevron = true) {
+                if (AiDiary.enabled) sheets.confirm("AI 다듬기를 끌까요?", "넣어 둔 키를 이 차에서 지워요.", "끄기", true) { store.aiKey = null; AiDiary.key = null; render() }
+                else sheets.input("Anthropic API 키", "sk-ant-…", ok = "저장") { v -> store.aiKey = v; AiDiary.key = v; toast("키를 암호화해 저장했어요. 다음 일기부터 다듬어요."); render() }
+            },
+            k.item("저장소", SecurePrefs.status, "lock"),
+            k.item("개인정보·위치정보 안내", "무엇을 어디에 두고, 누구에게 보이는지", "eye", chevron = true) { go(MainActivity.LEARN, "privacy") },
         )))
         addView(k.section("알아 두기"))
         addView(k.groupOf(listOf(
@@ -133,6 +138,7 @@ internal fun MainActivity.learnScreen(key: String?): View {
     val k = kit
     if (key == null || key == "law") return lawScreen()
     if (key == "tips") return tipsScreen()
+    if (key == "privacy") return privacyScreen()
     val (title, sub, notes) = when (key) {
         "lamp" -> Triple("경고등 색 읽는 법", "색으로 먼저 판단하고, 자세한 뜻은 차의 설명서를 따라요.", Notes.lamps + car.lampsOn.mapNotNull { Lamps.all[it] }.map { Note("지금 켜진 표시등 · ${it.name} (${it.level})", it.what) })
         "newcar" -> Triple("면허시험 차와 다른 곳", "차마다 다르니 출발 준비에서 직접 해 보세요.", Notes.newCar)
@@ -216,6 +222,24 @@ internal fun MainActivity.pickLicenseYear() {
     }
 }
 
+/** 개인정보·위치정보 안내 (Pleos 심사: 위치를 쓰는 앱은 처리방침과 위치정보 이용 안내가 필요) */
+internal fun MainActivity.privacyScreen(): View {
+    val k = kit
+    val rows = listOf(
+        Triple("무엇을 쓰나요", "차량 신호(깜빡이·브레이크·기어·와이퍼·전조등·안전띠·좌석·주행거리), 내비 목적지와 회전 안내, 차의 위치(동의한 운전자만), 운전자가 적은 이름과 한마디", "list"),
+        Triple("어디에 두나요", "이 차 안에만 둬요. 안드로이드 키스토어 키로 암호화한 저장소에 저장하고, 앱 서버는 없어요.", "lock"),
+        Triple("위치는", "운전자마다 따로 동의를 받아요. 동의하지 않으면 위치를 쓰지도 남기지도 않아요. 근거: 위치정보법 제15조.", "pin"),
+        Triple("밖으로 나가는 것", "도착지 날씨를 켜면 목적지 좌표만 공개 예보(Open-Meteo)로, AI 다듬기를 켜면 일기 초안만 Anthropic API로 가요. 둘 다 끌 수 있어요.", "share"),
+        Triple("누구에게 보이나요", "함께 쓰는 사람에게는 내가 고른 일기와 건넨 길만 보여요. 길을 건넬 때는 출발한 곳 근처 500m를 빼요.", "people"),
+        Triple("지우려면", "설정 › 데이터 › 기록 모두 지우기. 이 차에서 바로 지워져요.", "trash"),
+    )
+    return k.col().apply {
+        addView(k.header("개인정보·위치정보 안내", "차곡車곡이 다루는 정보와 지키는 방법", onBack = { back() }))
+        addView(k.gap(18))
+        addView(k.groupOf(rows.map { (t, b, ic) -> k.item(t, b, ic) }))
+    }
+}
+
 // ═══════════════ 연결 상태 ═══════════════
 
 internal fun MainActivity.checkScreen(): View {
@@ -245,8 +269,8 @@ internal fun MainActivity.checkScreen(): View {
             k.item("기어", null, "steering", value = car.gear),
             k.item("주행거리계", null, "road", value = car.odometerKm?.let { String.format("%.1fkm", it) } ?: "읽지 못함"),
             k.item("연료/배터리", null, "fuel", value = car.energy?.let { "$it%" } ?: "읽지 못함"),
-            k.item("표시등", null, "warning", value = car.lampsOn.joinToString().ifEmpty { "없음" }),
-            k.item("타이어", null, "car", value = car.tires.entries.joinToString { "${it.key.take(2)} ${it.value.toInt()}" }.ifEmpty { "읽지 못함" }),
+            k.item("경고 (엔진오일·브레이크액)", "Safety · CAR_SAFETY", "warning", value = car.lampsOn.joinToString().ifEmpty { "없음" }),
+            k.item("표시등 · 타이어 공기압", "Pleos 비공개 권한(PRIVATE_CAR_SAFETY)이라 써드파티 앱은 받을 수 없어요 · 시험용 신호로만", "car", value = "쓰지 않음"),
             k.item("운전석 위치", null, "seat", value = car.seatPos?.toString() ?: "읽지 못함"),
             if (car.failures.isNotEmpty()) k.item("실패한 신호", car.failures.entries.joinToString("\n") { "${it.key}: ${it.value}" }, "info", Ink.warn) else null,
         )))

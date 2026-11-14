@@ -71,8 +71,11 @@ class Overlay(private val host: FrameLayout, private val kitOf: () -> Kit) {
         }
 
     /** 글 한 줄 입력 */
+    /** 차가 글자 입력을 막았는지 (CarUxRestrictions NO_KEYBOARD). MainActivity 가 채운다. */
+    var keyboardBlocked: () -> Boolean = { false }
+
     fun input(title: String, hint: String, initial: String = "", ok: String = "확인", onDone: (String) -> Unit) =
-        sheet(title) { close ->
+        if (keyboardBlocked()) toast("달리는 동안은 글자를 입력할 수 없어요. 멈춘 뒤에 써 주세요.") else sheet(title) { close ->
             val k = kitOf(); val ui = k.ui
             val field = EditText(ctx).apply {
                 setText(initial); this.hint = hint; textSize = ui.sp(Type.Body.size); typeface = ui.regular

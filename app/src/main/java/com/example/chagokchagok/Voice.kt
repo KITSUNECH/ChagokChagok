@@ -14,6 +14,18 @@ import ai.pleos.playground.tts.constant.Mode
 import ai.pleos.playground.tts.listener.EventListener
 import ai.pleos.playground.tts.listener.OnInitializeListener
 
+/**
+ * 오디오 포커스 (Pleos 오디오 가이드): 소리를 내기 전에 AudioAttributes 와 함께 포커스를 요청하고,
+ * 짧은 안내라 AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK 로 다른 소리(음악·내비)는 잠깐 줄이기만 한다. 끝나면 돌려준다.
+ */
+internal class Focus(ctx: Context, attrs: AudioAttributes) {
+    private val am = ctx.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    private val req = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(attrs).setOnAudioFocusChangeListener { }.build()
+    fun take(): Boolean = try { am.requestAudioFocus(req) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED } catch (_: Throwable) { true }
+    fun give() { try { am.abandonAudioFocusRequest(req) } catch (_: Throwable) {} }
+}
+
 class Voice(private val ctx: Context) {
     var status = "준비 중"; private set
     var ready = false; private set
@@ -28,6 +40,8 @@ class Voice(private val ctx: Context) {
     private val attrs = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+
+    private val focus by lazy { Focus(ctx.applicationContext, attrs) }
 
     fun start() {
         if (Car.offline) { status = "꺼짐 (화면 확인용)"; return }
@@ -71,6 +85,11 @@ class Voice(private val ctx: Context) {
                 if (s == android.speech.tts.TextToSpeech.SUCCESS) {
                     val lang = t!!.setLanguage(Locale.KOREA)
                     t!!.setAudioAttributes(attrs)
+                    t!!.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                        override fun onStart(id: String?) {}
+                        override fun onDone(id: String?) { if (id == "chagok") focus.give() }
+                        @Deprecated("기본 콜백") override fun onError(id: String?) { focus.give() }
+                    })
                     system = t; ready = true; engine = "기본"
                     status += if (lang < 0) " → 기본 음성(한국어 데이터 없음)" else " → 기본 음성"
                     then()
@@ -81,7 +100,13 @@ class Voice(private val ctx: Context) {
 
     private fun flush() { pending?.let { pending = null; say(it) } }
 
-    private fun systemSay(text: String) { system?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "chagok") }
+    /** 기본 음성: 포커스를 받고, 앞에 180ms 무음(문서 권장 150–200ms)을 둔 뒤 읽는다 */
+    private fun systemSay(text: String) {
+        val t = system ?: return
+        focus.take()
+        t.playSilentUtterance(180, android.speech.tts.TextToSpeech.QUEUE_FLUSH, "pre")
+        t.speak(text, android.speech.tts.TextToSpeech.QUEUE_ADD, null, "chagok")
+    }
 
     fun say(text: String) {
         last = text
