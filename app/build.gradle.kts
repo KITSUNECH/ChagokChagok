@@ -19,8 +19,16 @@ android {
         applicationId = "com.example.chagokchagok"
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+    // 제출용 release: 공모전 안내대로 실행 가능한 release 버전. 서명은 공개 디버그 키로 해 별도 키 파일 없이 설치된다.
+    // (Pleos App Market 탑재 때는 마켓 안내에 따른 정식 키로 바꾼다.) 코드 축소(R8)는 SDK 동작 확인 전이라 끈다.
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+        }
     }
     // 판 나누기: contest(공모전 시연용 기능 포함, 기본은 꺼짐) · market(Pleos App Market 탑재용, 시연용·가상 데이터 없음)
     // Pleos 심사 가이드의 "테스트용 더미 데이터 금지"에 맞춰 market 판에는 시연 기능이 아예 들어가지 않는다.
