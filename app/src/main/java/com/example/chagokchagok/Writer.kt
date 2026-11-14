@@ -36,7 +36,7 @@ class TurnCoach {
 }
 
 class Recorder {
-    private data class Raw(val time: Long, val km: Float, val type: String, val value: String)
+    private data class Raw(val time: Long, val km: Float, val type: String, val value: String, val lat: Double? = null, val lng: Double? = null)
 
     private val raw = mutableListOf<Raw>()
     private var startTime = 0L
@@ -52,8 +52,8 @@ class Recorder {
 
     fun distance(km: Float) { if (startKm == null) startKm = km; lastKm = km }
 
-    fun add(type: String, value: String) {
-        if (active) raw.add(Raw(System.currentTimeMillis(), kmNow(), type, value))
+    fun add(type: String, value: String, lat: Double? = null, lng: Double? = null) {
+        if (active) raw.add(Raw(System.currentTimeMillis(), kmNow(), type, value, lat, lng))
     }
 
     /** 이번 주행에서 지금까지 달린 거리(km). 주행거리 신호가 없으면 0. */
@@ -106,7 +106,7 @@ class Recorder {
         val events = raw.filter {
             (it.type == Evt.SIGNAL && it.value != "OFF") || (it.type == Evt.BRAKE && it.value == "on") ||
                 it.type == Evt.WIPER || it.type == Evt.LIGHT || it.type == Evt.LOST || it.type == Evt.SAY || it.type == Evt.CALM
-        }.map { Ev(p(it), it.type, it.value) }
+        }.map { Ev(p(it), it.type, it.value, it.lat, it.lng) }
 
         return Drive(
             driver = driver, date = end, distKm = totalKm, minutes = (totalMs / 60000).toInt(), seconds = (totalMs / 1000).toInt(), events = events,
@@ -191,7 +191,7 @@ object Writer {
             if (drive.turnsSignaled == drive.turns) "돌 때마다 미리 깜빡이를 켰다. "
             else "${times(drive.turns)} 도는 동안 ${times(drive.turnsSignaled)}은 미리 깜빡이를 켰다. "
         )
-        if (drive.calm > 0) sb.append("${times(drive.calm)} 숨을 골랐다. ")
+        if (drive.calm > 0) sb.append("${times(drive.calm)} 천천히 가자고 했다. ")
 
         if (drive.parkMoves > 0) {
             val last = before.lastOrNull { it.drive.parkMoves > 0 }?.drive?.parkMoves

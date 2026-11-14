@@ -99,7 +99,7 @@ private fun MainActivity.analysis(all: List<Diary>): View {
         k.item("와이퍼를 1분 넘게 켠 날", "와이퍼 신호", "cloud", Ink.rain, value = "${ds.count { it.drive.rained }}번"),
         k.item("누군가를 태운 날", "좌석 감지 신호", "people", value = "${ds.count { it.drive.passenger }}번"),
         k.item("받은 길을 따라 달린 날", "끝까지 달린 날만", "road", value = "${ds.count { it.guideId != null && it.drive.completed }}번"),
-        k.item("숨 고르기", "직접 누른 횟수", "breath", value = "${ds.sumOf { it.drive.calm }}번"),
+        k.item("천천히", "천천히 가자고 한 횟수", "breath", value = "${ds.sumOf { it.drive.calm }}번"),
     )))
 
     // 물려받고 돌려드리기: 보여 주기로 한 가족의 요즘 운전

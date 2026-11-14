@@ -2,7 +2,7 @@
 // Pleos App Integration Guide 형식: assets/schema.json 의 function 이름이 broadcast action 으로 오고,
 // 인자는 ACTION_PARAM(JSON 문자열)으로 온다. 처리한 뒤 APP_ACTION_RESPONSE 로 결과를 돌려준다 (7초 안).
 // 공모전 참가팀은 Gleo Interface 를 별도 승인 없이 쓸 수 있다 (공모전 공지 · 개발 범위 안내).
-// 달리는 동안 화면을 누를 수 없으니(도로교통법 제49조) 숨 고르기와 한마디 남기기를 말로 할 수 있게 한다.
+// 달리는 동안 화면을 누를 수 없으니(도로교통법 제49조) 천천히와 한마디 남기기를 말로 할 수 있게 한다.
 package com.example.chagokchagok
 
 import android.content.BroadcastReceiver
@@ -32,10 +32,10 @@ class GleoReceiver : BroadcastReceiver() {
         val store = a?.store ?: Store(context)
         if (!store.onboarded) { reply(context, action, "fail", "The app has not been set up yet."); return }
         when (action) {
-            "TAKE_A_BREATH" -> {
+            "TAKE_IT_SLOW" -> {
                 if (a == null || !a.trip.active) { reply(context, action, "fail", "There is no drive in progress."); return }
                 a.trip.breathe()   // 앱이 직접 말한다 → 글레오는 말하지 않게 silent
-                reply(context, action, "success", "The driver was reassured and the moment was recorded.", JSONArray().put(JSONObject().put("comfortableRouteRequested", a.car.naviConnected)), mode = "silent")
+                reply(context, action, "success", "The spot was remembered for review after parking. The car speed is not changed.", JSONArray().put(JSONObject().put("comfortableRouteRequested", a.car.naviConnected)), mode = "silent")
             }
             "SAVE_NOTE_HERE" -> {
                 val note = param.optString("note").trim()

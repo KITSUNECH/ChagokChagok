@@ -66,7 +66,7 @@ Android Studio의 Build Variants에서 `contestDebug` / `marketDebug` 를 고르
 | 회전 안내·목적지·도착·편안한 길·내비 화면 열기 | 실제 | NaviHelper SDK |
 | 그 자리의 한마디 (반경 150m) | 실제 | FusedLocation SDK `addProximityAlert` + 진행 방향 확인 |
 | 소리로 알려 주기 | 실제 | TextToSpeech SDK (ON_DEVICE), 오디오 포커스 |
-| 달리는 동안 말로: 숨 고르기·여기 한마디 남기기·최근 일기 읽기 | 실제 | Gleo AI App Integration |
+| 달리는 동안 말로: 천천히·여기 한마디 남기기·최근 일기 읽기 | 실제 | Gleo AI App Integration |
 | 주행 중 화면 잠금, 입력 막기, 긴 글 줄이기 | 실제 | CarUxRestrictions (`activeRestrictions`) |
 | 같은 차를 함께 쓰는 사람 (운전석 바꾸기) | 실제 | 앱 안 프로필 |
 | 다른 차의 가족·친구와 잇기 (Pleos 계정 연동, 같이 가기) | **시연용** | 공개 API 없음 → 향후 계획 (`docs/향후계획.md`) |
@@ -80,7 +80,7 @@ Android Studio의 Build Variants에서 `contestDebug` / `marketDebug` 를 고르
    - 그 자리의 한마디: 에뮬레이터 ⋯ › Location › Routes에서 `tools/예시길.gpx`를 불러와 재생하면, 한마디를 남긴 자리 150m 안에서 들려줍니다.
    - 위치가 움직이지 않는 환경이면 출발 전 화면의 **모의 주행 (시연용)**을 씁니다. 이 기록은 성장 바·졸업·분석에서 빠집니다.
 3. **출발 준비**: 깜빡이(양쪽)·와이퍼·전조등·기어(R→P)를 Virtual Console로 조작하면 하나씩 확인됩니다. 차종을 고르면 기어 쓰는 법과 안전 조작 10가지가 나옵니다.
-4. **달리는 동안 말로**: 글레오에게 "차곡차곡, 숨 고를래", "차곡차곡, 여기 한마디 남겨 줘"라고 말합니다.
+4. **달리는 동안 말로**: 글레오에게 "차곡차곡, 천천히 갈래", "차곡차곡, 여기 한마디 남겨 줘"라고 말합니다.
 
 ## 구조
 

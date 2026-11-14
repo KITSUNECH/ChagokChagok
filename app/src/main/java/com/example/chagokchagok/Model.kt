@@ -8,7 +8,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** 주행 중 일어난 일 하나. p 는 그 주행에서의 진행 정도(0~1)다. */
-data class Ev(val p: Float, val type: String, val value: String)
+/** 주행 중 사건. lat/lng: 그 순간의 위치 (위치 동의가 있고, 돌아볼 만한 사건일 때만) */
+data class Ev(val p: Float, val type: String, val value: String, val lat: Double? = null, val lng: Double? = null)
 
 /** 가족이 길 위의 한 지점에 남긴 한마디. */
 data class Tip(val p: Float, val text: String, val lat: Double? = null, val lng: Double? = null) {
@@ -37,7 +38,7 @@ data class Drive(
     val passenger: Boolean = false, // 운전석 말고 다른 자리에 누가 탔는지
     val turns: Int = 0,           // 내비가 안내한 좌·우회전 횟수
     val turnsSignaled: Int = 0,   // 그중 돌기 전에 깜빡이를 켠 횟수
-    val calm: Int = 0,            // 숨 고르기를 누른 횟수
+    val calm: Int = 0,            // "천천히"를 청한 횟수
     val place: String? = null,    // 내비 목적지 이름 (건네준 길 없이 간 길)
     val lamps: List<String> = emptyList(), // 달리는 동안 켜진 표시등 종류
     val placeLat: Double? = null,  // 목적지 좌표 (다시 가기, 건네주기에 쓴다)
@@ -94,7 +95,7 @@ object Evt {
     const val CRUISE = "cruise"   // 주행 보조(크루즈)
     const val SEAT = "seat"       // 동승자 탑승
     const val TURN = "turn"       // 내비가 안내한 회전을 지남 (값: signaled / missed)
-    const val CALM = "calm"       // 숨 고르기
+    const val CALM = "calm"       // 천천히 (운전자가 직접 청함)
     const val SAY = "say"         // 옆자리 한마디 (값: 그 말)
     const val LAMP = "lamp"       // 표시등 (값: 종류:on/off)
     const val NAVI = "navi"       // 내비 안내가 바뀜 (기록하지 않고 화면만 고친다)
@@ -138,6 +139,17 @@ class Store(ctx: Context) {
 
     /** 일기에 내가 남긴 한 줄 (기분). */
     fun feeling(diaryId: String): String? = prefs.getString("feel_$diaryId", null)
+    /** 이번 주행에서 길 위에서 들은 한마디 */
+    fun heardTips(diaryId: String): List<String> = prefs.getString("heard_$diaryId", null)?.let { s -> org.json.JSONArray(s).let { a -> (0 until a.length()).map { a.getString(it) } } } ?: emptyList()
+    fun setHeardTips(diaryId: String, tips: List<String>) = prefs.edit().putString("heard_$diaryId", org.json.JSONArray(tips).toString()).apply()
+    /** 운전자가 직접 남긴 답: 한마디가 도움이 됐는지, 지난번보다 어땠는지 */
+    fun answer(diaryId: String, q: String): String? = prefs.getString("ans_${q}_$diaryId", null)
+    fun setAnswer(diaryId: String, q: String, a: String) = prefs.edit().putString("ans_${q}_$diaryId", a).apply()
+    /** 도착 화면에서 "괜찮았어요"로 넘긴 순간(why) */
+    fun skippedMoments(diaryId: String): Set<String> = prefs.getStringSet("skip_$diaryId", emptySet()) ?: emptySet()
+    fun skipMoment(diaryId: String, why: String) = prefs.edit().putStringSet("skip_$diaryId", skippedMoments(diaryId) + why).apply()
+    fun keptMoments(diaryId: String): Set<String> = prefs.getStringSet("kept_$diaryId", emptySet()) ?: emptySet()
+    fun keepMoment(diaryId: String, why: String) = prefs.edit().putStringSet("kept_$diaryId", keptMoments(diaryId) + why).apply()
     fun setFeeling(diaryId: String, f: String) = prefs.edit().putString("feel_$diaryId", f).apply()
     /** 처음 탈 때 운전자 유형을 물어봤는지. */
     fun asked(name: String) = prefs.contains("type_$name")
@@ -293,7 +305,7 @@ class Store(ctx: Context) {
         put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }; put("completed", d.completed); put("sim", d.sim)
         put("path", JSONArray().apply { d.path.forEach { put(JSONArray().put(it.p.toDouble()).put(it.lat).put(it.lng)) } })
         put("events", JSONArray().apply {
-            d.events.forEach { put(JSONObject().put("p", it.p.toDouble()).put("t", it.type).put("v", it.value)) }
+            d.events.forEach { e -> put(JSONObject().put("p", e.p.toDouble()).put("t", e.type).put("v", e.value).apply { if (e.lat != null && e.lng != null) { put("la", e.lat); put("ln", e.lng) } }) }
         })
     }
 
@@ -301,7 +313,7 @@ class Store(ctx: Context) {
         val a = o.getJSONArray("events")
         val evs = (0 until a.length()).map {
             val e = a.getJSONObject(it)
-            Ev(e.getDouble("p").toFloat(), e.getString("t"), e.getString("v"))
+            Ev(e.getDouble("p").toFloat(), e.getString("t"), e.getString("v"), if (e.has("la")) e.getDouble("la") else null, if (e.has("ln")) e.getDouble("ln") else null)
         }
         return Drive(
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,

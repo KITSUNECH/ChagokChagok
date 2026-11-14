@@ -127,7 +127,7 @@ class Overlay(private val host: FrameLayout, private val kitOf: () -> Kit) {
             })
         }
         // 아래 가운데: 제목과 겹치지 않게. 좁은 창은 탭 막대 위로.
-        // 오른쪽 위: 시작 단추·숨 고르기 같은 주요 단추를 가리지 않는 자리 (성장 바 왼쪽)
+        // 오른쪽 위: 시작 단추·천천히 같은 주요 단추를 가리지 않는 자리 (성장 바 왼쪽)
         host.addView(bar, FrameLayout.LayoutParams(k.WRAP, k.WRAP, Gravity.TOP or Gravity.END).apply { topMargin = ui.dp(18); rightMargin = ui.dp(if (ui.wide) 104 else 72); leftMargin = ui.dp(24) })
         banner = bar
         bar.alpha = 0f; bar.translationY = -ui.dp(12).toFloat(); bar.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()

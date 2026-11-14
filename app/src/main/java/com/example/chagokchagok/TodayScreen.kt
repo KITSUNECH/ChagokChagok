@@ -48,8 +48,10 @@ internal fun MainActivity.todayScreen(): View {
         trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
 
     car.refreshNavi()
-    // 주인공: 누가 건네준 길이 있으면 그 길, 없으면 내가 가고 싶은 곳
-    val hero = if (todaysGuide() != null) heroCard() else myRouteHero()
+    // 주인공: 내가 다녀온 곳이 있으면 "다시 갈 곳"(같은 길, 다른 날)이 먼저. 없으면 건네받은 길, 그것도 없으면 가고 싶은 곳
+    val hasPlaces = diaries.any { it.ownTrip() && it.drive.place != null && !it.drive.sim && it.drive.placeLat != null && it.drive.completed }
+    val guideHero = todaysGuide() != null && !hasPlaces
+    val hero = if (guideHero) heroCard() else myRouteHero()
     // 옆 카드는 지금 필요한 것 두 장까지만. 위에 있을수록 먼저 (경고 → 소식 → 운전자 유형에 맞는 것 → 요약)
     val type = store.typeOf(d)
     fun small(icon: String, title: String, sub: String, onClick: () -> Unit) = k.card(onClick = onClick) {
@@ -61,12 +63,13 @@ internal fun MainActivity.todayScreen(): View {
     }
     val candidates = listOf<() -> View?>(
         { carCard() },
+        { if (!guideHero) todaysGuide()?.let { g -> small("road", "${Writer.subj(g.owner)} 건네준 길", g.title + " · 한마디 ${g.tips.size}개") { depart(g) } } else null },
         { newsCard() },
-        { lawCard() },
         { if (!store.prepDone(d) && type in listOf("초보", "새 차")) small("steering", "출발 준비", shifterLine() ?: "면허시험 차와 다른 곳을 손으로 익혀요") { prepDone.clear(); prepSeen.clear(); prepLine = "하나씩 같이 확인해 봐요."; go(MainActivity.PREP); speak("면허시험 차와 다른 곳을 하나씩 같이 확인해 봐요.") } else null },
         { if (store.demoOn) small("people", "친구들의 오늘", Demo.friends.filter { it.driving }.joinToString { it.name + " 운전 중" }.ifEmpty { "함께 차곡에서 보기" } + " · 시연용") { go(MainActivity.TOGETHER) } else null },
         { if (diaries.isEmpty()) starterCard() else null },
-        { if (!store.prepDone(d)) small("steering", "출발 준비", "깜빡이, 와이퍼, 전조등, 기어를 한 번씩") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) } else null },
+        { if (!store.prepDone(d)) small("steering", "출발 준비", "깜빡이, 와이퍼, 전조등, 기어 자리") { prepDone.clear(); prepSeen.clear(); go(MainActivity.PREP) } else null },
+        { lawCard() },
     )
     val side = mutableListOf<View>()
     for (c in candidates) { if (side.size >= 2) break; c()?.let { side.add(it) } }
@@ -84,7 +87,7 @@ internal fun MainActivity.todayScreen(): View {
                 // 왼쪽: 큰 카드 + 큰 시작 단추(남는 높이를 채운다). 오른쪽 묶음과 밑단이 맞는다.
                 // 시작 단추를 맨 위에: 처음 쓰는 사람도 스크롤 없이 바로 찾는다. 아래 큰 카드가 남는 높이를 채운다.
                 addView(k.col(16).apply {
-                    addView(startCard(todaysGuide()), k.lp(k.MATCH, k.WRAP))
+                    addView(startCard(if (guideHero) todaysGuide() else null), k.lp(k.MATCH, k.WRAP))
                     addView(hero, k.lp(k.MATCH, 0, 1f))
                 }, k.lp(0, k.MATCH, 1.55f))
                 if (side.isNotEmpty()) addView(k.col(16).apply { side.forEachIndexed { i, v -> addView(v, if (i == side.lastIndex) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.MATCH, 1f))
@@ -92,7 +95,7 @@ internal fun MainActivity.todayScreen(): View {
             bottom.forEach { addView(k.gap(20)); addView(it, k.lp(k.MATCH, k.WRAP)) }
         } else addView(k.col(16).apply {
             // 좁은 창(분할 화면): 시작 단추를 맨 위에 두어 스크롤하지 않아도 보이게
-            addView(startCard(todaysGuide())); addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) }
+            addView(startCard(if (guideHero) todaysGuide() else null)); addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) }
         })
     }
 }
@@ -409,7 +412,7 @@ internal fun MainActivity.readyScreen(): View {
     val placed = g.tips.count { it.placed }
     val canPlace = store.locationOn && (places.lat != null || places.status == "켜짐")
     val tipRows = g.tips.mapIndexed { i, t ->
-        k.item(t.text, if (t.placed && store.locationOn) "남긴 자리에 가까워지면 들려줘요" else "자리 정보가 없어요 · 지금 미리 들어 두세요",
+        k.item(t.text, if (t.placed && store.locationOn) "남긴 곳 근처에 가면 들려줘요" else "자리 정보가 없어요 · 지금 미리 들어 두세요",
             if (t.placed) "pin" else "quote", if (t.placed) Ink.accent else Ink.text3,
             trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 44) { speak(t.text) })
     }
@@ -419,14 +422,14 @@ internal fun MainActivity.readyScreen(): View {
         addView(k.groupOf(checks))
     }
     val right = k.col().apply {
-        addView(k.section("${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"))
+        addView(k.section(if (g.kind == "나") "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"))
         if (tipRows.isEmpty()) addView(k.card { addView(k.text("이 길에는 한마디가 없어요. 조용히 기록만 해요.", Type.Sub, Ink.text2)) })
         else addView(k.groupOf(tipRows))
         if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 자리에서 들려줘요.", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
     }
     return k.col().apply {
         Session.convoy?.let { f -> addView(k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) }); addView(k.gap(12)) }
-        addView(k.header(g.title, "${Writer.subj(g.owner)} 건네준 ${if (g.kind == "연습") "연습" else "길"} · ${facts(g.drive)}", onBack = { trip.guide = null; Session.convoy = null; back() }))
+        addView(k.header(g.title, (when (g.kind) { "나" -> "지난번의 내가 다녀온 길"; "다시" -> "다시 가는 길"; "연습" -> "${Writer.subj(g.owner)} 건네준 연습"; else -> "${Writer.subj(g.owner)} 건네준 길" }) + " · ${facts(g.drive)}", onBack = { trip.guide = null; Session.convoy = null; back() }))
         addView(k.gap(8))
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
         else { addView(left); addView(right) }

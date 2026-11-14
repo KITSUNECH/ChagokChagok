@@ -86,9 +86,10 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     // ───────── 차에서 온 신호 ─────────
 
     fun onCar(type: String, value: String) {
-        // 앱이 내비에 직접 요청한 재탐색(숨 고르기 → 편안한 길)은 운전자가 길을 벗어난 것이 아니므로 기록하지 않는다
+        // 앱이 내비에 직접 요청한 재탐색(천천히 → 편안한 경로)은 운전자가 길을 벗어난 것이 아니므로 기록하지 않는다
         if (type == Evt.LOST && System.currentTimeMillis() < ownRerouteUntil) return
-        if (type != Evt.NAVI) recorder.add(type, value)
+        // 돌아볼 만한 사건(재탐색·브레이크)은 그 순간의 위치를 함께 적는다 (위치 동의한 운전자만 lastFix 가 있다)
+        if (type != Evt.NAVI) { val f = if (type == Evt.LOST || (type == Evt.BRAKE && value == "on")) freshFix() else null; recorder.add(type, value, f?.first, f?.second) }
         if (active && (type == Evt.NAVI || type == Evt.SIGNAL)) {
             val side = coach.update(car.turn, car.turnMeters, if (type == Evt.SIGNAL) value else car.signal)
             if (side != null && support <= 2) { prompt = if (side == "LEFT") "왼쪽 깜빡이" else "오른쪽 깜빡이"; host.speak("지금 $prompt", Voice.PLACE) }
@@ -133,6 +134,9 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     var sdkZones = false
     private val inZone = mutableSetOf<Int>()
     private var lastFix: Triple<Double, Double, Float?>? = null
+    private var lastFixAt = 0L
+    /** 20초 안에 받은 위치만 사건의 자리로 쓴다 (오래된 위치를 붙이지 않게) */
+    private fun freshFix() = lastFix?.takeIf { System.currentTimeMillis() - lastFixAt < 20_000 }
 
     /** SDK가 "한마디 자리 반경 안에 들어왔다"고 알렸다 */
     fun onTipZone(i: Int) { inZone.add(i); lastFix?.let { (la, ln, hd) -> tipsNear(la, ln, hd) } }
@@ -140,7 +144,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     private fun tipsNear(lat: Double, lng: Double, heading: Float?) {
         val g = guide ?: return
         if (!store.locationOn) return
-        lastFix = Triple(lat, lng, heading)
+        lastFix = Triple(lat, lng, heading); lastFixAt = System.currentTimeMillis()
         val bySdk = sdkZones && !sim
         var nearest: Double? = null
         g.tips.forEachIndexed { i, t ->
@@ -291,6 +295,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         courses.forEach { store.addCourseDone(driver, it.id) }
         val d = if (courses.isEmpty()) written else written.copy(text = written.text + " 오늘 ‘${courses.joinToString("’, ‘") { it.title }}’를 해냈다.")
         store.addDiary(d)
+        store.setHeardTips(d.id, heard.sorted().mapNotNull { g?.tips?.getOrNull(it)?.text })
         guide = null; routeSent = false
         host.tripEnded(d)
         host.say("주차했어요. 오늘 일기를 썼어요.")
@@ -314,12 +319,12 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     fun saveHandover(driver: String, note: String) =
         store.setHandover(Handover(driver, System.currentTimeMillis(), car.energy, car.washerLow, note))
 
-    /** 달리는 동안 숨 고르기: 기록하고, 내비에 편안한 길을 요청한다 */
+    /** 달리는 동안 "천천히": 이 자리를 기억해 두고(주차 후 돌아보기), 내비에 편안한 경로를 요청한다. 차의 속도를 바꾸지는 않는다. */
     fun breathe() {
-        recorder.add(Evt.CALM, "on")
+        recorder.add(Evt.CALM, "on", freshFix()?.first, freshFix()?.second)
         val asked = car.comfortable()
         if (asked) ownRerouteUntil = System.currentTimeMillis() + 60_000
-        host.say(if (asked) "괜찮아요. 내비에 편안한 길로 바꿔 달라고 요청했어요." else "괜찮아요. 천천히 가도 돼요.")
+        host.say(if (asked) "좋아요. 이곳을 기억해 둘게요. 내비에 편안한 경로를 요청했어요." else "좋아요. 이곳을 기억해 둘게요.")
     }
 
     // ───────── 모의 주행 (시연용) ─────────

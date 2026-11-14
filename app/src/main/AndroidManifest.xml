@@ -53,7 +53,7 @@
         <!-- Gleo AI 연동 (App Integration Guide). 공모전 참가팀은 Gleo Interface 를 별도 승인 없이 쓸 수 있다 (공모전 공지). -->
         <receiver android:name=".GleoReceiver" android:exported="true" android:enabled="true">
             <intent-filter>
-                <action android:name="TAKE_A_BREATH" />
+                <action android:name="TAKE_IT_SLOW" />
                 <action android:name="SAVE_NOTE_HERE" />
                 <action android:name="READ_LATEST_DIARY" />
                 <category android:name="android.intent.category.DEFAULT" />

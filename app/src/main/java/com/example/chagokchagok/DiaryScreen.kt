@@ -20,7 +20,7 @@ internal fun MainActivity.diaryScreen(id: String?): View {
         addView(k.section("오늘의 숫자"))
         addView(numbers(d))
         if (prev != null) {
-            addView(k.section("지난번과 비교 · ${visits(d)}번째"))
+            addView(k.section((if (sameRoad(prev.drive, d.drive)) "같은 길" else "같은 곳") + " · ${visits(d)}번째"))
             addView(compareCard(prev, d))
         }
         addView(k.section("주행 타임라인"))
@@ -41,16 +41,31 @@ internal fun MainActivity.diaryScreen(id: String?): View {
                 addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 48) { readAloud(d.title, d.text) })
             }))
         addView(k.gap(18))
+        // 주차 후 첫 화면: 돌아보기(한마디가 도움이 됐는지, 지난번보다 어땠는지, 돌아볼 만한 순간)가 일기보다 먼저
+        arrivalCard(d, prev)?.let { addView(it, k.lp(k.MATCH, k.WRAP)); addView(k.gap(18)) }
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(paper, k.lp(0, k.WRAP, 1.15f)); addView(side, k.lp(0, k.WRAP, 1f)) })
         else { addView(paper); addView(side) }
     }
 }
 
-/** 같은 곳(목적지 이름) 또는 같은 받은 길로 간 바로 전 주행 (모의 주행 제외) */
-internal fun MainActivity.previousSame(d: Diary): Diary? = store.diariesOf(d.driver).filter { o ->
-    o.id != d.id && o.date < d.date && !o.drive.sim &&
+/**
+ * 비교할 바로 전 주행: 같은 목적지 이름이거나 같은 받은 길. 둘 다 끝까지 다녀온 기록이어야 하고, 지난번은 실제 주행이어야 한다.
+ * (중단한 주행과 끝까지 간 주행을 섞으면 비교가 틀어진다)
+ */
+internal fun MainActivity.previousSame(d: Diary): Diary? = if (!d.drive.completed) null else store.diariesOf(d.driver).filter { o ->
+    o.id != d.id && o.date < d.date && !o.drive.sim && o.drive.completed &&
         ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
 }.maxByOrNull { it.date }
+
+/**
+ * 같은 길인지: 두 경로가 70% 넘게 겹치면(오늘 경로의 점이 지난 경로 120m 안) "같은 길", 아니면 "같은 곳".
+ * 경로가 없으면(위치 미동의) 알 수 없으니 "같은 곳"으로 부른다.
+ */
+internal fun sameRoad(a: Drive, b: Drive): Boolean {
+    if (a.path.size < 5 || b.path.size < 5) return false
+    val near = b.path.count { p -> a.path.any { q -> Places.meters(p.lat, p.lng, q.lat, q.lng) <= 120 } }
+    return near >= b.path.size * 0.7
+}
 
 private fun MainActivity.visits(d: Diary) = store.diariesOf(d.driver).count { o ->
     !o.drive.sim && o.date <= d.date && ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
@@ -104,14 +119,18 @@ private fun MainActivity.numbers(d: Diary): View {
     return k.card(pad = 20) { addView(k.grid(2, tiles, 14)) }
 }
 
-/** 지난번과 비교: 같은 곳에 다시 간 날, 무엇이 달라졌는지 막대 두 개씩 */
+/**
+ * 지난번과 비교: 같은 곳에 다시 간 날, 무엇이 달라졌는지 막대 두 개씩.
+ * 숫자로 "늘었다"고 판정하지 않는다 (시간·브레이크는 길 상황 탓일 수 있다). 줄었는지 늘었는지만 적고,
+ * 좋은 습관이라고 말할 수 있는 "돌기 전 깜빡이"가 늘었을 때만 초록으로 보여 준다.
+ */
 private fun MainActivity.compareCard(a: Diary, b: Diary): View {
     val k = kit
     data class M(val label: String, val prev: Float, val now: Float, val unit: String, val lowerIsEasier: Boolean)
     val ms = mutableListOf(M("걸린 시간", a.drive.minutes.toFloat().coerceAtLeast(a.drive.seconds / 60f), b.drive.minutes.toFloat().coerceAtLeast(b.drive.seconds / 60f), "분", true))
     if (a.drive.distKm > 0.3f && b.drive.distKm > 0.3f) ms.add(M("1km마다 브레이크", a.drive.brakes / a.drive.distKm, b.drive.brakes / b.drive.distKm, "번", true))
     if (a.drive.turns > 0 && b.drive.turns > 0) ms.add(M("돌기 전 깜빡이", 100f * a.drive.turnsSignaled / a.drive.turns, 100f * b.drive.turnsSignaled / b.drive.turns, "%", false))
-    ms.add(M("숨 고르기", a.drive.calm.toFloat(), b.drive.calm.toFloat(), "번", true))
+    ms.add(M("천천히", a.drive.calm.toFloat(), b.drive.calm.toFloat(), "번", true))
     fun fmt(v: Float, u: String) = (if (v % 1f == 0f || v >= 10) String.format("%.0f", v) else String.format("%.1f", v)) + u
     return k.card(pad = 20) {
         addView(k.row(14).apply {
@@ -121,7 +140,7 @@ private fun MainActivity.compareCard(a: Diary, b: Diary): View {
         addView(k.gap(8))
         ms.forEach { m ->
             val max = maxOf(m.prev, m.now, 0.01f)
-            val easier = if (m.lowerIsEasier) m.now < m.prev else m.now > m.prev
+            val habitUp = !m.lowerIsEasier && m.now > m.prev
             val same = Math.abs(m.now - m.prev) < 0.05f * max
             addView(k.col(6).apply {
                 setPadding(0, ui.dp(10), 0, ui.dp(4))
@@ -129,14 +148,14 @@ private fun MainActivity.compareCard(a: Diary, b: Diary): View {
                     addView(k.text(m.label, Type.Sub), k.lp(0, k.WRAP, 1f))
                     addView(k.text("${fmt(m.prev, m.unit)} → ${fmt(m.now, m.unit)}", Type.BodyStrong))
                     addView(k.gap(8))
-                    addView(k.tag(if (same) "비슷해요" else if (easier) "한결 수월" else "오늘은 달랐어요", if (same) Ink.text2 else if (easier) Ink.go else Ink.text2))
+                    addView(k.tag(if (same) "비슷해요" else if (m.now < m.prev) "줄었어요" else "늘었어요", if (!same && habitUp) Ink.go else Ink.text2))
                 })
                 addView(Bar(context, ui).apply { color = Ink.line; value = m.prev / max }, k.lp(k.MATCH, ui.dp(7)))
                 addView(Bar(context, ui).apply { color = Ink.accent; value = m.now / max }, k.lp(k.MATCH, ui.dp(7)))
             })
         }
         addView(k.gap(8))
-        addView(k.text("같은 곳에 간 기록끼리만 비교해요. 길이 막혔던 날은 시간이 늘 수 있어요.", Type.Caption, Ink.text3))
+        addView(k.text("끝까지 다녀온 기록끼리만 비교해요. 시간과 브레이크는 길 상황(막힘·신호)에 따라 달라져요. 어땠는지는 숫자보다 내 느낌으로 남겨요.", Type.Caption, Ink.text3))
     }
 }
 
@@ -224,7 +243,7 @@ private fun timelineSummary(v: Drive): String {
 private fun MainActivity.actions(d: Diary, guide: Guide?): View {
     val k = kit
     val all = linkedMapOf<String, () -> View>()
-    all["self"] = { k.item("다음의 나에게 한마디", "같은 곳에 다시 갈 때 그 자리에서 들려줘요", "quote", chevron = true) { noteToSelf(d) } }
+    all["self"] = { k.item("다음의 나에게 한마디", "같은 곳에 다시 갈 때 그 근처에서 들려줘요", "quote", chevron = true) { noteToSelf(d) } }
     if (guide != null && guide.owner != d.driver) {
         val sent = store.newsSent(d.id)
         all["notify"] = { k.item(if (sent) "${guide.owner} 님에게 알렸어요" else "${guide.owner} 님에게 다녀왔다고 알리기", null, "flag", value = if (sent) "보냄" else null) {

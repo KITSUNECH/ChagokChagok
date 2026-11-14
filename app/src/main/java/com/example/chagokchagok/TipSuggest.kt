@@ -7,7 +7,16 @@ package com.example.chagokchagok
 import android.view.Gravity
 import android.view.View
 
-internal data class TipIdea(val p: Float, val text: String, val why: String, val score: Int)
+/**
+ * 한마디 후보.
+ * why: 차가 본 사실만 적는다 ("이 근처에서 내비가 경로를 다시 찾았어요"). 그게 어려웠던 순간인지는 운전자가 정한다.
+ * moment: 이번 주행에서 실제로 일어난 사건에서 나온 후보 (도착 화면의 "오늘 돌아볼 만한 순간"에 보인다)
+ * lat/lng: 그 순간에 저장한 위치. 없으면 진행 정도(p)로 경로에서 찾는다.
+ */
+internal data class TipIdea(val p: Float, val text: String, val why: String, val score: Int,
+                            val moment: Boolean = false, val lat: Double? = null, val lng: Double? = null, val icon: String = "pin") {
+    fun tip(t: String = text) = Tip(p, t, lat, lng)
+}
 
 internal object TipSuggest {
     private fun where(p: Float) = when { p < .3f -> "출발하고 곧"; p < .75f -> "가는 길 중간"; else -> "도착 직전" }
@@ -16,30 +25,43 @@ internal object TipSuggest {
     fun ideas(d: Drive, forSelf: Boolean): List<TipIdea> {
         val out = mutableListOf<TipIdea>()
         val ev = d.events
-        // 브레이크가 몰린 구간 (길의 10% 안에 3번 이상)
-        val brakes = ev.filter { it.type == Evt.BRAKE && it.value == "on" }.map { it.p }.sorted()
-        var best: Pair<Float, Int>? = null
-        for (b in brakes) { val n = brakes.count { it in b..(b + .1f) }; if (n >= 3 && (best == null || n > best.second)) best = b + .05f to n }
-        best?.let { (p, n) -> out.add(TipIdea(p, if (forSelf) "여기서 브레이크를 자주 밟았어. 조금 일찍 속도를 줄이자." else "여기는 브레이크를 자주 밟게 돼요. 미리 속도를 줄여요.", "브레이크 ${n}번 · ${where(p)}", 5)) }
-        // 숨 고르기
-        ev.firstOrNull { it.type == Evt.CALM }?.let { out.add(TipIdea(it.p, if (forSelf) "여기서 숨을 골랐어. 천천히 가도 괜찮아." else "여기서 긴장될 수 있어요. 천천히 가도 괜찮아요.", "숨 고르기 · ${where(it.p)}", 6)) }
-        // 길을 놓친 곳
-        ev.firstOrNull { it.type == Evt.LOST }?.let { out.add(TipIdea((it.p - .03f).coerceAtLeast(0f), if (forSelf) "여기서 길을 놓쳤어. 미리 차로를 확인하자." else "여기서 길을 놓치기 쉬워요. 미리 차로를 확인해요.", "내비 경로 재탐색 · ${where(it.p)}", 6)) }
-        // 회전 전 깜빡이를 놓친 적이 있으면 첫 회전 자리
+        // 브레이크가 몰린 구간 (길의 10% 안에 3번 이상). 자리는 그 구간 가운데 브레이크의 위치
+        val brakes = ev.filter { it.type == Evt.BRAKE && it.value == "on" }.sortedBy { it.p }
+        var best: List<Ev>? = null
+        for (b in brakes) { val run = brakes.filter { it.p in b.p..(b.p + .1f) }; if (run.size >= 3 && run.size > (best?.size ?: 0)) best = run }
+        best?.let { run ->
+            val mid = run[run.size / 2]
+            out.add(TipIdea(mid.p, if (forSelf) "여기선 조금 일찍 속도를 줄이자." else "여기는 미리 속도를 줄이면 편해요.",
+                "브레이크를 ${run.size}번 밟은 구간이에요 · ${where(mid.p)}", 5, moment = true, lat = mid.lat, lng = mid.lng, icon = "stop"))
+        }
+        // 운전자가 직접 "천천히"를 청한 자리
+        ev.firstOrNull { it.type == Evt.CALM }?.let { out.add(TipIdea(it.p, if (forSelf) "여기선 서두르지 말자. 천천히 가도 괜찮아." else "여기서는 천천히 가도 괜찮아요.",
+            "천천히 가자고 한 곳이에요 · ${where(it.p)}", 6, moment = true, lat = it.lat, lng = it.lng, icon = "breath")) }
+        // 내비가 경로를 다시 찾은 곳. 길을 놓쳤는지는 모른다 (운전자가 확인한다). 위치가 없으면 조금 앞(진행 3%)을 추정한다
+        ev.firstOrNull { it.type == Evt.LOST }?.let { e ->
+            out.add(TipIdea(if (e.lat != null) e.p else (e.p - .03f).coerceAtLeast(0f), if (forSelf) "여기선 미리 차로를 확인하자." else "여기서는 미리 차로를 확인해요.",
+                "이 근처에서 내비가 경로를 다시 찾았어요 · ${where(e.p)}", 6, moment = true, lat = e.lat, lng = e.lng, icon = "navi"))
+        }
+        // 회전 전 깜빡이를 켜지 못한 회전이 있었으면 (자리는 대략)
         if (d.turns > d.turnsSignaled) {
             val p = ev.firstOrNull { it.type == Evt.SIGNAL && it.value != "OFF" }?.p ?: .5f
-            out.add(TipIdea((p - .02f).coerceAtLeast(0f), if (forSelf) "돌기 전에 깜빡이를 조금 더 일찍 켜자." else "돌기 전에 깜빡이를 미리 켜 두면 편해요.", "회전 ${d.turns}번 중 깜빡이 ${d.turnsSignaled}번", 4))
+            out.add(TipIdea((p - .02f).coerceAtLeast(0f), if (forSelf) "돌기 전에 깜빡이를 조금 더 일찍 켜자." else "돌기 전에 깜빡이를 미리 켜 두면 편해요.",
+                "회전 ${d.turns}번 중 미리 켠 깜빡이 ${d.turnsSignaled}번이에요", 4, moment = true, icon = "turnRight"))
         }
         // 후진 뒤 기어 전환 (주차)
-        if (d.parkMoves > 0) out.add(TipIdea(.92f, if (forSelf) "주차장에서는 천천히. 후진은 두세 번 해도 괜찮아." else "주차장이 까다로워요. 천천히 넣어도 괜찮아요.", "후진 뒤 기어 전환 ${d.parkMoves}번 · 도착 직전", 4))
+        if (d.parkMoves > 0) out.add(TipIdea(.92f, if (forSelf) "주차장에서는 천천히. 후진은 두세 번 해도 괜찮아." else "주차장이 까다로워요. 천천히 넣어도 괜찮아요.",
+            "주차하며 기어를 ${d.parkMoves}번 바꿨어요 · 도착 직전", 4, moment = true, icon = "gear"))
         // 비, 밤
-        if (d.rained) out.add(TipIdea(.15f, if (forSelf) "비 오는 날 이 길은 차간 거리를 넉넉히." else "비 오면 이 길은 차간 거리를 넉넉히 둬요.", "와이퍼 1분 넘게", 3))
-        if (d.night) out.add(TipIdea(.15f, if (forSelf) "밤에는 이 길이 어두워. 전조등 먼저 확인." else "밤에는 어두운 길이에요. 전조등을 먼저 확인해요.", "18시 이후 전조등", 3))
+        if (d.rained) out.add(TipIdea(.15f, if (forSelf) "비 오는 날 이 길은 차간 거리를 넉넉히." else "비 오면 이 길은 차간 거리를 넉넉히 둬요.", "와이퍼를 1분 넘게 썼어요", 3))
+        if (d.night) out.add(TipIdea(.15f, if (forSelf) "밤에는 이 길이 어두워. 전조등 먼저 확인." else "밤에는 어두운 길이에요. 전조등을 먼저 확인해요.", "18시 이후에 전조등을 켰어요", 3))
         // 기본: 도착지
         d.place?.let { out.add(TipIdea(.92f, if (forSelf) "$it 입구는 미리 보고 들어가자." else "$it 입구는 미리 보고 들어가요.", "목적지 · 도착 직전", 1)) }
         out.add(TipIdea(.5f, if (forSelf) "오늘처럼만 가면 돼." else "천천히 가도 괜찮아요. 잘하고 있어요.", "응원", 0))
         return out.distinctBy { it.text }.sortedByDescending { it.score }.take(3)
     }
+
+    /** 도착 화면의 "오늘 돌아볼 만한 순간": 실제 사건에서 나온 것만, 세 개까지 */
+    fun moments(d: Drive): List<TipIdea> = ideas(d, forSelf = true).filter { it.moment }
 }
 
 /** 후보 세 개 중 여러 개 고르기 + 직접 쓰기. 고른 것을 Tip 목록으로 돌려준다. */
@@ -70,12 +92,12 @@ internal fun MainActivity.pickTips(title: String, sub: String, ideas: List<TipId
             k.button("직접 쓰기", Kit.Btn.Secondary, "pencil") {
                 close()
                 sheets.choose("어디쯤에서 들을 말인가요?", null, TIP_PLACES.map { it.first }) { w ->
-                    sheets.input("한마디", "예: 두 번째 신호에서 우회전") { onDone(chosen.map { Tip(ideas[it].p, ideas[it].text) } + Tip(TIP_PLACES[w].second, it)) }
+                    sheets.input("한마디", "예: 두 번째 신호에서 우회전") { onDone(chosen.map { ideas[it].tip() } + Tip(TIP_PLACES[w].second, it)) }
                 }
             },
             k.button("고른 것 남기기", Kit.Btn.Primary, "check") {
                 if (chosen.isEmpty()) { toast("하나 이상 골라 주세요."); return@button }
-                close(); onDone(chosen.sorted().map { Tip(ideas[it].p, ideas[it].text) })
+                close(); onDone(chosen.sorted().map { ideas[it].tip() })
             }, stack = false))
     }
 }

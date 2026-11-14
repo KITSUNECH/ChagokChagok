@@ -20,7 +20,7 @@ import kotlin.math.pow
 
 internal data class Block(val id: String, val stage: Int, val title: String, val hint: String, val done: Boolean)
 
-/** 단계 이름: 그 단계에서 하는 일 (차를 익히고, 다닐 길을 넓히고, 길을 건네며 차곡차곡 쌓는다) */
+/** 단계 이름: 그 단계에서 하는 일 (차를 익히고, 다닐 길을 넓히고, 같은 길을 다시 달리며 차곡차곡 쌓는다) */
 internal val STAGES = listOf("익히기", "넓히기", "차곡차곡")
 /** 단계 색: 현대자동차 CI 전용색상에서 (익히기 Active Blue · 넓히기 Hyundai Blue/밤에는 Sky Blue · 차곡차곡 Active Red). 색약 구분 검사 통과 */
 internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#00AAD2", "#AACAE6", "#E63312")[stage] else listOf("#00AAD2", "#002C5F", "#E63312")[stage])
@@ -52,15 +52,17 @@ internal fun MainActivity.blocks(): List<Block> {
         Block("prep", 0, "차와 친해졌어요", "출발 준비에서 네 가지를 해 봐요", store.prepDone(me)),
         Block("first", 0, "첫 주행 기록", "기어 D로 출발해 P로 주차해요", ds.isNotEmpty()),
         Block("feel", 0, "일기에 내 한 줄", "일기에서 ‘오늘 한 줄 남기기’", ds.any { store.feeling(it.id) != null }),
-        Block("follow", 1, "받은 길을 끝까지", "건네받은 길로 목적지까지", ds.any { it.guideId != null && it.drive.completed }),
-        Block("signal", 1, "돌기 전에 깜빡이", "내비가 알려 준 회전 전에 미리 켜요", ds.any { it.drive.turnsSignaled > 0 }),
-        Block("self", 1, "다음의 나에게 한마디", "일기에서 ‘다음의 나에게 한마디’", store.guides().any { it.owner == me && it.kind == "나" }),
-        Block("grad", 1, "길 하나 졸업", "같은 길을 세 번 끝까지", store.guidesFor(me).any { store.graduated(me, it.id) }),
+        // 넓히기: 다닐 길을 하나씩 늘린다
         Block("new", 1, "혼자 새 길", "받은 길 없이 처음 가 보는 곳", store.places(me).isNotEmpty()),
-        Block("give", 2, "길을 건넸어요", "일기에서 ‘이 길 건네주기’", myGuides.isNotEmpty()),
-        Block("cheer", 2, "응원을 보냈어요", "받은 소식에 응원 보내기", store.flag("cheered_$me")),
-        Block("post", 2, "함께 차곡에 올렸어요", "일기를 함께 차곡에 올리기", ds.any { store.posted(it.id) != null }),
-        Block("passed", 2, "내 길을 누군가 달렸어요", "내가 건넨 길을 다른 사람이 따라 달리면", myGuides.any { g -> store.diaries().any { it.guideId == g.id && it.driver != me && !it.drive.sim } }),
+        Block("signal", 1, "돌기 전에 깜빡이", "내비가 알려 준 회전 전에 미리 켜요", ds.any { it.drive.turnsSignaled > 0 }),
+        Block("self", 1, "다음의 나에게 한마디", "주차 후 ‘오늘을 돌아봐요’에서 기억해 둘 일 남기기", store.guides().any { it.owner == me && it.kind == "나" }),
+        Block("follow", 1, "받은 길을 끝까지", "가족·친구가 건넨 길로 목적지까지", ds.any { it.guideId != null && it.drive.completed }),
+        Block("places", 1, "다녀온 곳 세 곳", "목적지를 넣고 다녀온 곳이 세 곳", ds.filter { it.drive.completed }.mapNotNull { it.drive.place }.distinct().size >= 3),
+        // 차곡차곡: 같은 길을 다시 달리며 쌓는다. "늘었다"는 차가 정하지 않고 운전자가 답한다
+        Block("again", 2, "같은 곳에 다시", "다녀온 곳에 한 번 더, 끝까지", ds.any { previousSame(it) != null }),
+        Block("helped", 2, "지난번 한마디가 도움이 됐어요", "길 위에서 들은 한마디에 ‘도움이 됐어요’", ds.any { store.answer(it.id, Q_HELPED) == "도움이 됐어요" }),
+        Block("easier", 2, "지난번보다 더 편했어요", "같은 곳에 다시 간 날 ‘더 편했어요’", ds.any { store.answer(it.id, Q_VS_LAST) == "더 편했어요" }),
+        Block("give", 2, "익숙해진 길을 건넸어요", "일기에서 ‘이 길 건네주기’", myGuides.any { it.kind != "나" }),
     )
 }
 
@@ -239,7 +241,7 @@ internal fun MainActivity.stackRail(): View {
 
 internal fun MainActivity.stackSheet() {
     val bs = blocks()
-    sheets.sheet("성장 ${bs.count { it.done }} / ${bs.size}", "해낼 때마다 한 칸씩 쌓여요. 차를 익히고, 다닐 길을 넓히고, 길을 건네며 차곡차곡 쌓아요.") { _ ->
+    sheets.sheet("성장 ${bs.count { it.done }} / ${bs.size}", "해낼 때마다 한 칸씩 쌓여요. 차를 익히고, 다닐 길을 넓히고, 같은 길을 다시 달리며 차곡차곡 쌓아요.") { _ ->
         val k = kit
         STAGES.forEachIndexed { s, name ->
             val mine = bs.filter { it.stage == s }
