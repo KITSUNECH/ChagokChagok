@@ -93,6 +93,7 @@ internal fun MainActivity.testSignals() {
         "전조등 켜기" to { onCarEvent(Evt.LIGHT, "on") }, "안전벨트 매기" to { onCarEvent("belt", "on") }, "동승자 탑승" to { onCarEvent(Evt.SEAT, "on") },
         "내비: 150m 앞 우회전" to { car.setTurn("TURN_RIGHT", 150, "") }, "내비: 80m 앞 우회전" to { car.setTurn("TURN_RIGHT", 80, "") }, "내비: 회전 지남" to { car.setTurn(null, 0, "") },
         "표시등: 오토 홀드" to { car.setLamps(car.lampsOn + "AUTO_HOLD") }, "표시등: 타이어 공기압" to { car.setLamps(car.lampsOn + "TPMS") }, "표시등 모두 끄기" to { car.setLamps(emptySet()) },
+        "차선 변경 (깜빡이 켜고 8초 뒤)" to { car.simLaneChange("LEFT", 8f, android.os.Handler(mainLooper)) },
         "기어 D" to { onCarEvent(Evt.GEAR, "D") }, "기어 R" to { onCarEvent(Evt.GEAR, "R") }, "기어 P" to { onCarEvent(Evt.GEAR, "P") },
     )
     sheets.choose("시험용 신호", "실제 차량 신호가 아니에요. 차량 데이터 지표에도 세지 않아요.", items.map { it.first }) { i -> Telemetry.muted = true; try { items[i].second() } finally { Telemetry.muted = false } }

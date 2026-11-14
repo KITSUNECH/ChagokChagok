@@ -86,6 +86,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var schoolZone = false; private set
     var cautionMeters = 0; private set
     var steering = 0f; private set
+    /** 조향각이 바뀔 때 (차선 변경 판정에 쓴다. 기록에는 남기지 않는다) */
+    var onSteer: ((Float) -> Unit)? = null
     var odometerKm: Float? = null; private set
     var naviConnected = false; private set
     var lat: Double? = null; private set
@@ -121,7 +123,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
         override fun onFailed(e: Exception) { failures[Evt.BRAKE] = e.message ?: "실패" }
     }
     private val steeringL = object : SteeringWheelAngleListener {
-        override fun onSteeringWheelAngleUpdated(angle: Float?) { steering = angle ?: 0f }
+        override fun onSteeringWheelAngleUpdated(angle: Float?) = ui { steering = angle ?: 0f; onSteer?.invoke(steering) }
         override fun onFailed(e: Exception) { failures["steering"] = e.message ?: "실패" }
     }
     // 기어: Pleos 문서는 Vehicle SDK의 Gear(지원 중단)를 쓰지 말고 AAOS 표준 GEAR_SELECTION 속성을 쓰라고 한다.
@@ -295,6 +297,13 @@ class Car(private val ctx: Context, private val listener: Listener) {
 
     /** 놀란 운전자를 위해 내비 경로를 편안한 길로 바꾼다. */
     fun comfortable(): Boolean = naviConnected && attempt("navi") { navi.changeRouteOption(ai.pleos.playground.navi.constants.RouteOption.COMFORTABLE) }
+
+    /** 시험용·시연용 차선 변경: 깜빡이를 켜고 wait 초 뒤 조향, 조금 뒤 끈다. 실제 차량 신호가 아니다. */
+    fun simLaneChange(side: String, waitSec: Float, main: android.os.Handler) {
+        signal = side; listener.onCarEvent(Evt.SIGNAL, side)
+        main.postDelayed({ steering = if (side == "LEFT") -6f else 6f; onSteer?.invoke(steering) }, (waitSec * 1000).toLong())
+        main.postDelayed({ steering = 0f; onSteer?.invoke(0f); signal = "OFF"; listener.onCarEvent(Evt.SIGNAL, "OFF") }, (waitSec * 1000).toLong() + 2500)
+    }
 
     /** 모의 주행이 앞길 정보를 넣을 때 쓴다. 실제 내비 값이 아니다. */
     fun setAhead(limit: Int, cameraMeters: Int, cameraLimit: Int) {

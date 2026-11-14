@@ -34,6 +34,19 @@ internal object TipSuggest {
             out.add(TipIdea(mid.p, if (forSelf) "여기선 조금 일찍 속도를 줄이자." else "여기는 미리 속도를 줄이면 편해요.",
                 "브레이크를 ${run.size}번 밟은 구간이에요 · ${where(mid.p)}", 5, moment = true, lat = mid.lat, lng = mid.lng, icon = "stop"))
         }
+        // 차선 변경: 가장 오래 기다린 한 번 (6초 넘게), 또는 깜빡이를 켰다가 바꾸지 못한 때 (조향각을 받을 때만 알 수 있다)
+        // 안내는 그 구간에 들어서기 전에 들려야 하니, 자리를 경로에서 400m 앞으로 당겨 둔다
+        val ls = d.lanes()
+        val gaveUp = ls.firstOrNull { !it.second.moved && it.second.steerKnown }
+        val longest = ls.filter { it.second.moved && it.second.wait >= 6f }.maxByOrNull { it.second.wait }
+        (gaveUp ?: longest)?.let { (e, l) ->
+            val cond = listOfNotNull(if (l.rain) "비" else null, if (l.dark) "밤" else null).joinToString("·")
+            val fact = if (!l.moved) "깜빡이를 켰다가 차선을 바꾸지 못했어요" else "깜빡이를 켜고 ${l.wait.toInt()}초 기다린 뒤 차선을 바꿨어요" + if (!l.steerKnown) " (추정)" else ""
+            val lead = if (e.lat != null && e.lng != null) Paths.before(d.path, e.lat, e.lng, 400) else null
+            out.add(TipIdea(e.p, if (forSelf) "곧 합류 구간이야. 미리 차선을 옮겨 두자." else "곧 합류 구간이에요. 미리 차선을 옮겨 두면 편해요.",
+                fact + " · ${where(e.p)}" + if (cond.isNotEmpty()) " · $cond" else "", 7, moment = true,
+                lat = lead?.lat ?: e.lat, lng = lead?.lng ?: e.lng, icon = if (l.side == "LEFT") "turnLeft" else "turnRight"))
+        }
         // 운전자가 직접 "천천히"를 청한 자리
         ev.firstOrNull { it.type == Evt.CALM }?.let { out.add(TipIdea(it.p, if (forSelf) "여기선 서두르지 말자. 천천히 가도 괜찮아." else "여기서는 천천히 가도 괜찮아요.",
             "천천히 가자고 한 곳이에요 · ${where(it.p)}", 6, moment = true, lat = it.lat, lng = it.lng, icon = "breath")) }

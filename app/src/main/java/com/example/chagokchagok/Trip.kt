@@ -37,6 +37,11 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     var nextTipMeters: Int? = null; private set       // 다음 한마디까지 거리
     val heard = mutableSetOf<Int>()
     var arrived = false; private set
+    /** 차선 변경 판정 (깜빡이 + 조향각) */
+    private val lanes = LaneWatch().also { w ->
+        car.onSteer = { a -> if (active) w.steer(a) }
+        w.onLane = { lane, at -> recorder.add(Evt.LANE, lane.encode(), at?.first, at?.second) }
+    }
     /** 이 시각까지 오는 재탐색은 앱이 요청한 것 */
     private var ownRerouteUntil = 0L
     var withPassenger = false; private set
@@ -88,6 +93,10 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     fun onCar(type: String, value: String) {
         // 앱이 내비에 직접 요청한 재탐색(천천히 → 편안한 경로)은 운전자가 길을 벗어난 것이 아니므로 기록하지 않는다
         if (type == Evt.LOST && System.currentTimeMillis() < ownRerouteUntil) return
+        if (active && type == Evt.SIGNAL) {
+            val near = car.turn in listOf("LEFT", "RIGHT", "UTURN") && car.turnMeters in 1..150
+            lanes.signal(value, near, car.routeStarted || routeSent || sim, car.wiper, car.lowBeam, freshFix()?.let { it.first to it.second })
+        }
         // 돌아볼 만한 사건(재탐색·브레이크)은 그 순간의 위치를 함께 적는다 (위치 동의한 운전자만 lastFix 가 있다)
         if (type != Evt.NAVI) { val f = if (type == Evt.LOST || (type == Evt.BRAKE && value == "on")) freshFix() else null; recorder.add(type, value, f?.first, f?.second) }
         if (active && (type == Evt.NAVI || type == Evt.SIGNAL)) {
@@ -222,7 +231,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     }
 
     fun start() {
-        recorder.start(car.odometerKm)
+        recorder.start(car.odometerKm); lanes.reset()
         recorder.add(Evt.GEAR, car.gear)
         if (car.wiper) recorder.add(Evt.WIPER, "on")
         if (car.lowBeam) recorder.add(Evt.LIGHT, "on")

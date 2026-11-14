@@ -22,6 +22,15 @@ object Paths {
     fun lengthKm(path: List<Pt>) = path.zipWithNext().sumOf { (a, b) -> Places.meters(a.lat, a.lng, b.lat, b.lng) }.toFloat() / 1000f
     /** 진행 정도 p 에 가장 가까운 점 */
     fun at(path: List<Pt>, p: Float): Pt? = path.minByOrNull { Math.abs(it.p - p) }
+
+    /** 경로에서 (lat,lng)에 가장 가까운 점부터 거꾸로 meters 만큼 앞선 점. 경로가 없으면 null */
+    fun before(path: List<Pt>, lat: Double, lng: Double, meters: Int): Pt? {
+        if (path.size < 2) return null
+        var i = path.indices.minByOrNull { Places.meters(path[it].lat, path[it].lng, lat, lng) } ?: return null
+        var acc = 0.0
+        while (i > 0 && acc < meters) { acc += Places.meters(path[i].lat, path[i].lng, path[i - 1].lat, path[i - 1].lng); i-- }
+        return path[i]
+    }
     /** 남에게 건넬 때: 출발한 곳(집일 수 있다) 근처 500m는 뺀다 */
     fun shareable(path: List<Pt>): List<Pt> {
         val first = path.firstOrNull() ?: return path
