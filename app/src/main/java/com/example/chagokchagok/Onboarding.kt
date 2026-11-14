@@ -132,7 +132,7 @@ internal fun MainActivity.onboardScreen(): View {
                     }
                     addView(nameField, k.lp(0, k.WRAP, 1f))
                 })
-                addView(k.row(8).apply { addView(k.icon("lock", Ink.text3, 16)); addView(k.text("앱 안에서만 쓰는 이름이에요. ‘나’로 두어도 돼요.", Type.Sub, Ink.text2)) })
+                addView(k.row(8).apply { addView(k.icon("lock", Ink.text3, 16)); addView(k.text("앱 안에서만 쓰는 이름이에요. 바꿔도 되고 그대로 두어도 돼요.", Type.Sub, Ink.text2)) })
                 onNext = { O.name = nameField?.text?.toString()?.trim()?.ifEmpty { "나" } ?: "나"; next() }
             }
             2 -> {
@@ -231,7 +231,7 @@ internal fun MainActivity.onboardScreen(): View {
                     k.toggleItem("소리로 알려 주기", "달리는 동안 화면 대신 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
                     k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
                 )))
-                side(k.row(10).apply { gravity = Gravity.TOP; addView(k.icon("lock", Ink.text2, 18)); addView(k.text("일기와 지나온 길은 이 차 안에만 저장돼요. 누구에게 보여 줄지는 일기마다 직접 골라요.", Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f)) })
+                side(k.row(10).apply { gravity = Gravity.TOP; addView(k.icon("lock", Ink.text2, 18)); addView(k.text("일기와 지나온 길은 이 차 안에만 저장돼요. 앱 서버는 없어요.", Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f)) })
                 nextLabel = "시작하기"
                 onNext = { if (!Car.offline) askLocation(); finishOnboarding(false) }
             }

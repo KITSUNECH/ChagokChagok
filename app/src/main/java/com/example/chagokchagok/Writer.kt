@@ -139,7 +139,9 @@ object Writer {
     /** 3 → "세 번" */
     fun times(n: Int) = if (n in 1..10) "${counts[n - 1]} 번" else "${n}번"
     /** 이름에 조사를 붙인다. "나"는 "내가", "나의"로 바뀐다. */
-    fun subj(name: String) = if (name == "나") "내가" else "${name}가"
+    fun subj(name: String) = if (name == "나") "내가" else name + if (hasBatchim(name)) "이" else "가"
+    /** 마지막 글자에 받침이 있는지 (한글이 아니면 없다고 본다) */
+    fun hasBatchim(s: String) = s.lastOrNull()?.let { it in '가'..'힣' && (it - '가') % 28 != 0 } == true
     fun poss(name: String) = if (name == "나") "내" else "${name}의"
 
     /**
@@ -180,7 +182,7 @@ object Writer {
             if (before.none { it.guideId == null && it.drive.place == drive.place }) { sb.append("처음으로 ${drive.place}까지 내 힘으로 가 봤다. "); if (stamp == null) stamp = "첫\n새 길" }
             else sb.append("${drive.place}에 또 다녀왔다. ")
         }
-        drive.events.firstOrNull { it.type == Evt.SAY }?.let { sb.append("옆자리에서 “${it.value}”라고 해 줬다. ") }
+        drive.events.firstOrNull { it.type == Evt.SAY }?.let { sb.append("달리면서 “${it.value}”라고 말로 남겼다. ") }
         for (lamp in drive.lamps) {
             val name = Lamps.firstUse[lamp] ?: continue
             if (before.none { lamp in it.drive.lamps }) { sb.append("처음으로 ${name}을 써 봤다. "); if (stamp == null) stamp = "첫\n" + name.take(4); break }
@@ -209,7 +211,7 @@ object Writer {
             // 졸업은 끝까지 달린 날만 센다. 중간에 멈춘 날과 모의 주행은 넣지 않는다.
             val followed = before.count { it.guideId == guide.id && it.drive.completed && !it.drive.sim } + if (drive.completed && !drive.sim) 1 else 0
             if (!drive.completed) sb.append("오늘은 끝까지 가지 않고 멈췄다. ")
-            if (drive.completed && !drive.sim && followed == GRADUATE) { sb.append("이 길은 이제 졸업이다. "); stamp = "졸업" }
+            if (drive.completed && !drive.sim && followed == GRADUATE) { sb.append("이 길은 이제 익숙해졌다. ") }
             else if (guide.kind != "나") sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 내 기록도 생겼다. ")
         }
 

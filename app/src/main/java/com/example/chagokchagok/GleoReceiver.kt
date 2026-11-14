@@ -57,7 +57,7 @@ class GleoReceiver : BroadcastReceiver() {
                 val focus = store.answer("focus_$driver", "focus")?.takeIf { Coach.label(it) != null }
                 val answer = if (topic == "today") Coach.today(drive, before, focus, live != null) else Coach.about(topic, drive, before, live != null)
                 // 앱이 직접 읽어 주고 글레오는 조용히 (운전 기록 문장은 방송으로 내보내지 않는다). 앱 화면이 없을 때만 답을 데이터로 넘긴다.
-                if (a != null) { a.speak(answer); reply(context, action, "success", "The app is answering aloud from the vehicle signals it recorded.", JSONArray().put(JSONObject().put("topic", topic)), mode = "silent") }
+                if (a != null && store.voiceOn) { a.speak(answer); reply(context, action, "success", "The app is answering aloud from the vehicle signals it recorded.", JSONArray().put(JSONObject().put("topic", topic)), mode = "silent") }
                 else reply(context, action, "success", "The answer was produced from the vehicle signals recorded by the app.", JSONArray().put(JSONObject().put("topic", topic).put("answer", answer)))
             }
             else -> reply(context, action, "fail", "This function is not supported.")

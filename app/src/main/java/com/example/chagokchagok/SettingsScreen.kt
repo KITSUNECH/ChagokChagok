@@ -81,7 +81,7 @@ internal fun MainActivity.settingsScreen(): View {
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
         else { addView(left); addView(right) }
         addView(k.gap(20))
-        addView(k.text("차곡차곡 0.3 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
+        addView(k.text("차곡차곡 ${BuildConfig.VERSION_NAME} · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
     }
 }
 
@@ -116,8 +116,8 @@ internal val SIGNAL_NAMES = mapOf("washer" to "워셔액", "oil" to "엔진오�
     Evt.SPEED to "속도", Evt.GEAR to "기어", Evt.SIGNAL to "방향지시등", Evt.BRAKE to "브레이크", "steering" to "조향각", Evt.WIPER to "와이퍼", Evt.LIGHT to "전조등", "belt" to "안전벨트",
     Evt.CRUISE to "크루즈", Evt.SEAT to "좌석 감지", "seatPos" to "운전석 위치", "distance" to "주행거리", "navi" to "내비", "vin" to "차대번호", "vehicle" to "차량 연결")
 
-internal val TALK = listOf(Triple("초보", "자주", "돌기 전 깜빡이, 잘한 것까지"), Triple("오랜만", "필요할 때", "한마디와 경고"), Triple("익숙", "경고만", "꼭 필요한 것만"))
-internal fun MainActivity.talkOf(n: String) = when (store.typeOf(n)) { "초보" -> "초보"; "익숙" -> "익숙"; else -> "오랜만" }
+internal val TALK = listOf(Triple("초보", "자주", "돌기 전 깜빡이, 잘한 것까지 말해요"), Triple("익숙", "필요할 때만", "남겨 둔 한마디와 경고만 말해요"))
+internal fun MainActivity.talkOf(n: String) = if (store.typeOf(n) == "익숙") "익숙" else "초보"
 
 internal val DRIVER_TYPES = listOf("초보" to "면허를 딴 지 얼마 안 됐어요", "오랜만" to "오랜만에 다시 운전해요", "새 차" to "운전은 하는데 이 차가 처음이에요", "익숙" to "운전이 익숙해요")
 
@@ -249,12 +249,12 @@ internal fun MainActivity.pickLicenseYear() {
 internal fun MainActivity.privacyScreen(): View {
     val k = kit
     val rows = listOf(
-        Triple("무엇을 쓰나요", "차량 신호(깜빡이·브레이크·기어·와이퍼·전조등·안전띠·좌석·주행거리), 내비 목적지와 회전 안내, 차의 위치(동의한 운전자만), 운전자가 적은 이름과 한마디", "list"),
+        Triple("무엇을 쓰나요", "차량 신호(기어·속도·깜빡이·브레이크·운전대 각도·와이퍼·전조등·안전벨트·좌석·주행거리·연비), 내비 목적지와 회전 안내, 차의 위치(동의한 운전자만), 운전자가 적은 이름과 한마디", "list"),
         Triple("어디에 두나요", "이 차 안에만 둬요. 안드로이드 키스토어 키로 암호화한 저장소에 저장하고, 앱 서버는 없어요.", "lock"),
         Triple("위치는", "운전자마다 따로 동의를 받아요. 동의하지 않으면 위치를 쓰지도 남기지도 않아요. 근거: 위치정보법 제15조.", "pin"),
-        Triple("밖으로 나가는 것", "도착지 날씨를 켜면 목적지 좌표만 공개 예보(Open-Meteo)로, AI 다듬기를 켜면 일기 초안만 Anthropic API로 가요. 둘 다 끌 수 있어요.", "share"),
-        Triple("누구에게 보이나요", "함께 쓰는 사람에게는 내가 고른 일기와 건넨 길만 보여요. 길을 건넬 때는 출발한 곳 근처 500m를 빼요.", "people"),
-        Triple("지우려면", "설정 › 데이터 › 기록 모두 지우기. 이 차에서 바로 지워져요.", "trash"),
+        Triple("밖으로 나가는 것", "도착지 날씨를 켜면 목적지 좌표(약 1km 단위로 줄여서)만 공개 예보(Open-Meteo)로 가요. 설정에서 끌 수 있어요. 그 밖에 밖으로 나가는 것은 없어요.", "share"),
+        Triple("누구에게 보이나요", "이 차를 함께 쓰는 사람에게는 내가 건넨 길과 그 길의 한마디만 보여요. 길을 건넬 때는 출발한 곳 근처 500m를 빼요.", "people"),
+        Triple("지우려면", "설정 › 차와 데이터 › 기록 모두 지우기. 이 차에서 바로 지워져요.", "trash"),
     )
     return k.col().apply {
         addView(k.header("개인정보·위치정보 안내", "차곡차곡이 다루는 정보와 지키는 방법", onBack = { back() }))

@@ -37,7 +37,7 @@ class WriterTest {
         assertTrue(cruise.text.contains("속도를 맡겨"))
         val fourth = Writer.write(drive("나", 2, false).copy(passenger = true), listOf(first, second, third), guide, 1)
         println("G> " + fourth.text + " | stamp=" + fourth.stamp?.replace("\n", ""))
-        assertEquals("졸업", fourth.stamp)
+        assertTrue(fourth.text.contains("이제 익숙해졌다"))   // 세 번 끝까지 따라 달린 길 (도장은 화면에서 뺐다)
         println("3> " + third.title + " | " + third.text + " | hl=" + third.highlight)
         val reverse = Writer.write(drive("아빠", 1, false), emptyList(), guide.copy(owner = "나"), 0)
         println("4> " + reverse.text)

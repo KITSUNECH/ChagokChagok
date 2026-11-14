@@ -147,13 +147,13 @@ class Car(private val ctx: Context, private val listener: Listener) {
     private var props: android.car.hardware.property.CarPropertyManager? = null
     private val gearCb = object : android.car.hardware.property.CarPropertyManager.CarPropertyEventCallback {
         override fun onChangeEvent(value: android.car.hardware.CarPropertyValue<*>) = ui {
-            gearKnown = true
+            val first = !gearKnown; gearKnown = true
             val g = when (value.value as? Int) {
                 android.car.VehicleGear.GEAR_DRIVE -> "D"; android.car.VehicleGear.GEAR_REVERSE -> "R"
                 android.car.VehicleGear.GEAR_NEUTRAL -> "N"; android.car.VehicleGear.GEAR_PARK -> "P"
                 else -> if ((value.value as? Int ?: 0) >= 16) "D" else this@Car.gear   // 16 이상은 수동 1~9단(GEAR_FIRST…) = 앞으로
             }
-            if (g != gear) { gear = g; listener.onCarEvent(Evt.GEAR, g) }
+            if (g != gear || first) { gear = g; listener.onCarEvent(Evt.GEAR, g) }
         }
         override fun onErrorEvent(propId: Int, zone: Int) { failures[Evt.GEAR] = "GEAR_SELECTION 오류" }
     }

@@ -101,7 +101,7 @@ internal fun MainActivity.startCard(guide: Guide?): View {
             }, k.lp(ui.dp(64), ui.dp(64)))
             addView(k.col(4).apply {
                 addView(k.text(if (auto) "기어를 D에 놓으면 기록을 시작해요" else "기록 시작", Type.Title, Ink.onAccent))
-                addView(k.text(if (auto) "누를 것은 없어요. 달리는 동안은 말로 알려 줄게요." else "기어 신호를 받지 못했어요. 누르면 바로 기록을 시작해요.", Type.Sub, Ink.alpha(Ink.onAccent, .8f)))
+                addView(k.text(if (auto) "따로 누르지 않아도 돼요. 달리는 동안은 말로 알려 줄게요." else "기어 신호를 받지 못했어요. 누르면 바로 기록을 시작해요.", Type.Sub, Ink.alpha(Ink.onAccent, .8f)))
             }, k.lp(0, k.WRAP, 1f))
         })
         // 지금 차가 알려 주는 것 (받은 신호만 보여 준다)

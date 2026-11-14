@@ -69,7 +69,7 @@ internal fun MainActivity.driveScreen(): View {
         if (trip.sim) addView(k.tag("모의 주행 · 시연용", Ink.warn))
         // Pleos 내비를 앞으로 (NaviHelper requestNavigationScreen). 분할 화면이면 옆 창에 뜬다.
         addView(k.gap(8))
-        addView(k.button("내비", Kit.Btn.Secondary, "navi", enabled = !limits.restricted) { showNavi(null) })
+        addView(k.button("내비", Kit.Btn.Secondary, "navi", enabled = !rolling) { showNavi(null) })
     }
 
     // 다음 회전 (내비)
@@ -124,12 +124,12 @@ internal fun MainActivity.driveScreen(): View {
     val statsCard = k.card(24) { addView(k.text("지금까지", Type.Caption, Ink.text2)); addView(V.stats); addView(V.statsSub) }
     V.statsCard = statsCard
     // 도로교통법 제49조 제1항 제11호의2: 운전 중 화면 조작은 정지 중에만. 차가 주행 제한을 걸면(움직이는 중) 버튼을 잠근다.
-    val moving = limits.restricted
+    val moving = rolling
     // 달리는 동안은 말로: "차곡차곡, 천천히 갈래" (Gleo AI → GleoReceiver TAKE_IT_SLOW)
 
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
     // 멈춰 있을 때는 언제나 "기록 끝내기"를 둔다 (기어 신호가 없거나 P로 바뀌지 않아도 빠져나올 수 있게)
-    val stop = if (!limits.restricted) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
+    val stop = if (!rolling) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
 
     // 달리는 동안(주행 제한): 지금 필요한 것 하나만. 경로 그림·제한속도·통계는 내비·계기판과 겹치니 멈췄을 때만 보여 준다.
     val view = if (moving) {
@@ -169,7 +169,7 @@ internal fun MainActivity.refreshDrive() {
     val vehicleOk = Car.offline || !car.failures.containsKey("vehicle")
     V.status?.text = (if (trip.sim) "모의 주행 기록 중" else "기록 중") + (if (sec < 60) " · 방금 출발" else " · ${sec / 60}분") + (if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else "") +   // 초가 계속 움직이지 않게 분 단위
         // 멈춰 있을 때는 차가 지금까지 적은 조작을 보여 준다 (조작이 실제로 적히고 있는지 눈으로 확인할 수 있게)
-        (if (!limits.restricted) listOfNotNull(trip.recorder.brakesNow().takeIf { it > 0 }?.let { "브레이크 ${it}번" }, trip.recorder.signalsNow().takeIf { it > 0 }?.let { "깜빡이 ${it}번" }).joinToString("") { " · $it" } else "") +
+        (if (!rolling) listOfNotNull(trip.recorder.brakesNow().takeIf { it > 0 }?.let { "브레이크 ${it}번" }, trip.recorder.signalsNow().takeIf { it > 0 }?.let { "깜빡이 ${it}번" }).joinToString("") { " · $it" } else "") +
         (if (!vehicleOk) " · 차량 신호가 없어 시간과 위치만 적어요" else if (!car.naviConnected && !trip.sim) " · 내비 연결 안 됨" else "")
 
     // 다음 회전
@@ -197,7 +197,8 @@ internal fun MainActivity.refreshDrive() {
     // 한마디
     V.tipWho?.text = when {
         g == null -> "혼자 가는 길"
-        trip.currentTip != null -> "${Writer.poss(g.owner)} 한마디"
+        trip.currentTip != null -> (if (g.owner == store.driver) "내" else Writer.poss(g.owner)) + " 한마디"
+        g.owner == store.driver -> "지난번에 다녀온 길"
         else -> "${Writer.poss(g.owner)} 길"
     }
     V.tip?.text = limits.fit(trip.currentTip ?: when {
@@ -212,7 +213,7 @@ internal fun MainActivity.refreshDrive() {
     (V.tipCard?.background as? GradientDrawable)?.setColor(if (speaking) Ink.accentSoft else Ink.surface)
     V.tipNow?.visibility = if (speaking) View.VISIBLE else View.GONE
     // 달리는 동안은 한마디가 나오는 때만 한마디 카드를 보여 준다 (평소에는 위 카드 하나)
-    V.tipCard?.visibility = if (!limits.restricted || speaking) View.VISIBLE else View.GONE
+    V.tipCard?.visibility = if (!rolling || speaking) View.VISIBLE else View.GONE
 
     // 길 위의 위치
     if (g != null) {

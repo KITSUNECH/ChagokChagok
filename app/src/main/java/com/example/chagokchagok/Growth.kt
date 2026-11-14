@@ -150,7 +150,7 @@ internal object Growth {
         if (j.early) return "지난번 한 번과 견준 값이에요. 같은 길을 한 번 더 달리면 늘었는지 판단해요."
         val up = j.verdict == Verdict.UP
         val main = j.top(1).firstOrNull()
-        val why = main?.let { "${it.metric.label}이 ${it.text()}" } ?: ""
+        val why = main?.let { "${it.metric.label} ${it.text()}" } ?: ""
         return when {
             answer == null || answer == "답하지 않음" -> when (j.verdict) {
                 Verdict.UP -> "가장 큰 변화는 $why."
@@ -269,7 +269,7 @@ internal fun MainActivity.evidenceSheet(j: Judgement) {
             k.item(c.metric.label, c.text() + if (c.weight == 0f) " · 참고만" else " · 무게 ${"%.1f".format(c.weight)}",
                 if (c.better) "check" else if (c.worse) "info" else "minus", if (c.better) Ink.go else Ink.text3)
         }).apply { background = k.rounded(Ink.fill, 18) })
-        addView(k.text("· 내가 정할 수 있는 습관(돌기 전 깜빡이, 차선 변경 3초 전 깜빡이, 급하게 선 횟수, 재탐색, 주차)으로 판단해요. 연비는 가볍게, 차선 변경 전 기다린 시간·브레이크 횟수·걸린 시간은 길 상황에 달려 있어 참고로만 보여 줘요.\n· 오늘과 조건(시간대·비·밤)이 다른 기록은 절반만 반영해요." + if (j.condDiffers) " 오늘은 ${j.today.label()}이라 조건이 달랐어요." else "" +
+        addView(k.text("· 내가 정할 수 있는 습관(돌기 전 깜빡이, 차선 변경 3초 전 깜빡이, 급하게 선 횟수, 재탐색, 주차)으로 판단해요. 연비는 가볍게, 차선 변경 전 기다린 시간·브레이크 횟수·걸린 시간은 길 상황에 달려 있어 참고로만 보여 줘요.\n· 오늘과 조건(시간대·비·밤)이 다른 기록은 절반만 반영해요." + (if (j.condDiffers) " 오늘은 조건이 달랐어요 (${j.today.label()})." else "") +
             "\n· 합쳐서 +10% 넘게 나아지면 ‘늘었어요’, 10% 넘게 나빠지면 ‘쉽지 않았어요’예요. 지금 점수 ${(j.score * 100).toInt()}%.", Type.Sub, Ink.text2))
         addView(k.buttons(k.button("닫기", Kit.Btn.Primary) { close() }))
     }
@@ -305,7 +305,7 @@ internal fun MainActivity.roadScreen(anchorId: String?): View {
         addView(k.header("이 길의 나 · $name", "${visits.size}번 다녀왔어요. 같은 길을 다시 달릴 때마다 차가 본 변화가 쌓여요.", onBack = { back() }))
         addView(k.gap(16))
         lj?.let { addView(judgementView(it, store.answer(last.id, Q_VS_LAST)).apply { (background as? android.graphics.drawable.GradientDrawable)?.setColor(Ink.surface) }); addView(k.gap(16)) }
-        if (charts.isEmpty()) addView(k.card { addView(k.text("두 번 넘게 다녀오면 지표마다 그래프가 그려져요.", Type.Sub, Ink.text2)) })
+        if (charts.isEmpty()) addView(k.card { addView(k.text("두 번째 방문부터 지표마다 그래프가 그려져요.", Type.Sub, Ink.text2)) })
         else addView(k.grid(if (ui.wide) 2 else 1, charts, 14))
         addView(k.section("다녀온 기록"))
         addView(k.groupOf(rows))

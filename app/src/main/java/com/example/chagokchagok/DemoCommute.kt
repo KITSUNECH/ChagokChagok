@@ -58,7 +58,7 @@ internal object DemoCommute {
             a.trip.demoAuto = true
             val last = a.store.diariesOf(me).last { it.drive.place == PLACE && !it.drive.sim }
             a.goAgain(PLACE, last)
-            a.toast("시연: 지난 출근 세 번은 예시 기록이에요. ‘모의 주행 (시연용)’을 누르세요.")
+            a.toast("시연: 지난 출근 세 번은 예시 기록이에요. ‘모의 주행 시작 (시연용)’을 누르세요.")
         }
         if (a.store.locationConsent(me) == null) { a.askLocationConsent(me); a.toast("위치에 동의하면 한마디를 남긴 곳 근처에서 들려줘요.") }
         go()

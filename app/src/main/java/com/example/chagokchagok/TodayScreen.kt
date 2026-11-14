@@ -398,9 +398,9 @@ internal fun MainActivity.readyScreen(): View {
     val comfy = if (trip.routeSent && store.typeOf(d) in listOf("초보", "오랜만")) check(true, "편안한 길로 부탁했어요", "", "", "road") else null
     val checks = listOfNotNull(
         navi, comfy,
-        check(car.energy?.let { it >= 20 }, "연료 ${car.energy}%", "연료 ${car.energy}% · 가는 길에 넣어요", "", "fuel"),
+        check(car.energy?.let { it >= 20 }, (if (car.isEv == true) "배터리 " else "연료 ") + "${car.energy}%", (if (car.isEv == true) "배터리 ${car.energy}% · 가는 길에 충전해요" else "연료 ${car.energy}% · 가는 길에 넣어요"), "", "fuel"),
         check(if (car.washerKnown) !car.washerLow else null, "워셔액 충분", "워셔액이 부족해요", "", "info"),
-        check(car.belt, "안전벨트를 맸어요", "안전벨트를 매 주세요", "", "seat"),
+        check(if (car.beltKnown) car.belt else null, "안전벨트를 맸어요", "안전벨트를 매 주세요", "", "seat"),
         check(if ("ENGINE_OIL_LEVEL" in car.lampsOn || "BRAKE_FLUID_LEVEL" in car.lampsOn) false else if (!car.failures.containsKey("oil")) true else null, "엔진오일·브레이크액 정상", "엔진오일이나 브레이크액이 적어요", "", "car"),
         store.seat(d)?.let { mine -> car.seatPos?.let { now -> check(now == mine, "의자가 지난번 내 자리 그대로예요", "의자가 지난번 내 자리와 달라요", "", "seat") } },
         Session.forecast?.let { f -> check(f.rainChance < 50, "도착지 ${f.sky} ${f.tempC}°", "도착지 ${f.sky} ${f.tempC}° · 3시간 안 비 올 확률 ${f.rainChance}%", "", "cloud") },
@@ -420,10 +420,10 @@ internal fun MainActivity.readyScreen(): View {
         addView(k.groupOf(checks))
     }
     val right = k.col().apply {
-        addView(k.section(if (g.kind == "나") "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"))
+        addView(k.section(if (g.owner == d) "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"))
         if (tipRows.isEmpty()) addView(k.card { addView(k.text("이 길에는 한마디가 없어요. 조용히 기록만 해요.", Type.Sub, Ink.text2)) })
         else addView(k.groupOf(tipRows))
-        if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 근처에서 들려줘요." + if (BuildConfig.DEMOS) " 모의 주행(시연용)은 경로를 따라 들려줘요." else "", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
+        if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 근처에서 들려줘요." + "", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
     }
     return k.col().apply {
         Session.convoy?.let { f -> addView(k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) }); addView(k.gap(12)) }

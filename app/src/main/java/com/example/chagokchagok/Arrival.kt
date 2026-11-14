@@ -28,11 +28,9 @@ internal fun MainActivity.keepForNextTime(d: Diary, picked: List<Tip>, quiet: Bo
 
 /** 이 일기를 쓴 운전자가 아직 답하지 않은 것이 있는지 */
 internal fun MainActivity.pending(d: Diary, prev: Diary?): Boolean {
-    val moments = TipSuggest.moments(d.drive)
-    val handled = store.skippedMoments(d.id) + store.keptMoments(d.id)
+    // 돌아볼 만한 순간(한마디 남기기)은 하고 싶을 때 하는 것이라 세지 않는다
     return (store.heardTips(d.id).isNotEmpty() && store.answer(d.id, Q_HELPED) == null) ||
-        (prev != null && store.answer(d.id, Q_VS_LAST) == null) ||
-        moments.any { it.why !in handled } || unnamed(d)
+        (prev != null && store.answer(d.id, Q_VS_LAST) == null) || unnamed(d)
 }
 
 /** 내비 목적지도, 전에 다녀온 곳도 아닌 곳에 주차했다: 이름을 붙이면 다음부터 같은 곳으로 비교한다 */

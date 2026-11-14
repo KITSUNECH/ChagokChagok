@@ -140,7 +140,7 @@ private fun MainActivity.analysis(all: List<Diary>): View {
     val k = kit
     val ds = all.filter { !it.drive.sim }
     val simCount = all.size - ds.size
-    if (ds.size < 2) return k.card { addView(k.empty("list", "두 번 넘게 달리면 변화가 보여요", "주행마다 차가 관측한 값을 모아 그래프로 보여 줘요. 지금 ${ds.size}번 달렸어요." + if (simCount > 0) " (모의 주행 ${simCount}번은 빼고 세요)" else "")) }
+    if (ds.size < 2) return k.card { addView(k.empty("list", "두 번째 주행부터 변화가 보여요", "주행마다 차가 관측한 값을 모아 그래프로 보여 줘요. 지금 ${ds.size}번 달렸어요." + if (simCount > 0) " (모의 주행 ${simCount}번은 빼고 세요)" else "")) }
     val labels = ds.map { dateText(it.date, "M/d") }
     val km = ds.sumOf { it.drive.distKm.toDouble() }
     val list = k.col(16)
@@ -171,7 +171,7 @@ private fun MainActivity.analysis(all: List<Diary>): View {
     charts.add(card("주행마다 달린 거리", "주행거리계 · 위치 경로", BarChart(this, ui, dist, labels) { String.format(Locale.KOREA, "%.1fkm", it) },
         "가장 길게 달린 날 ${String.format(Locale.KOREA, "%.1fkm", dist.maxOrNull() ?: 0f)}"))
     val turnRatio = ds.map { if (it.drive.turns > 0) it.drive.turnsSignaled * 100f / it.drive.turns else null }
-    if (turnRatio.count { it != null } >= 1) charts.add(card("돌기 전에 켠 깜빡이", "내비 회전 안내 + 방향지시등 · 회전 100m 안에서 켰는지", TrendChart(this, ui, turnRatio, labels, { "${it.toInt()}%" }), change(turnRatio) { "${it.toInt()}%" }))
+    if (turnRatio.count { it != null } >= 1) charts.add(card("돌기 전에 켠 깜빡이", "내비 회전 안내 + 방향지시등 · 회전 200m 안에서 켜져 있었는지", TrendChart(this, ui, turnRatio, labels, { "${it.toInt()}%" }), change(turnRatio) { "${it.toInt()}%" }))
     val brakeKm = ds.map { if (it.drive.distKm >= 0.3f) it.drive.brakes / it.drive.distKm else null }
     if (brakeKm.count { it != null } >= 1) charts.add(card("브레이크 밟은 횟수 (1km당)", "브레이크 페달 신호 ÷ 달린 거리 · 막히는 길에서는 늘어나요", TrendChart(this, ui, brakeKm, labels, { String.format(Locale.KOREA, "%.1f번", it) }), change(brakeKm) { String.format(Locale.KOREA, "%.1f번", it) }))
     val park = ds.map { if (it.drive.parkMoves > 0) it.drive.parkMoves.toFloat() else null }

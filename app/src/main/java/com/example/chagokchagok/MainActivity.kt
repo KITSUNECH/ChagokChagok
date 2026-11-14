@@ -75,6 +75,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         setContentView(root)
         sheets = Overlay(root) { kit }
         AiDiary.key = store.aiKey
+        Coach.isSample = { id -> store.isSample(id) }
         Live.activity = java.lang.ref.WeakReference(this)   // 글레오 요청을 진행 중인 주행에 전한다
         car = Car(this, this)
         trip = Trip(store, car, this)
@@ -85,7 +86,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         limits = Restrictions(this) { onRestricted() }
         sheets.keyboardBlocked = { limits.noKeyboard || trip.active }
         sheets.driving = { driving }   // 기록 중에는 글자 입력을 받지 않는다 (도로교통법 제49조)
-        car.onSpeed = { kmh -> val sec = System.currentTimeMillis() / 1000; if (sec != speedTick) { speedTick = sec; Telemetry.hit(Evt.SPEED, "${kmh.toInt()}km/h") }; trip.onSpeed(kmh) }
+        car.onSpeed = { kmh -> val sec = System.currentTimeMillis() / 1000; if (sec != speedTick) { speedTick = sec; Telemetry.hit(Evt.SPEED, "${kmh.toInt()}km/h") }; trip.onSpeed(kmh); if (rolling != wasRolling) { wasRolling = rolling; if (route.name == DRIVE) render() } }
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
         // 효과음: 알림음 용도(SONIFICATION)로 만들고, 울릴 때마다 잠깐 포커스를 받아 다른 소리를 줄인다 (Pleos 오디오 가이드)
@@ -152,6 +153,10 @@ class MainActivity : Activity(), Car.Listener, TripHost {
      */
     internal val driving get() = trip.active || limits.restricted ||
         (!Car.offline && !limits.known && (!car.gearKnown || car.gear == "D" || car.gear == "R"))
+
+    /** 차가 지금 굴러가는 중인지: 차의 주행 제한 신호, 또는 속도 시속 5km 이상. 이때는 주행 화면의 단추를 잠근다 */
+    internal val rolling get() = limits.restricted || (car.speedKmh ?: 0f) >= 5f
+    private var wasRolling = false
 
     internal fun go(name: String, arg: String? = null) {
         if (driving && name in PARKED_ONLY) { toast("달리는 중에는 열지 않아요. 주차하면 볼 수 있어요."); return }
@@ -341,7 +346,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         when (route.name) {
             DRIVE -> refreshDrive()
             READY -> if (type == "belt" || type == Evt.SEAT || (type == Evt.NAVI && value == "route")) render()
-            TODAY -> if (type == Evt.LAMP) render()
+            TODAY -> if (type == Evt.LAMP || type == Evt.GEAR || type == "belt") render()
         }
     }
 

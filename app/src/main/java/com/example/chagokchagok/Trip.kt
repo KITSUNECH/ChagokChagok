@@ -193,6 +193,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (!sim && store.locationConsent(store.driver) != true) return
         val last = path.lastOrNull()
         if (last == null || Places.meters(last.first, last.second, lat, lng) >= 30) { path.add(lat to lng); if (!sim) save() }
+        // 급하게 선 곳·차선 변경·재탐색의 자리를 적으려면 받은 길이 없어도 지금 위치를 기억해 둬야 한다
+        lastFix = Triple(lat, lng, heading); lastFixAt = System.currentTimeMillis()
         tipsNear(lat, lng, heading)
     }
 
@@ -239,7 +241,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     private fun play(i: Int, t: Tip) {
         heard.add(i); currentTip = t.text
         host.chime()
-        host.speak("${Writer.poss(guide!!.owner)} 한마디. ${t.text}", Voice.PLACE)
+        host.speak((if (guide!!.owner == store.driver) "내" else Writer.poss(guide!!.owner)) + " 한마디. ${t.text}", Voice.PLACE)
         host.tripChanged()
     }
 
@@ -308,6 +310,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         host.say(when {
             g == null -> "출발해요. 조용히 적고 있을게요."
             g.kind == "나" -> "지난번의 내가 남긴 길로 출발해요. 그 자리에 가면 알려 드릴게요."
+            g.owner == store.driver -> "지난번에 다녀온 길로 출발해요. 조용히 적고 있을게요."
             placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 한마디를 남긴 곳 근처에 가면 알려 드릴게요."
             else -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 조용히 적고 있을게요."
         } + (Coach.label(focus)?.let { " 오늘은 ${it}부터 봐 드릴게요." } ?: ""))
@@ -378,7 +381,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val acted = drive.events.any { it.type != Evt.GEAR }
         if (!wasSim && !arrived && drive.seconds < 15 && drive.distKm < 0.05f && !acted && voiceNotes.isEmpty()) {
             guide = null; routeSent = false
-            host.tripDiscarded(); host.say("잠깐 움직여서 일기로 남기지 않았어요.")
+            host.tripDiscarded(); host.say("잠깐만 움직여서 일기로 남기지 않았어요.")
             return
         }
         val written = Writer.write(drive, store.diariesOf(driver), g, heard.size, store.tone(driver), seasoned = store.typeOf(driver) == "익숙")

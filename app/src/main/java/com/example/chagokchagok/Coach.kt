@@ -19,8 +19,10 @@ internal object Coach {
 
     /** 평소의 나: 지금까지의 실제 주행(최근 5번)에서 본 습관 */
     class Usual(val signalPct: Float?, val laneWait: Float?, val drives: Int)
+    /** 예시 기록인지 (MainActivity 가 채운다). 평소의 나에는 실제 주행만 넣는다 */
+    var isSample: (String) -> Boolean = { false }
     fun usual(before: List<Diary>): Usual {
-        val ds = before.filter { !it.drive.sim }.takeLast(5).map { it.drive }
+        val ds = before.filter { !it.drive.sim && !isSample(it.id) }.takeLast(5).map { it.drive }
         val t = ds.sumOf { it.turns }; val s = ds.sumOf { it.turnsSignaled }
         val waits = ds.mapNotNull { it.laneWaitMedian() }
         return Usual(if (t >= 3) 100f * s / t else null, if (waits.isNotEmpty()) waits.average().toFloat() else null, ds.size)
@@ -152,7 +154,7 @@ internal fun MainActivity.carSawCard(d: Diary): View? {
  */
 internal fun MainActivity.usualCard(): View {
     val k = kit
-    val ds = store.diariesOf(store.driver).filter { !it.drive.sim }
+    val ds = store.diariesOf(store.driver).filter { !it.drive.sim && !store.isSample(it.id) }
     val u = Coach.usual(ds)
     val last = ds.lastOrNull()
     fun stat(value: String, label: String) = k.col(2).apply { addView(k.text(value, Type.Display)); addView(k.text(label, Type.Sub, Ink.text2)) }
@@ -203,6 +205,6 @@ internal fun MainActivity.showNavi(keyword: String?) {
     } catch (_: Throwable) { false }
     window.decorView.postDelayed({
         val asked = car.openNavi(keyword)
-        if (!asked && !launched) toast(if (car.naviConnected) "내비 화면을 열지 못했어요. 아래 내비 단추로 열어 주세요." else "내비가 연결되지 않았어요. 아래 내비 단추로 열어 주세요.")
+        if (!asked && !launched) toast(if (car.naviConnected) "내비 화면을 열지 못했어요. 차 화면 아래쪽의 내비 아이콘으로 열어 주세요." else "내비가 연결되지 않았어요. 차 화면 아래쪽의 내비 아이콘으로 열어 주세요.")
     }, if (launched) 700L else 0L)
 }
