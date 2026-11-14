@@ -59,6 +59,7 @@ internal fun MainActivity.todayScreen(): View {
     val candidates = listOf<() -> View?>(
         { carCard() },
         { reviewCard() },
+        { focusCard() },
         { if (!guideHero) todaysGuide()?.let { g -> small("road", "${Writer.subj(g.owner)} 건네준 길", g.title + " · 한마디 ${g.tips.size}개") { depart(g) } } else null },
         { newsCard() },
         { if (diaries.isEmpty()) loopCard() else null },

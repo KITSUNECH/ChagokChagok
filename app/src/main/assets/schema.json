@@ -1,6 +1,6 @@
 {
   "packageName": "com.example.chagokchagok",
-  "appDescription": "A driving diary app that records each drive from vehicle signals, writes a diary after parking, and plays notes left at specific places on the route.",
+  "appDescription": "A driving diary app that records each drive from vehicle signals, tells the driver how their driving is changing on roads they repeat, and plays notes left at specific places on the route.",
   "invokeWord": "차곡차곡",
   "version": "0.2.0",
   "actionCalls": [
@@ -31,9 +31,15 @@
     {
       "type": "function",
       "function": {
-        "name": "READ_LATEST_DIARY",
-        "description": "Returns the title and text of the driving diary written after the driver's most recent drive.",
-        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "name": "ASK_MY_DRIVING",
+        "description": "Answers the driver's question about their own driving, using vehicle signals recorded by this app: turn-signal use before turns, waiting time before lane changes, parking adjustments and braking. Covers the drive in progress, or the most recent drive when parked.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "topic": { "type": "string", "description": "What the driver asks about. One of: today, lane, turn, park, brake. Use today for a general question about the drive." }
+          },
+          "required": []
+        },
         "component": "service"
       }
     }

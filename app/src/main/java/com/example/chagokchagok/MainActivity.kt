@@ -354,6 +354,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     override fun speak(text: String, pri: Int) { if (store.voiceOn) voice.say(text, pri) }
     /** 말로 알리고, 주행 중이 아니거나 소리를 꺼 두었으면 글로도 (주행 중에는 화면을 가리지 않게 말로만) */
     override fun say(text: String, pri: Int) { speak(text, pri); if (!driving || !store.voiceOn) sheets.toast(text, "speaker") }
+    override fun tripFocus() = focusKey()
     override fun chime() {
         val f = chimeFocus; f?.take()
         sound?.play(chimeId, 1f, 1f, 1, 0, 1f)

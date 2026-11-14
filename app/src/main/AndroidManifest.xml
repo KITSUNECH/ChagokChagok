@@ -59,7 +59,7 @@
             <intent-filter>
                 <action android:name="TAKE_IT_SLOW" />
                 <action android:name="SAVE_NOTE_HERE" />
-                <action android:name="READ_LATEST_DIARY" />
+                <action android:name="ASK_MY_DRIVING" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>

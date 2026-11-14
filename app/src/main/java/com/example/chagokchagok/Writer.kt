@@ -85,8 +85,10 @@ class Recorder {
     }
 
     /** 주행을 끝내고 요약을 만든다. */
-    fun finish(driver: String): Drive {
-        active = false
+    fun finish(driver: String): Drive { val d = summary(driver); active = false; return d }
+
+    /** 지금까지의 기록 요약 (기록은 계속된다) */
+    fun summary(driver: String): Drive {
         val end = System.currentTimeMillis()
         val totalKm = kmNow()
         val totalMs = (end - startTime).coerceAtLeast(1L)

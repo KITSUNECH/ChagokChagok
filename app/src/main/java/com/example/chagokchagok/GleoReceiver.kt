@@ -45,12 +45,20 @@ class GleoReceiver : BroadcastReceiver() {
                 reply(context, action, "success", if (placed) "The note was saved at the current position and will be played here on the next drive to this destination." else "The note was saved, but the current position is unknown, so it will be played along the route instead.",
                     JSONArray().put(JSONObject().put("placedAtPosition", placed)))
             }
-            "READ_LATEST_DIARY" -> {
-                val d = store.diariesOf(store.driver).lastOrNull()
-                if (d == null) reply(context, action, "success", "There is no diary entry yet.")
-                // 일기 본문은 방송으로 내보내지 않는다 (보안 가이드). 앱이 직접 읽어 주고 글레오는 조용히, 데이터에는 제목만.
-                else if (a != null) { a.speak(d.title + ". " + d.text); reply(context, action, "success", "The app is reading the latest diary aloud.", JSONArray().put(JSONObject().put("title", d.title)), mode = "silent") }
-                else reply(context, action, "success", "The latest diary entry was found. Open the app to read it.", JSONArray().put(JSONObject().put("title", d.title)))
+            "ASK_MY_DRIVING" -> {
+                // 운전자의 질문에 이 앱이 기록한 차량 신호로 답한다. 달리는 중이면 지금까지, 아니면 가장 최근 주행.
+                val topic = param.optString("topic").trim().lowercase().takeIf { t -> Coach.FOCUS.any { it.first == t } } ?: "today"
+                val driver = store.driver; val all = store.diariesOf(driver)
+                val live = a?.trip?.takeIf { it.active }
+                val last = all.lastOrNull()
+                if (live == null && last == null) { reply(context, action, "success", "No drive has been recorded yet."); return }
+                val drive = live?.recorder?.summary(driver) ?: last!!.drive
+                val before = if (live != null) all else all.dropLast(1)
+                val focus = store.answer("focus_$driver", "focus")?.takeIf { Coach.label(it) != null }
+                val answer = if (topic == "today") Coach.today(drive, before, focus, live != null) else Coach.about(topic, drive, before, live != null)
+                // 앱이 직접 읽어 주고 글레오는 조용히 (운전 기록 문장은 방송으로 내보내지 않는다). 앱 화면이 없을 때만 답을 데이터로 넘긴다.
+                if (a != null) { a.speak(answer); reply(context, action, "success", "The app is answering aloud from the vehicle signals it recorded.", JSONArray().put(JSONObject().put("topic", topic)), mode = "silent") }
+                else reply(context, action, "success", "The answer was produced from the vehicle signals recorded by the app.", JSONArray().put(JSONObject().put("topic", topic).put("answer", answer)))
             }
             else -> reply(context, action, "fail", "This function is not supported.")
         }

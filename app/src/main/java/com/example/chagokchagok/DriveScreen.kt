@@ -145,6 +145,8 @@ internal fun MainActivity.driveScreen(): View {
             // 제한속도·주행 통계는 차의 드라이빙 뷰와 내비가 이미 보여 준다. 겹쳐 그리지 않는다
             addView(routeCard)
             addView(k.fill())
+            // 글레오에게 말로 묻는 것과 같은 답 (멈춰 있을 때만 누를 수 있다)
+            addView(k.button("차에게 물어보기", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, k.WRAP))
             addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))

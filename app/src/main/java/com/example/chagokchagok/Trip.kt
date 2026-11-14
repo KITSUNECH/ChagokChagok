@@ -20,6 +20,8 @@ interface TripHost {
     fun tripEnded(d: Diary)
     fun diaryUpdated(d: Diary)
     fun lampsChanged()
+    /** 운전자가 고른 "요즘 신경 쓰이는 것" (없으면 null) */
+    fun tripFocus(): String? = null
     /** 너무 짧아 일기로 남기지 않은 주행 */
     fun tripDiscarded() {}
 }
@@ -44,13 +46,27 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     /** 차선 변경 판정 (깜빡이 + 조향각) */
     private val lanes = LaneWatch().also { w ->
         car.onSteer = { a -> if (active) w.steer(a) }
-        w.onLane = { lane, at -> recorder.add(Evt.LANE, lane.encode(), at?.first, at?.second) }
+        w.onLane = { lane, at -> recorder.add(Evt.LANE, lane.encode(), at?.first, at?.second); lanePraise(lane) }
     }
     /** 이 시각까지 오는 재탐색은 앱이 요청한 것 */
     private var ownRerouteUntil = 0L
     var withPassenger = false; private set
     var aiStatus = if (AiDiary.enabled) "대기 중" else "키 없음 (규칙으로 씀)"
 
+    /** 이번 주행에서 운전자가 신경 쓰인다고 한 것 */
+    var focus: String? = null; private set
+    private var lanePraised = 0
+    /**
+     * 차선 변경을 마친 뒤의 한마디. 끼어드는 순간에는 말하지 않고(차는 옆 차를 보지 못한다), 끝난 뒤에 잘한 것만 말한다.
+     * 깜빡이를 켜고 3초가 안 돼 넘어간 것은 칭찬하지 않는다. 신경 쓰인다고 한 날은 네 번까지, 아니면 한 번만.
+     */
+    private fun lanePraise(l: LaneMove) {
+        if (!l.moved || l.wait < LANE_FLOOR) return
+        val max = if (focus == "lane") 4 else if (support <= 2) 1 else 0
+        if (lanePraised >= max) return
+        lanePraised++
+        host.speak("깜빡이 켜고 ${l.wait.toInt()}초, 잘 넘어갔어요.", Voice.LOW)
+    }
     private var praised = 0
     private val spoken = mutableSetOf<String>()
     private var support = 3          // 1 연습(자주) · 2 받은 길(필요할 때) · 3 혼자(안전만)
@@ -128,7 +144,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     fun onArrived() {
         if (!active || arrived) return
         arrived = true
-        host.say("목적지에 도착했어요. 기어를 P에 놓으면 일기를 쓸게요.")
+        host.say("목적지에 도착했어요. " + (if (focus == "park") "주차는 서두르지 않아도 돼요. " else "") + "기어를 P에 놓으면 일기를 쓸게요.")
     }
 
     fun onDistance(km: Float) { if (!sim) recorder.distance(km) }
@@ -242,7 +258,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         heard.clear(); inZone.clear(); lastFix = null; voiceNotes.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
-        praised = 0; spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
+        praised = 0; lanePraised = 0; focus = host.tripFocus(); spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
         // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
         support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
             when (store.typeOf(store.driver)) { "초보" -> minOf(base, 2); "익숙" -> 3; else -> base }
@@ -256,7 +272,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             g.kind == "나" -> "지난번의 내가 남긴 길로 출발해요. 그 자리에 가면 알려 드릴게요."
             placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 한마디를 남긴 곳 근처에 가면 알려 드릴게요."
             else -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 조용히 적고 있을게요."
-        })
+        } + (Coach.label(focus)?.let { " 오늘은 ${it}부터 봐 드릴게요." } ?: ""))
         // 받은 응원이 있으면 출발하고 조금 뒤에 대신 전해 준다
         store.news(store.driver).lastOrNull { it.contains("응원") }?.let { cheer ->
             main.postDelayed({ if (active) host.speak(cheer.substringAfter("\t").replace("“", "").replace("”", ""), Voice.LOW) }, 5000)
@@ -322,8 +338,11 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         store.addDiary(d)
         store.setHeardTips(d.id, heard.sorted().mapNotNull { g?.tips?.getOrNull(it)?.text })
         guide = null; routeSent = false
+        // 신경 쓰인다고 한 것은 일기와 함께 남기고, 주차하자마자 그것부터 말해 준다
+        val f = focus; focus = null
+        if (f != null) store.setAnswer(d.id, "focus", f)
         host.tripEnded(d)
-        host.say("기록해 뒀어요. 시간 날 때 돌아봐요.")
+        host.say(if (f != null && !wasSim) "기록해 뒀어요. " + Coach.about(f, drive, store.diariesOf(driver).filter { it.id != d.id }) else "기록해 뒀어요. 시간 날 때 돌아봐요.")
         // 일기 머리의 날씨는 도착한 곳의 실제 날씨로 (설정에서 끌 수 있다)
         val end = route.lastOrNull()
         val la = car.lat ?: end?.lat; val ln = car.lng ?: end?.lng

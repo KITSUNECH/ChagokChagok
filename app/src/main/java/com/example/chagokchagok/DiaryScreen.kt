@@ -42,6 +42,8 @@ internal fun MainActivity.diaryScreen(id: String?): View {
             trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(store.feeling(d.id), d.text).joinToString(". ")) }))
         addView(k.gap(18))
         // 주차 후 첫 화면: 돌아보기(한마디가 도움이 됐는지, 지난번보다 어땠는지, 돌아볼 만한 순간)가 일기보다 먼저
+        // 같은 길의 지난 기록이 없는 날(첫 주행, 처음 간 길): 기준에 비춘 사실과 평소의 나
+        if (Growth.judge(store.diariesOf(d.driver), d) == null) carSawCard(d)?.let { addView(it, k.lp(k.MATCH, k.WRAP)); addView(k.gap(18)) }
         arrivalCard(d, prev)?.let { addView(it, k.lp(k.MATCH, k.WRAP)); addView(k.gap(18)) }
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(paper, k.lp(0, k.WRAP, 1.15f)); addView(side, k.lp(0, k.WRAP, 1f)) })
         else { addView(paper); addView(side) }
