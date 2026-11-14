@@ -208,8 +208,16 @@ internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
         feeling == null -> ask("오늘 운전은 어땠어요?", "한 줄만 남기면 내 일기가 돼요.", FEELS, "한 줄") { store.setFeeling(d.id, it); render() }
         else -> null
     }
-    val left: View = if (judge != null) judgementView(judge, vs).apply { (background as? android.graphics.drawable.GradientDrawable)?.setColor(Ink.surface) }
-        else carSawCard(d) ?: k.card(pad = 26) { addView(k.text(d.text, Type.Body)) }
+    // 왼쪽: 차가 본 것(판정이나 오늘 본 사실) + 아래에 지나온 길 그림. 상자 하나가 화면 아래 끝까지 간다
+    val saw: View = if (judge != null) judgementView(judge, vs) else carSawCard(d) ?: k.col().apply { setPadding(ui.dp(26), ui.dp(26), ui.dp(26), 0); addView(k.text(d.text, Type.Body)) }
+    saw.background = null
+    val left: View = k.col().apply {
+        background = k.rounded(Ink.surface, 24)
+        addView(saw, k.lp(k.MATCH, k.WRAP))
+        addView(View(context), k.lp(1, 0, 1f))
+        val lanes = listOfNotNull(prev?.let { Lane("지난번의 나", it.drive, faded = true) }, Lane(if (prev != null) "오늘의 나" else "오늘 지나온 길", d.drive))
+        addView(TraceView(context, ui).apply { this.lanes = lanes }, k.lp(k.MATCH, ui.dp(if (lanes.size > 1) 170 else 110)).apply { leftMargin = ui.dp(22); rightMargin = ui.dp(22); bottomMargin = ui.dp(18) })
+    }
     val right = k.col(14).apply {
         if (feeling != null) addView(k.card(pad = 22) {
             addView(k.row(8).apply {
@@ -219,6 +227,17 @@ internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
             addView(k.voice("“$feeling”", if (ui.wide) 26f else 22f))
         })
         question?.let { addView(it) }
+        // 오늘의 숫자 세 개 (자세한 것은 아래에)
+        addView(k.card(pad = 22) {
+            addView(k.row(16).apply {
+                fun stat(v: String, l: String) = k.col(2).apply { addView(k.text(v, Type.Title)); addView(k.text(l, Type.Caption, Ink.text2)) }
+                val dr = d.drive
+                addView(stat(if (dr.distKm > 0.05f) String.format(java.util.Locale.KOREA, "%.1fkm", dr.distKm) else "–", "거리"), k.lp(0, k.WRAP, 1f))
+                addView(stat(if (dr.minutes >= 1) "${dr.minutes}분" else "${dr.seconds}초", "시간"), k.lp(0, k.WRAP, 1f))
+                addView(stat(if (dr.turns > 0) "${dr.turnsSignaled}/${dr.turns}" else "–", "돌기 전 깜빡이"), k.lp(0, k.WRAP, 1f))
+            })
+        })
+        addView(View(context), k.lp(1, 0, 1f))   // 남는 높이: 단추들은 화면 맨 아래에 모인다
         if (mine) addView(k.button(if (open.isNotEmpty()) "돌아볼 순간 ${open.size}곳 · 다음에 들을 한마디 남기기" else "다음에 들을 한마디 남기기", if (question == null) Kit.Btn.Primary else Kit.Btn.Tinted, "quote") {
             if (open.size == 1) reviewMoment(d, open.first()) else noteToSelf(d)
         }, k.lp(k.MATCH, k.WRAP))
@@ -229,7 +248,9 @@ internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
         addView(k.header(d.title, dateText(d.date) + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
             trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(feeling, Coach.today(d.drive, all.filter { it.date < d.date }, store.answer(d.id, "focus"))).joinToString(". ")) }))
         addView(k.gap(16))
-        if (ui.wide) addView(k.row(20).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
-        else { addView(left); addView(k.gap(14)); addView(right) }
+        if (ui.wide) {
+            minimumHeight = pageHeight()
+            addView(k.row(20).apply { addView(left, k.lp(0, k.MATCH, 1f)); addView(right, k.lp(0, k.MATCH, 1f)) }, k.lp(k.MATCH, 0, 1f))
+        } else { addView(left); addView(k.gap(14)); addView(right) }
     }
 }

@@ -200,6 +200,9 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         else -> todayScreen()
     }
 
+    /** 넓은 창에서 내용이 쓸 수 있는 화면 높이(px). 한 화면을 꽉 채우는 배치의 기준 */
+    internal fun pageHeight(): Int = (ui.h * resources.displayMetrics.density).toInt() - (ui.dp(34) * 2 + ui.dp(20))
+
     /** 현재 탭 (밀어 넣은 화면이면 그 아래 탭) */
     private fun currentTab() = stack.firstOrNull { it.name in TABS }?.name ?: TODAY
 
@@ -209,7 +212,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         val body = k.scroll(FrameLayout(this).apply {
             val padH = ui.dp(if (ui.wide) 44 else 20); val padV = ui.dp(if (ui.wide) 34 else 20)
             setPadding(padH, padV, padH, padV + ui.dp(20))
-            addView(content, FrameLayout.LayoutParams(-1, -2))
+            addView(content, FrameLayout.LayoutParams(-1, -1))
         })
         pageScroll = body as? android.widget.ScrollView
         if (ui.wide) return k.row().apply {

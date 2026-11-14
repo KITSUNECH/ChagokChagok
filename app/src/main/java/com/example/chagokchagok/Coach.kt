@@ -146,29 +146,46 @@ internal fun MainActivity.carSawCard(d: Diary): View? {
 }
 
 
-/** 홈: 평소의 나. 최근 주행에서 차가 본 습관 두 가지. 누르면 흐름을 본다. 기록이 모자라면 무엇이 쌓이는지 알려 준다. */
+/**
+ * 홈: 차가 본 나. 위에는 평소의 나(최근 주행의 습관 두 가지), 아래에는 지난 주행에서 차가 본 것을 글로.
+ * 화면의 남는 높이를 이 상자가 채우므로, 빈칸 대신 읽을 것이 들어 있다. 누르면 흐름을 본다.
+ */
 internal fun MainActivity.usualCard(): View {
     val k = kit
     val ds = store.diariesOf(store.driver).filter { !it.drive.sim }
     val u = Coach.usual(ds)
-    fun stat(value: String, label: String) = k.col(2).apply { addView(k.text(value, Type.Large)); addView(k.text(label, Type.Caption, Ink.text2)) }
+    val last = ds.lastOrNull()
+    fun stat(value: String, label: String) = k.col(2).apply { addView(k.text(value, Type.Display)); addView(k.text(label, Type.Sub, Ink.text2)) }
     return k.card(pad = 22, onClick = if (ds.size >= 2) ({ go(MainActivity.ANALYSIS) }) else null) {
         addView(k.row(10).apply {
             addView(k.icon("car", Ink.accent, 22))
-            addView(k.text("평소의 나", Type.Headline), k.lp(0, k.WRAP, 1f))
+            addView(k.text("차가 본 나", Type.Headline), k.lp(0, k.WRAP, 1f))
             addView(k.text(if (u.drives == 0) "아직 기록이 없어요" else "최근 ${u.drives}번", Type.Sub, Ink.text2))
             if (ds.size >= 2) addView(k.icon("chevron", Ink.text3, 20))
         })
-        addView(k.gap(10))
-        if (u.signalPct == null && u.laneWait == null) addView(k.text("달릴수록 차가 본 내 습관이 여기에 쌓여요. 돌기 전 깜빡이, 차선 변경 전 기다림.", Type.Sub, Ink.text2))
+        addView(k.gap(12))
+        if (u.signalPct == null && u.laneWait == null) addView(k.col(12).apply {
+            gravity = Gravity.CENTER
+            addView(android.widget.FrameLayout(context).apply {
+                background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Ink.accentSoft) }
+                addView(IconView(context, "chart", Ink.accent), android.widget.FrameLayout.LayoutParams(ui.dp(34), ui.dp(34), Gravity.CENTER))
+            }, k.lp(ui.dp(76), ui.dp(76)))
+            addView(k.text("달릴수록 차가 본 내 습관이 여기에 쌓여요.\n돌기 전 깜빡이, 차선 변경 3초 전 깜빡이.", Type.Sub, Ink.text2).apply { gravity = Gravity.CENTER })
+        }, k.lp(k.MATCH, 0, 1f))
         else addView(k.row(28).apply {
-            gravity = Gravity.TOP
-            addView(stat(u.signalPct?.let { "${it.toInt()}%" } ?: "–", "돌기 전 깜빡이"))
-            addView(stat(u.laneWait?.let { "${it.toInt()}초" } ?: "–", "차선 변경 전 기다림"))
+            addView(stat(u.signalPct?.let { "${it.toInt()}%" } ?: "–", "돌기 전 깜빡이"), k.lp(0, k.WRAP, 1f))
+            addView(stat(u.laneWait?.let { "${it.toInt()}초" } ?: "–", "차선 변경 전 기다림"), k.lp(0, k.WRAP, 1f))
         })
+        if (last != null) {
+            addView(k.gap(14))
+            addView(View(context).apply { setBackgroundColor(Ink.line) }, k.lp(k.MATCH, ui.dp(1)))
+            addView(k.gap(14))
+            addView(k.text("지난 주행 · ${dateText(last.date, "M월 d일")}" + (last.drive.place?.let { " · $it" } ?: ""), Type.Sub, Ink.accent))
+            addView(k.gap(4))
+            addView(k.text(Coach.today(last.drive, ds.dropLast(1), null), Type.Body).apply { ellipsize = android.text.TextUtils.TruncateAt.END }, k.lp(k.MATCH, 0, 1f))
+        }
     }
 }
-
 
 /** 홈의 "내비 열기": 어디로 갈지 받아서 내비의 장소 검색 화면으로 넘긴다 (주차 중에만 글자를 받는다) */
 internal fun MainActivity.findInNavi() {

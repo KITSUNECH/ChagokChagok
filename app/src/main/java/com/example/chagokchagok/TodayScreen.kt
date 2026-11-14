@@ -47,9 +47,9 @@ internal fun MainActivity.todayScreen(): View {
         addView(head); addView(k.gap(if (ui.wide) 20 else 16))
         if (ui.wide) addView(k.row(20).apply {
             gravity = Gravity.TOP
-            addView(k.col(16).apply { addView(startCard(null), k.lp(k.MATCH, k.WRAP)); addView(againCard(guide), k.lp(k.MATCH, k.WRAP)) }, k.lp(0, k.WRAP, 1.4f))
-            addView(k.col(16).apply { side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
-        }) else addView(k.col(16).apply { addView(startCard(null)); addView(againCard(guide)); side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
+            addView(k.col(16).apply { addView(startCard(null), k.lp(k.MATCH, k.WRAP)); addView(againCard(guide), k.lp(k.MATCH, 0, 1f)) }, k.lp(0, k.MATCH, 1.4f))
+            addView(k.col(16).apply { side.forEachIndexed { i, v -> addView(v, if (i == side.lastIndex) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.MATCH, 1f))
+        }, k.lp(k.MATCH, 0, 1f)) else addView(k.col(16).apply { addView(startCard(null)); addView(againCard(guide)); side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
     }
 }
 
@@ -61,7 +61,7 @@ internal fun MainActivity.againCard(guide: Guide?): View {
     val k = kit; val me = store.driver
     val dest = car.destName?.takeIf { it.isNotBlank() }
     val places = store.diariesOf(me).filter { it.ownTrip() && it.drive.place != null && !it.drive.sim && it.drive.placeLat != null && it.drive.completed }
-        .groupBy { it.drive.place!! }.entries.sortedByDescending { e -> e.value.last().date }.take(if (guide != null) 2 else 3)
+        .groupBy { it.drive.place!! }.entries.sortedByDescending { e -> e.value.last().date }.take((if (ui.wide && ui.h / ui.scale >= 800f) 4 else 3) - if (guide != null) 1 else 0)
     val rows = places.map { (place, ds) ->
         val note = store.selfGuide(me, place)?.tips?.firstOrNull()?.text
         k.item(place, (if (note != null) "지난번 한마디 “$note”" else "지난번 ${dateText(ds.last().date, "M월 d일")}") + " · ${ds.size}번 다녀옴", if (note != null) "quote" else "pin",
@@ -77,15 +77,16 @@ internal fun MainActivity.againCard(guide: Guide?): View {
         } else {
             addView(k.text("이렇게 써요", Type.Headline))
             addView(k.gap(6))
+            // 처음에는 이 네 줄이 상자의 높이를 고르게 나눠 채운다
             LOOP_STEPS.forEach { (ic, t, s) ->
-                addView(k.row(14).apply {
+                addView(k.row(16).apply {
                     setPadding(0, ui.dp(7), 0, ui.dp(7))
-                    addView(k.icon(ic, Ink.accent, 24))
-                    addView(k.text(t, Type.BodyStrong), k.lp(ui.dp(if (ui.wide) 130 else 108), k.WRAP))
-                    addView(k.text(s, Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
-                })
+                    addView(android.widget.FrameLayout(context).apply { background = k.rounded(Ink.accentSoft, 14); addView(IconView(context, ic, Ink.accent), android.widget.FrameLayout.LayoutParams(ui.dp(24), ui.dp(24), Gravity.CENTER)) }, k.lp(ui.dp(48), ui.dp(48)))
+                    addView(k.col(2).apply { addView(k.text(t, Type.Headline)); addView(k.text(s, Type.Sub, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
+                }, k.lp(k.MATCH, 0, 1f))
             }
         }
+        addView(View(context), k.lp(1, 0, 1f))   // 남는 높이는 여기로: 내비 줄은 상자 맨 아래에 붙는다
         addView(k.gap(12))
         // 새로운 곳: 실제 Pleos 내비의 화면을 연다 (NaviHelper requestNavigationScreen)
         addView(k.row(12).apply {
@@ -430,7 +431,14 @@ internal fun MainActivity.readyScreen(): View {
         addView(k.gap(8))
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
         else { addView(left); addView(right) }
-        addView(k.gap(26))
+        addView(k.gap(20))
+        // 이 길의 그림: 지난번에 지나온 길과 한마디를 남긴 자리. 화면의 남는 높이를 채운다
+        addView(k.card(pad = 20) {
+            addView(k.text("지난번에 지나온 길", Type.Sub, Ink.text2))
+            addView(TraceView(context, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips)) }, k.lp(k.MATCH, 0, 1f).apply { topMargin = ui.dp(6) })
+            minimumHeight = ui.dp(130)
+        }, if (ui.wide) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, ui.dp(150)))
+        addView(k.gap(20))
         addView(k.card(pad = 22, color = Ink.accentSoft) {
             addView(k.row(14).apply {
                 addView(k.icon("steering", Ink.accent, 28))
