@@ -98,6 +98,19 @@ class Car(private val ctx: Context, private val listener: Listener) {
     /** 차대번호 (CarInfo SDK). 차종과 변속 방식을 알아내는 데만 쓰고 밖으로 보내지 않는다. */
     var vin: String? = null; private set
     var isEv: Boolean? = null; private set
+    /** 이번 주행 연비 (차가 계산한 "현재" 연비: 내연기관 km/L, 전기차 km/kWh). 읽지 못하면 null */
+    var economy: Float? = null; private set
+    val economyUnit get() = if (isEv == true) "km/kWh" else "km/L"
+    private val econL = object : ai.pleos.playground.vehicle.listener.FuelEconomyListener {
+        override fun onFuelEconomyUpdated(value: Float?) = ui { if (value != null && value > 0f && isEv != true) economy = value }
+        override fun onFailed(e: Exception) { failures["economy"] = e.message ?: "실패" }
+    }
+    private val evEconL = object : ai.pleos.playground.vehicle.listener.EvBatteryEfficiencyListener {
+        override fun onEvBatteryEfficiencyUpdated(value: Float?) = ui { if (value != null && value > 0f) { isEv = true; economy = value } }
+        override fun onFailed(e: Exception) { failures["evEconomy"] = e.message ?: "실패" }
+    }
+    /** 시험용·시연용 연비 (실제 차량 값이 아니다) */
+    fun simEconomy(v: Float?) { economy = v }
     /** 신호별로 마지막에 실패한 이유. 화면의 점검 칸에서 보여 준다. */
     val failures: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()   // SDK 콜백 스레드에서도 쓴다
 
@@ -240,6 +253,9 @@ class Car(private val ctx: Context, private val listener: Listener) {
             if (!pm.registerCallback(gearCb, android.car.VehiclePropertyIds.GEAR_SELECTION, android.car.hardware.property.CarPropertyManager.SENSOR_RATE_ONCHANGE))
                 failures[Evt.GEAR] = "GEAR_SELECTION 을 지원하지 않음"
         }
+        // 연비: Vehicle SDK Fuel(현재 연비) / EvBattery(현재 전비). 드라이빙 뷰의 "현 주행 정보" 연비와 같은 종류의 값
+        cap("economy", { ok, no -> vehicle.getFuel().checkCurrentFuelEconomyCapabilities(ok, no) }) { vehicle.getFuel().registerCurrentFuelEconomy(econL) }
+        cap("evEconomy", { ok, no -> vehicle.getEvBattery().checkCurrentEvEfficiencyCapabilities(ok, no) }) { vehicle.getEvBattery().registerCurrentEvEfficiency(evEconL) }
         refreshCondition()
         cap("vin", { ok, no -> vehicle.getCarInfo().checkVINInfoCapabilities(ok, no) }) { vehicle.getCarInfo().getVINInfo({ v -> ui { vin = v?.trim()?.takeIf { it.length >= 10 }; listener.onCarEvent(Evt.NAVI, "vin") } }, { e -> failures["vin"] = e.message ?: "실패" }) }
 

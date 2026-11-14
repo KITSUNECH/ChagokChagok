@@ -110,11 +110,14 @@ private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
 /** 오늘의 숫자: 네 칸 */
 private fun MainActivity.numbers(d: Diary): View {
     val k = kit; val v = d.drive
-    val tiles = listOf(
+    val lw = v.laneWaitMedian()
+    val tiles = listOfNotNull(
         k.stat(if (v.distKm > 0.05f) String.format(java.util.Locale.KOREA, "%.1fkm", v.distKm) else "–", "거리"),
         k.stat(if (v.minutes >= 1) "${v.minutes}분" else "${v.seconds}초", "시간"),
         k.stat(if (v.turns > 0) "${v.turnsSignaled}/${v.turns}" else "${v.signals}번", if (v.turns > 0) "돌기 전 깜빡이" else "깜빡이"),
         k.stat(if (v.distKm > 0.3f) String.format(java.util.Locale.KOREA, "%.1f", v.brakes / v.distKm) else "${v.brakes}번", if (v.distKm > 0.3f) "1km마다 브레이크" else "브레이크"),
+        v.economy?.let { k.stat(String.format(java.util.Locale.KOREA, "%.1f", it), "연비 ${v.economyUnit}") },
+        lw?.let { k.stat("${it.toInt()}초", "차선 변경 전 기다림") },
     )
     return k.card(pad = 20) { addView(k.grid(2, tiles, 14)) }
 }

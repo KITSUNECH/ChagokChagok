@@ -285,7 +285,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 else -> d
             }
             val far = g != null && g.drive.distKm > 0.05f && km >= g.drive.distKm * 0.9f
-            placed.copy(distKm = km, path = route, completed = g == null || arrived || far || wasSim, sim = wasSim)
+            placed.copy(distKm = km, path = route, completed = g == null || arrived || far || wasSim, sim = wasSim, economy = car.economy, economyUnit = car.economyUnit)
         }
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")

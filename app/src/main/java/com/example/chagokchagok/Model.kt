@@ -48,7 +48,10 @@ data class Drive(
     /** 시연용 모의 주행으로 만든 기록. 졸업·다녀온 곳·성장 숫자에 넣지 않는다. */
     val sim: Boolean = false,
     /** 지나온 길 (이 차 안에만 저장. 건네줄 때는 출발 근처를 빼고 보낸다) */
-    val path: List<Pt> = emptyList()
+    val path: List<Pt> = emptyList(),
+    /** 이번 주행 연비: 차가 계산한 값 (내연기관 km/L, 전기차 km/kWh). 읽지 못하면 null */
+    val economy: Float? = null,
+    val economyUnit: String = "km/L",
 )
 
 /** 건네준 길: 누군가의 주행 한 번 + 목적지 + 한마디. */
@@ -303,7 +306,7 @@ class Store(ctx: Context) {
     private fun json(d: Drive) = JSONObject().apply {
         put("driver", d.driver); put("date", d.date); put("distKm", d.distKm.toDouble()); put("minutes", d.minutes); put("seconds", d.seconds)
         put("signals", d.signals); put("brakes", d.brakes); put("rained", d.rained); put("night", d.night)
-        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }; put("completed", d.completed); put("sim", d.sim)
+        put("parkMoves", d.parkMoves); put("lostWay", d.lostWay); put("longestSignalSec", d.longestSignalSec); put("cruise", d.cruise); put("passenger", d.passenger); put("turns", d.turns); put("turnsSignaled", d.turnsSignaled); put("calm", d.calm); if (d.place != null) put("place", d.place); put("lamps", d.lamps.joinToString("|")); if (d.placeLat != null && d.placeLng != null) { put("placeLat", d.placeLat); put("placeLng", d.placeLng) }; put("completed", d.completed); put("sim", d.sim); if (d.economy != null) { put("eco", d.economy.toDouble()); put("ecoU", d.economyUnit) }
         put("path", JSONArray().apply { d.path.forEach { put(JSONArray().put(it.p.toDouble()).put(it.lat).put(it.lng)) } })
         put("events", JSONArray().apply {
             d.events.forEach { e -> put(JSONObject().put("p", e.p.toDouble()).put("t", e.type).put("v", e.value).apply { if (e.lat != null && e.lng != null) { put("la", e.lat); put("ln", e.lng) } }) }
@@ -320,7 +323,8 @@ class Store(ctx: Context) {
             o.getString("driver"), o.getLong("date"), o.getDouble("distKm").toFloat(), o.getInt("minutes"), o.optInt("seconds", o.getInt("minutes") * 60), evs,
             o.getInt("signals"), o.getInt("brakes"), o.getBoolean("rained"), o.getBoolean("night"),
             o.getInt("parkMoves"), o.getInt("lostWay"), o.getInt("longestSignalSec"), o.optBoolean("cruise", false), o.optBoolean("passenger", false), o.optInt("turns", 0), o.optInt("turnsSignaled", 0), o.optInt("calm", 0), if (o.has("place")) o.getString("place") else null, o.optString("lamps", "").split("|").filter { it.isNotEmpty() }, if (o.has("placeLat")) o.getDouble("placeLat") else null, if (o.has("placeLng")) o.getDouble("placeLng") else null, o.optBoolean("completed", true), o.optBoolean("sim", false),
-            o.optJSONArray("path")?.let { a -> (0 until a.length()).map { i -> a.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1), it.getDouble(2)) } } } ?: emptyList()
+            o.optJSONArray("path")?.let { a -> (0 until a.length()).map { i -> a.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1), it.getDouble(2)) } } } ?: emptyList(),
+            if (o.has("eco")) o.getDouble("eco").toFloat() else null, o.optString("ecoU", "km/L"),
         )
     }
 
