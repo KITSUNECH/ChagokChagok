@@ -88,13 +88,15 @@ class ScreenshotTest {
         snap("06_diary")
         if (!short) {
             // 같은 곳에 다시 간 날: 지난번과 비교 + 한마디 후보
-            val again = Drive("나", System.currentTimeMillis(), 4.1f, 13, 820, listOf(Ev(.2f, Evt.SIGNAL, "RIGHT"), Ev(.4f, Evt.BRAKE, "on"), Ev(.42f, Evt.BRAKE, "on"), Ev(.45f, Evt.BRAKE, "on"), Ev(.6f, Evt.CALM, "on"), Ev(.8f, Evt.SIGNAL, "LEFT")),
-                2, 5, false, false, 1, 0, 6, turns = 4, turnsSignaled = 3, calm = 1, place = "동네 마트", placeLat = 37.49, placeLng = 127.03,
+            val again = Drive("나", System.currentTimeMillis(), 4.1f, 13, 820, listOf(Ev(.2f, Evt.SIGNAL, "RIGHT"), Ev(.4f, Evt.BRAKE, "on"), Ev(.42f, Evt.BRAKE, "on"), Ev(.45f, Evt.BRAKE, "on"), Ev(.6f, Evt.CALM, "on"), Ev(.66f, Evt.LANE, LaneMove("LEFT", 12f, true, true, false, false).encode()), Ev(.8f, Evt.SIGNAL, "LEFT")),
+                2, 5, false, false, 1, 0, 6, turns = 4, turnsSignaled = 3, calm = 1, place = "동네 마트", placeLat = 37.49, placeLng = 127.03, economy = 14.8f,
                 path = SampleRoute.points.mapIndexed { i, q -> Pt(i / (SampleRoute.points.size - 1f), q.first, q.second) })
             val dd = Writer.write(again, store.diariesOf("나"), null, 0); store.addDiary(dd)
             a.go(MainActivity.DIARY, dd.id); snap("06b_diary_compare")
             a.noteToSelf(dd); snap("06c_tip_ideas"); a.onBackPressed()
             DiaryPrefs.mode = 1; a.go(MainActivity.DIARY, dd.id); snap("06d_diary_paper"); DiaryPrefs.mode = 0
+            a.go(MainActivity.ROAD, dd.id); snap("06e_road")
+            a.go(MainActivity.TODAY); snap("02b_today_review")
         }
         if (!short) {
             val last = store.diariesOf("나").last()

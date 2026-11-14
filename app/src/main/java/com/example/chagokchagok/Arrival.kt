@@ -44,8 +44,13 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
     val helped = store.answer(d.id, Q_HELPED); val vs = store.answer(d.id, Q_VS_LAST)
     if (heard.isEmpty() && prev == null && moments.isEmpty()) return null
 
-    // 다 답했으면: 내가 남긴 답이 곧 "늘었다"의 근거. 한 줄로.
+    val judge = if (prev != null) Growth.judge(store.diariesOf(d.driver), d) else null
+    // 다 답했으면: 앱의 판단과 내 답을 합친 한 줄
     if (!pending(d, prev)) {
+        if (judge != null) return k.card(pad = 22) {
+            addView(judgementView(judge, vs, compact = true))
+            addView(k.text(listOfNotNull(helped?.takeIf { it != "답하지 않음" }?.let { "들은 한마디 · $it" }, kept.size.takeIf { it > 0 }?.let { "다음에 들을 한마디 ${it}개" }).joinToString("  ·  "), Type.Sub, Ink.text2))
+        }
         val parts = listOfNotNull(
             vs?.let { "지난번보다 $it" },
             helped?.let { "들은 한마디 · $it" },
@@ -81,8 +86,10 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
         val blocks = mutableListOf<View>()
         if (heard.isNotEmpty() && helped == null) blocks.add(question(
             "길 위에서 들은 한마디, 도움이 됐나요?", heard.joinToString("  ·  ") { "“$it”" }, HELPED, helped) { store.setAnswer(d.id, Q_HELPED, it); render() })
+        // 앱이 먼저 판단하고, 운전자의 느낌을 묻는다. 둘을 합쳐 한 줄로 보여 준다
+        if (judge != null) blocks.add(judgementView(judge, vs))
         if (prev != null && vs == null) blocks.add(question(
-            "지난번보다 어땠어요?", "${dateText(prev.date, "M월 d일")}에 같은 곳에 다녀왔어요. 숫자보다 내 느낌이 먼저예요.", VS_LAST, vs) { store.setAnswer(d.id, Q_VS_LAST, it); render() })
+            "내 느낌은 어땠어요?", "${dateText(prev.date, "M월 d일")}에도 같은 곳에 다녀왔어요. 차의 판단과 합쳐서 보여 드려요.", VS_LAST, vs) { store.setAnswer(d.id, Q_VS_LAST, it); render() })
         val open = moments.filter { it.why !in skipped && it.why !in kept }
         if (open.isNotEmpty()) blocks.add(k.col(10).apply {
             addView(k.text("오늘 돌아볼 만한 순간", Type.Headline))

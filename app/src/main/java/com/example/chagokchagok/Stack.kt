@@ -61,7 +61,7 @@ internal fun MainActivity.blocks(): List<Block> {
         // 차곡차곡: 같은 길을 다시 달리며 쌓는다. "늘었다"는 차가 정하지 않고 운전자가 답한다
         Block("again", 2, "같은 곳에 다시", "다녀온 곳에 한 번 더, 끝까지", ds.any { previousSame(it) != null }),
         Block("helped", 2, "지난번 한마디가 도움이 됐어요", "길 위에서 들은 한마디에 ‘도움이 됐어요’", ds.any { store.answer(it.id, Q_HELPED) == "도움이 됐어요" }),
-        Block("easier", 2, "지난번보다 더 편했어요", "같은 곳에 다시 간 날 ‘더 편했어요’", ds.any { store.answer(it.id, Q_VS_LAST) == "더 편했어요" }),
+        Block("easier", 2, "차도 나도 늘었다고 했어요", "같은 길에서 차가 본 변화가 ‘늘었어요’이고, 내 느낌도 ‘더 편했어요’", ds.any { Growth.bothUp(Growth.judge(ds, it), store.answer(it.id, Q_VS_LAST)) }),
         Block("give", 2, "익숙해진 길을 건넸어요", "일기에서 ‘이 길 건네주기’", myGuides.any { it.kind != "나" }),
     )
 }

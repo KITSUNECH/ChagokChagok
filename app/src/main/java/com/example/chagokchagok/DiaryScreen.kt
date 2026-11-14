@@ -21,7 +21,10 @@ internal fun MainActivity.diaryScreen(id: String?): View {
         addView(numbers(d))
         if (prev != null) {
             addView(k.section((if (sameRoad(prev.drive, d.drive)) "같은 길" else "같은 곳") + " · ${visits(d)}번째"))
+            Growth.judge(store.diariesOf(d.driver), d)?.let { j -> addView(k.card(pad = 20) { addView(judgementView(j, store.answer(d.id, Q_VS_LAST), compact = true)) }); addView(k.gap(12)) }
             addView(compareCard(prev, d))
+            addView(k.gap(10))
+            addView(k.button("이 길의 나 · 그래프로 보기", Kit.Btn.Tinted, "chart") { go(MainActivity.ROAD, d.id) })
         }
         addView(k.section("주행 타임라인"))
         addView(k.card(pad = 20) {

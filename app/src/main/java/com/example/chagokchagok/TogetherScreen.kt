@@ -160,10 +160,11 @@ internal fun MainActivity.roadsScreen(): View {
         else k.groupOf(trips.map { (place, ds) ->
             val last = ds.last()
             k.item(place, "${Writer.times(ds.size)} · 마지막 ${dateText(last.date, "M월 d일")}" + (store.feeling(last.id)?.let { " · “$it”" } ?: ""), "pin", chevron = true) {
-                sheets.choose(place, null, listOfNotNull(if (last.drive.placeLat != null) "다시 가기" else null, "추천 장소로 건네주기", "일기 보기")) { i ->
-                    val opts = listOfNotNull(if (last.drive.placeLat != null) "again" else null, "give", "diary")
+                sheets.choose(place, null, listOfNotNull(if (last.drive.placeLat != null) "다시 가기" else null, if (ds.size >= 2) "이 길의 나 (그래프)" else null, "추천 장소로 건네주기", "일기 보기")) { i ->
+                    val opts = listOfNotNull(if (last.drive.placeLat != null) "again" else null, if (ds.size >= 2) "road" else null, "give", "diary")
                     when (opts[i]) {
                         "again" -> goAgain(place, last)
+                        "road" -> go(MainActivity.ROAD, last.id)
                         "give" -> { giveTitle = place; giveTips.clear(); giveKind = "추천"; go(MainActivity.GIVE, last.id) }
                         else -> go(MainActivity.DIARY, last.id)
                     }

@@ -44,7 +44,8 @@ internal fun MainActivity.myRouteHero(): View {
                 val self = store.selfGuide(me, place)
                 val note = self?.tips?.firstOrNull()?.text
                 k.item(place, (if (note != null) "지난번 한마디 “$note”" else "지난번 ${dateText(ds.last().date, "M월 d일")}") + " · ${ds.size}번 다녀옴",
-                    if (note != null) "quote" else "pin", chevron = true) { goAgain(place, ds.last()) }
+                    if (note != null) "quote" else "pin",
+                    trailing = if (ds.size >= 2) k.iconButton("chart", Ink.accent, Ink.accentSoft, 44) { go(MainActivity.ROAD, ds.last().id) } else k.icon("chevron", Ink.text3, 20)) { goAgain(place, ds.last()) }
             }).apply { background = k.rounded(Ink.fill, 18) })
             addView(k.gap(18))
             addView(k.text("새로운 곳", Type.Sub, Ink.text2))
