@@ -99,6 +99,8 @@ object Evt {
     const val SEAT = "seat"       // 동승자 탑승
     const val TURN = "turn"       // 내비가 안내한 회전을 지남 (값: signaled / missed)
     const val LANE = "lane"       // 차선 변경 (추정, 값: Lane.encode)
+    const val HARD = "hard"       // 급하게 섬 (속도가 짧은 시간에 크게 줄었다)
+    const val SPEED = "speed"     // 이번 주행에서 속도 신호를 받았다 (급정거가 "없었다"고 말할 수 있는지)
     const val CALM = "calm"       // 천천히 (운전자가 직접 청함)
     const val SAY = "say"         // 옆자리 한마디 (값: 그 말)
     const val LAMP = "lamp"       // 표시등 (값: 종류:on/off)

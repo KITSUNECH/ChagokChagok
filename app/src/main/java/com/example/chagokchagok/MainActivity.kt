@@ -63,6 +63,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     private var shownRoute: Route? = null
     private var pageScroll: android.widget.ScrollView? = null
     internal var roadsTab = 0
+    private var speedTick = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +85,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         limits = Restrictions(this) { onRestricted() }
         sheets.keyboardBlocked = { limits.noKeyboard || trip.active }
         sheets.driving = { driving }   // 기록 중에는 글자 입력을 받지 않는다 (도로교통법 제49조)
+        car.onSpeed = { kmh -> val sec = System.currentTimeMillis() / 1000; if (sec != speedTick) { speedTick = sec; Telemetry.hit(Evt.SPEED, "${kmh.toInt()}km/h") }; trip.onSpeed(kmh) }
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
         // 효과음: 알림음 용도(SONIFICATION)로 만들고, 울릴 때마다 잠깐 포커스를 받아 다른 소리를 줄인다 (Pleos 오디오 가이드)
@@ -95,7 +97,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             tripStarted(); say("끊겼던 기록을 이어 갈게요.")
         } else if (store.onboarded) {
             go(TODAY)
-            if (store.locationOn && !places.permitted() && !Car.offline) askLocation()
+            if (!Car.offline && ((store.locationOn && !places.permitted()) || checkSelfPermission(Car.SPEED_PERMISSION) != android.content.pm.PackageManager.PERMISSION_GRANTED)) askLocation()
         } else go(ONBOARD)
         // 시작 모션: 세 줄이 쌓이고 세로 획이 꿰뚫어 車이 된다 (주행 중 다시 켜졌을 때는 보여 주지 않는다)
         if (!Car.offline && !driving && savedInstanceState == null) {
@@ -132,9 +134,10 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     // ───────── 위치 권한 ─────────
 
     /** 위치 권한과 함께, 기록 중 알림을 보여 줄 알림 권한도 주차 중에 한 번에 묻는다 (달리는 중에는 묻지 않는다) */
-    internal fun askLocation() { try { requestPermissions(if (android.os.Build.VERSION.SDK_INT >= 33) arrayOf(Places.PERMISSION, android.Manifest.permission.POST_NOTIFICATIONS) else arrayOf(Places.PERMISSION), REQ_LOCATION) } catch (_: Throwable) {} }
+    internal fun askLocation() { try { requestPermissions(if (android.os.Build.VERSION.SDK_INT >= 33) arrayOf(Places.PERMISSION, Car.SPEED_PERMISSION, android.Manifest.permission.POST_NOTIFICATIONS) else arrayOf(Places.PERMISSION, Car.SPEED_PERMISSION), REQ_LOCATION) } catch (_: Throwable) {} }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode == REQ_LOCATION) car.startSpeed()
         if (requestCode == REQ_LOCATION && places.permitted()) places.listen()
         else if (requestCode == REQ_LOCATION) places.showBlocked()   // 문서 권장: 위치가 막히면 Pleos 안내 팝업
         if (route.name == SETTINGS || route.name == ONBOARD) render()

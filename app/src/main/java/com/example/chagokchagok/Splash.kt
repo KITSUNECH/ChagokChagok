@@ -2,7 +2,7 @@
 // 천천히, 끊기지 않게: 동작이 서로 겹치며 이어지고, 튕기지 않고 부드럽게 감속한다 (prompt-motion.com의 로고 등장 사례들을 참고).
 // 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓인다 → 쌓인 세 줄이 로고의 왼쪽 아래 칸으로 옮겨 가고,
 // 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다.
-// 그 끝에 흰 선이 아래에서부터 차곡차곡 쌓여 올라가 테두리가 되며 앱 아이콘과 같은 모습이 된다.
+// 그 끝에 흰 테두리가 가로 여덟 줄로 나뉘어 아랫줄부터 한 줄씩 빠르게 쌓이며 앱 아이콘과 같은 모습이 된다.
 // 화면 전체는 내내 아주 천천히 다가온다. 눌러도 끝까지 보여 준다.
 package com.example.chagokchagok
 
@@ -95,20 +95,27 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
             p.alpha = (255 * k).toInt()
             c.drawText(ch, ox + S * u, oy + S * v + (1 - k) * S * .07f, p)
         }
-        // 흰 선: 아래에서부터 네 켜가 차곡차곡 쌓여 올라가 테두리가 된다 (한 켜씩 겹치며, 튕김 없이 감속)
-        val layers = 4
-        val built = (0 until layers).sumOf { i -> expoOut(seg(.68f + i * .045f, .76f + i * .045f)).toDouble() }.toFloat() / layers
-        if (built > 0f) {
-            c.save()
-            c.clipRect(ox - S * .05f, oy + S * (1f - built), ox + S * 1.05f, oy + S * 1.05f)
-            p.shader = null; p.style = Paint.Style.STROKE; p.color = Color.WHITE
-            p.strokeWidth = S * LogoLayout.RING_W; p.alpha = 255
-            c.drawPath(LogoLayout.ring(ox, oy, S), p)
-            c.restore()
-            p.style = Paint.Style.FILL
+        // 흰 선: 테두리를 가로로 여덟 줄로 잘라, 아랫줄부터 한 줄씩 빠르게 떨어져 쌓인다.
+        // (앞에서 車의 세 줄이 천천히 쌓였으니, 여기는 훨씬 빠르게: 한 줄에 약 0.1초, 줄 사이 0.05초)
+        val rows = 8
+        if (t > .70f) {
+            p.shader = null; p.style = Paint.Style.STROKE; p.color = Color.WHITE; p.strokeWidth = S * LogoLayout.RING_W
+            val pad = S * .05f
+            for (i in 0 until rows) {
+                val k = seg(.70f + i * .012f, .724f + i * .012f); if (k <= 0f) continue
+                val e = cubicOut(k)
+                val top = oy + S * (1f - (i + 1f) / rows); val bottom = oy + S * (1f - i.toFloat() / rows)
+                c.save()
+                c.translate(0f, -(1f - e) * S * .09f)   // 위에서 떨어져 제자리에
+                c.clipRect(ox - pad, if (i == rows - 1) top - pad else top, ox + S + pad, if (i == 0) bottom + pad else bottom)
+                p.alpha = (255 * minOf(1f, k * 2f)).toInt()
+                c.drawPath(LogoLayout.ring(ox, oy, S), p)
+                c.restore()
+            }
+            p.style = Paint.Style.FILL; p.alpha = 255
         }
         // 한 줄 소개
-        val tag = cubicOut(seg(.86f, .94f))
+        val tag = cubicOut(seg(.84f, .93f))
         if (tag > 0f) {
             p.textSize = S * .085f; p.color = SKY; p.alpha = (255 * tag).toInt()
             c.drawText("차로 쓰는 성장일기", w / 2, oy + S + S * .22f + (1 - tag) * S * .03f, p)

@@ -26,6 +26,10 @@ internal data class LaneMove(val side: String, val wait: Float, val moved: Boole
 }
 
 /** 이번 주행의 차선 변경들 (사건 위치와 진행 정도 포함) */
+/** 급하게 선 횟수. 속도 신호를 받은 주행에서만 뜻이 있다 */
+internal fun Drive.hardBrakes() = events.count { it.type == Evt.HARD }
+internal fun Drive.speedSeen() = events.any { it.type == Evt.SPEED }
+
 internal fun Drive.lanes(): List<Pair<Ev, LaneMove>> = events.filter { it.type == Evt.LANE }.mapNotNull { e -> LaneMove.decode(e.value)?.let { e to it } }
 
 /** 바꾼 차선 변경의 기다린 시간 가운데값 (없으면 null) */

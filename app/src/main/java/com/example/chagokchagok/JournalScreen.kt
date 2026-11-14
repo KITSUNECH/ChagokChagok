@@ -6,65 +6,72 @@ import android.view.Gravity
 import android.view.View
 import java.util.Locale
 
-internal fun MainActivity.analysisScreen(): View { journalTab = 2; return journalScreen() }
+/** 평소의 나: 길과 상관없이 따라다니는 습관의 흐름 (홈의 "평소의 나"에서 들어온다) */
+internal fun MainActivity.analysisScreen(): View {
+    val k = kit
+    return k.col().apply {
+        addView(k.header("평소의 나", "어느 길에서든 따라다니는 습관이에요. 길과 날씨가 달라 그대로 견주기는 어려워요.", onBack = { back() }))
+        addView(k.gap(18))
+        addView(analysis(store.diariesOf(store.driver)))
+    }
+}
+
+/** 일기장에서 고른 길 (null = 전체) */
+internal var journalRoad: String? = null
 
 internal fun MainActivity.journalScreen(): View {
     val k = kit; val me = store.driver
     val all = store.diariesOf(me)
+    val roads = all.mapNotNull { it.drive.place }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }.take(5)
+    if (journalRoad != null && journalRoad !in roads) journalRoad = null
+    val shown = (if (journalRoad == null) all else all.filter { it.drive.place == journalRoad }).reversed()
     return k.col().apply {
-        addView(k.header("일기장", if (all.isEmpty()) "아직 일기가 없어요" else "${all.size}번 달렸어요 · 첫 일기 ${dateText(all.first().date, "M월 d일")}"))
-        addView(k.gap(18))
-        addView(k.segmented(listOf("길별", "날짜순", "평소의 나"), journalTab) { journalTab = it; render() }, k.lp(if (ui.wide) ui.dp(520) else k.MATCH, k.WRAP))
-        addView(k.gap(18))
-        addView(when (journalTab) { 0 -> roadList(all); 1 -> diaryList(all); else -> analysis(all) })
-    }
-}
-
-/** 길별: 일기는 길에 쌓인다. 같은 곳에 다녀온 일기를 한 묶음으로, 최근에 간 곳부터 */
-private fun MainActivity.roadList(all: List<Diary>): View {
-    val k = kit
-    if (all.isEmpty()) return diaryList(all)
-    val roads = all.filter { it.drive.place != null }.groupBy { it.drive.place!! }.entries.sortedByDescending { it.value.last().date }
-    val loose = all.filter { it.drive.place == null }
-    val cards = roads.map { (place, ds) ->
-        val last = ds.last(); val j = Growth.judge(all, last)
-        val note = store.selfGuide(store.driver, place)?.tips?.firstOrNull()?.text
-        k.card(pad = 22, onClick = { go(if (ds.size >= 2) MainActivity.ROAD else MainActivity.DIARY, last.id) }) {
-            addView(k.row(10).apply {
-                addView(k.icon("pin", Ink.accent, 22))
-                addView(k.text(place, Type.Headline, lines = 1), k.lp(0, k.WRAP, 1f))
-                if (j != null && !j.early) addView(k.tag(j.verdict.word, when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> Ink.text2; Verdict.DOWN -> Ink.warn }))
+        addView(k.header("일기장", if (all.isEmpty()) "아직 일기가 없어요" else "일기 ${all.size}장 · 첫 일기 ${dateText(all.first().date, "M월 d일")}"))
+        addView(k.gap(14))
+        if (roads.isNotEmpty()) {
+            addView(k.flow(10).apply {
+                addView(k.chip("전체", journalRoad == null) { journalRoad = null; render() })
+                roads.forEach { r -> addView(k.chip(r, journalRoad == r, "pin") { journalRoad = r; render() }) }
             })
-            addView(k.gap(6))
-            addView(k.text("일기 ${ds.size}장 · 지난번 ${dateText(last.date, "M월 d일")}", Type.Sub, Ink.text2))
-            if (note != null) { addView(k.gap(8)); addView(k.voice("“$note”", 17f, Ink.text2).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }) }
+            addView(k.gap(14))
+            // 길을 고르면 그 길에서의 변화로 바로 갈 수 있다
+            journalRoad?.let { r -> shown.firstOrNull()?.takeIf { shown.size >= 2 }?.let { last ->
+                addView(k.button("‘$r’에서 내가 늘었는지 보기", Kit.Btn.Tinted, "chart") { go(MainActivity.ROAD, last.id) }, k.lp(if (ui.wide) k.WRAP else k.MATCH, k.WRAP)); addView(k.gap(14)) } }
         }
-    }
-    return k.col().apply {
-        if (cards.isNotEmpty()) addView(k.grid(if (ui.wide) 2 else 1, cards, 16))
-        else addView(k.card { addView(k.text("목적지를 내비에 넣고 달리거나, 주차 후 그곳에 이름을 붙이면 길별로 묶여요.", Type.Sub, Ink.text2)) })
-        if (loose.isNotEmpty()) { addView(k.section("이름 없는 길")); addView(diaryList(loose)) }
+        addView(diaryList(shown))
     }
 }
 
-private fun MainActivity.diaryList(all: List<Diary>): View {
+/** 일기 면: 왼쪽에 날짜를 크게, 오른쪽에 내 한 줄(없으면 차가 적은 첫 문장), 아래에 길과 차의 판단 */
+private fun MainActivity.diaryList(list: List<Diary>): View {
     val k = kit
-    if (all.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면 일기 한 장이 생겨요.")) }
-    val cards = all.reversed().map { d ->
-        k.card(pad = 22, onClick = { go(MainActivity.DIARY, d.id) }) {
-            addView(k.row(8).apply {
-                addView(k.text(dateText(d.date, "M월 d일 E요일"), Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f))
-                if (d.drive.sim) addView(k.tag("모의", Ink.warn))
-            })
-            addView(k.gap(6))
-            addView(k.row(12).apply {
-                gravity = Gravity.TOP
-                addView(k.col(6).apply {
-                    addView(k.text(d.title, Type.Headline))
-                    addView(k.voice(d.text, 17f, Ink.text2).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
-                }, k.lp(0, k.WRAP, 1f))
-            })
-            addView(k.gap(8)); addView(k.text(facts(d.drive), Type.Caption, Ink.text3))
+    if (list.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면 일기 한 장이 생겨요.")) }
+    val all = store.diariesOf(store.driver)
+    val cards = list.map { d ->
+        val mine = store.feeling(d.id)
+        val j = Growth.judge(all, d)
+        k.row(18).apply {
+            gravity = Gravity.TOP
+            setPadding(ui.dp(22), ui.dp(20), ui.dp(22), ui.dp(20))
+            // 날짜 (일기장처럼 크게)
+            addView(k.col(0).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                addView(k.text(dateText(d.date, "d"), Type.Display, Ink.ink).apply { gravity = Gravity.CENTER })
+                addView(k.text(dateText(d.date, "M월 E요일"), Type.Micro, Ink.paperLine).apply { gravity = Gravity.CENTER; setTextColor(android.graphics.Color.parseColor("#7A766C")) })
+            }, k.lp(ui.dp(84), k.WRAP))
+            addView(View(context).apply { setBackgroundColor(Ink.grid) }, k.lp(ui.dp(2), k.MATCH))
+            addView(k.col(8).apply {
+                addView(k.voice(mine?.let { "“$it”" } ?: d.text.substringBefore(". ").trimEnd('.') + ".", if (mine != null) 22f else 19f, if (mine != null) Ink.ink else android.graphics.Color.parseColor("#5B5750")).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
+                addView(k.flow(8).apply {
+                    d.drive.place?.let { addView(k.tag(it, Ink.accent)) }
+                    if (j != null && !j.early) addView(k.tag("차: " + j.verdict.word, when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> Ink.text2; Verdict.DOWN -> Ink.warn }))
+                    if (mine == null && d.driver == store.driver) addView(k.tag("내 한 줄을 기다려요", android.graphics.Color.parseColor("#7A766C")))
+                    if (d.drive.sim) addView(k.tag("모의 주행", Ink.warn))
+                    if (store.isSample(d.id)) addView(k.tag("예시", android.graphics.Color.parseColor("#7A766C")))
+                })
+                addView(k.text(facts(d.drive), Type.Caption, Ink.ink).apply { setTextColor(android.graphics.Color.parseColor("#7A766C")) })
+            }, k.lp(0, k.WRAP, 1f))
+            k.pressable(this, k.rounded(Ink.paper, 20, 1, Ink.line)) { go(MainActivity.DIARY, d.id) }
         }
     }
     return k.grid(if (ui.wide) 2 else 1, cards, 16)

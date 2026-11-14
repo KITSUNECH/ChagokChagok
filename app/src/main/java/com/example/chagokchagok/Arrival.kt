@@ -219,13 +219,10 @@ internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
             addView(k.voice("“$feeling”", if (ui.wide) 26f else 22f))
         })
         question?.let { addView(it) }
-        if (mine) addView(k.button(if (open.isNotEmpty()) "돌아볼 순간 ${open.size}곳 · 다음의 나에게 한마디" else "다음의 나에게 한마디", if (question == null) Kit.Btn.Primary else Kit.Btn.Tinted, "quote") {
+        if (mine) addView(k.button(if (open.isNotEmpty()) "돌아볼 순간 ${open.size}곳 · 다음에 들을 한마디 남기기" else "다음에 들을 한마디 남기기", if (question == null) Kit.Btn.Primary else Kit.Btn.Tinted, "quote") {
             if (open.size == 1) reviewMoment(d, open.first()) else noteToSelf(d)
         }, k.lp(k.MATCH, k.WRAP))
-        addView(k.row(10).apply {
-            addView(k.button("자세히 보기", Kit.Btn.Secondary, "list") { diaryDetail = true; render() }, k.lp(0, k.WRAP, 1f))
-            if (mine && pending(d, prev)) addView(k.button("나중에", Kit.Btn.Plain) { go(MainActivity.TODAY) })
-        }, k.lp(k.MATCH, k.WRAP))
+        if (mine && pending(d, prev)) addView(k.button("나중에 할게요", Kit.Btn.Plain) { go(MainActivity.TODAY) }, k.lp(k.MATCH, k.WRAP))
     }
     return k.col().apply {
         addView(k.header(d.title, dateText(d.date) + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },

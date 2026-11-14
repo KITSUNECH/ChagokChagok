@@ -149,6 +149,28 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
 
     fun onDistance(km: Float) { if (!sim) recorder.distance(km) }
 
+    private var lastSpeed: Pair<Long, Float>? = null
+    private var lastHard = 0L
+    private var speedMarked = false
+    /**
+     * 속도가 바뀌었다 (km/h). 급하게 선 순간을 알아본다: 시속 20km 넘게 달리다가 1초에 약 시속 11km(3m/s²) 넘게 줄었을 때.
+     * 그 순간에는 말하지 않는다(지적은 멈췄을 때). 일기와 "차에게 물어보기"에만 나온다.
+     */
+    fun onSpeed(kmh: Float) {
+        val now = System.currentTimeMillis()
+        val prev = lastSpeed; lastSpeed = now to kmh
+        if (!active || sim) return
+        if (!speedMarked) { speedMarked = true; recorder.add(Evt.SPEED, "on") }
+        if (prev == null) return
+        val dt = (now - prev.first) / 1000f
+        if (dt < .2f || dt > 2.5f) return
+        val decel = (prev.second - kmh) / 3.6f / dt   // m/s²
+        if (prev.second >= 20f && decel >= HARD_BRAKE && now - lastHard > 5000) {
+            lastHard = now
+            val f = freshFix(); recorder.add(Evt.HARD, "on", f?.first, f?.second); save()
+        }
+    }
+
     /** 위치가 바뀌었다 (위치 SDK, 내비, 또는 모의 주행) */
     fun onLocation(lat: Double, lng: Double, heading: Float?) {
         if (!active) return
@@ -258,6 +280,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         heard.clear(); inZone.clear(); lastFix = null; voiceNotes.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
+        lastSpeed = null; lastHard = 0L; speedMarked = false
         praised = 0; lanePraised = 0; focus = host.tripFocus(); spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
         // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
         support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
@@ -273,6 +296,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 한마디를 남긴 곳 근처에 가면 알려 드릴게요."
             else -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 조용히 적고 있을게요."
         } + (Coach.label(focus)?.let { " 오늘은 ${it}부터 봐 드릴게요." } ?: ""))
+        if (car.beltKnown && !car.belt) host.say("안전벨트를 매 주세요.", Voice.URGENT)
         // 받은 응원이 있으면 출발하고 조금 뒤에 대신 전해 준다
         store.news(store.driver).lastOrNull { it.contains("응원") }?.let { cheer ->
             main.postDelayed({ if (active) host.speak(cheer.substringAfter("\t").replace("“", "").replace("”", ""), Voice.LOW) }, 5000)

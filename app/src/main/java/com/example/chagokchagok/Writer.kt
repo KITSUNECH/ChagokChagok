@@ -60,6 +60,7 @@ class Recorder {
     fun kmNow(): Float { val a = startKm; val b = lastKm; return if (a != null && b != null) (b - a).coerceAtLeast(0f) else 0f }
     fun secondsNow() = ((System.currentTimeMillis() - startTime) / 1000).toInt()
     /** 지금까지 켠 깜빡이 수 (끄는 신호는 빼고) */
+    fun brakesNow() = raw.count { it.type == Evt.BRAKE && it.value == "on" }
     fun signalsNow() = raw.count { it.type == Evt.SIGNAL && it.value != "OFF" }
 
     /** 어떤 장치가 켜져 있던 시간을 모두 더한다(초). */
@@ -107,7 +108,7 @@ class Recorder {
         // 그림에 쓸 표시만 남긴다: 켠 깜빡이, 밟은 브레이크, 와이퍼가 켜지고 꺼진 때.
         val events = raw.filter {
             (it.type == Evt.SIGNAL && it.value != "OFF") || (it.type == Evt.BRAKE && it.value == "on") ||
-                it.type == Evt.WIPER || it.type == Evt.LIGHT || it.type == Evt.LOST || it.type == Evt.SAY || it.type == Evt.CALM || it.type == Evt.LANE
+                it.type == Evt.WIPER || it.type == Evt.LIGHT || it.type == Evt.LOST || it.type == Evt.SAY || it.type == Evt.CALM || it.type == Evt.LANE || it.type == Evt.HARD || it.type == Evt.SPEED
         }.map { Ev(p(it), it.type, it.value, it.lat, it.lng) }
 
         return Drive(

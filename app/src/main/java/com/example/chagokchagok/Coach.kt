@@ -6,6 +6,7 @@
 //  · 주차는 같은 자리의 지난번과만 견준다.
 package com.example.chagokchagok
 
+import android.view.Gravity
 import android.view.View
 import java.util.Locale
 import kotlin.math.abs
@@ -30,7 +31,7 @@ internal object Coach {
         "turn" -> d.turns > 0
         "lane" -> d.lanes().isNotEmpty()
         "park" -> d.completed && d.parkMoves > 0
-        else -> d.brakes > 0
+        else -> d.brakes > 0 || d.hardBrakes() > 0
     }
 
     /**
@@ -65,7 +66,9 @@ internal object Coach {
                 val last = d.place?.let { p -> before.lastOrNull { !it.drive.sim && it.drive.place == p && it.drive.completed && it.drive.parkMoves > 0 } }
                 head + (last?.let { val f = it.drive.parkMoves - 1; if (f == fixes) " 같은 자리에서 지난번과 같아요." else " 같은 자리에서 지난번에는 ${f}번이었어요." } ?: "")
             }
-            else -> if (d.distKm > 0.3f) "브레이크는 1km마다 ${String.format(Locale.KOREA, "%.1f", d.brakes / d.distKm)}번 밟았어요." else "브레이크는 ${d.brakes}번 밟았어요."
+            else -> (if (d.distKm > 0.3f) "브레이크는 1km마다 ${String.format(Locale.KOREA, "%.1f", d.brakes / d.distKm)}번 밟았어요." else "브레이크는 ${d.brakes}번 밟았어요.") +
+                // 급정거는 속도 신호를 받은 주행에서만 말한다 (못 본 것을 "없었다"고 하지 않는다)
+                if (!d.speedSeen()) "" else d.hardBrakes().let { h -> if (h == 0) " 급하게 선 적은 없었어요." else " 그중 ${h}번은 급하게 섰어요." }
         }
     }
 
@@ -77,43 +80,41 @@ internal object Coach {
     }
 }
 
-/** 지금 운전자가 고른 "요즘 신경 쓰이는 것" */
+/** 지금 운전자가 고른 "요즘 신경 쓰이는 것" (전부·모르겠어요는 특정 주제가 아니라 null) */
 internal fun MainActivity.focusKey(): String? = store.answer("focus_${store.driver}", "focus")?.takeIf { Coach.label(it) != null }
 
 /**
- * 차에게 물어보기: 글레오에게 말로 묻는 것과 같은 답을 버튼으로 (말이 잘 안 통할 때를 위해).
- * drive 가 없으면 지금 달리는 중의 기록, 그것도 없으면 가장 최근 일기로 답한다.
+ * 차에게 물어보기: 글레오에게 "오늘 운전 어땠어?"라고 묻는 것과 같은 답을 버튼 한 번으로 바로 듣는다.
+ * 달리는 중이면 지금까지의 기록, 아니면 그 일기(없으면 가장 최근 일기)로 답한다. 고르는 단계 없이 바로 말하고 화면에도 보여 준다.
  */
 internal fun MainActivity.askCar(about: Diary? = null) {
     val all = store.diariesOf(store.driver)
-    val live = trip.active
+    val soFar = trip.active && about == null
     val target = about ?: all.lastOrNull()
-    if (!live && target == null) { toast("아직 기록이 없어요. 한 번 달리고 나서 물어봐 주세요."); return }
-    val drive = if (live && about == null) trip.recorder.summary(store.driver) else target!!.drive
-    val before = if (live && about == null) all else all.filter { it.date < target!!.date }
-    val soFar = live && about == null
-    val topics = listOf("today" to (if (soFar) "지금까지 전체" else "운전 전체")) + Coach.FOCUS
-    sheets.choose("차에게 물어보기", (if (soFar) "지금까지" else dateText(drive.date, "M월 d일") + " 주행을") + " 기록한 차량 신호로 답해요.", topics.map { it.second }, topics.map { if (it.first == "today") "car" else Coach.icon(it.first) }) { i ->
-        val key = topics[i].first
-        readAloud(topics[i].second, if (key == "today") Coach.today(drive, before, focusKey(), soFar) else Coach.about(key, drive, before, soFar))
-    }
+    if (!soFar && target == null) { toast("아직 기록이 없어요. 한 번 달리고 나서 물어봐 주세요."); return }
+    val drive = if (soFar) trip.recorder.summary(store.driver) else target!!.drive
+    val before = if (soFar) all else all.filter { it.date < target!!.date }
+    readAloud(if (soFar) "지금까지의 운전" else dateText(drive.date, "M월 d일") + "의 운전", Coach.today(drive, before, if (soFar) trip.focus else focusKey(), soFar))
 }
 
 /** 홈: 요즘 신경 쓰이는 것을 고른다. 고르면 달리는 동안과 주차 후에 그것부터 말해 준다. */
 internal fun MainActivity.focusCard(): View {
-    val k = kit; val me = store.driver; val now = focusKey()
+    val k = kit; val me = store.driver
+    val now = store.answer("focus_$me", "focus").orEmpty()
+    val choices = Coach.FOCUS + listOf("all" to "전부", "unsure" to "모르겠어요")
     return k.card(pad = 22) {
         addView(k.text("요즘 제일 신경 쓰이는 건?", Type.Headline))
         addView(k.gap(4))
-        addView(k.text(Coach.label(now)?.let { "다 적어 두되, ${it}부터 말해 줄게요." } ?: "고르면 달리는 동안과 주차 후에 그것부터 말해 줄게요.", Type.Sub, Ink.text2))
+        addView(k.text(when {
+            now == "all" -> "전부 적어 두고, 눈에 띄는 것부터 말해 줄게요."
+            now == "unsure" -> "괜찮아요. 달려 보고 차가 본 것부터 말해 줄게요."
+            Coach.label(now) != null -> "다 적어 두되, ${Coach.label(now)}부터 말해 줄게요."
+            else -> "고르면 달리는 동안과 주차 후에 그것부터 말해 줄게요."
+        }, Type.Sub, Ink.text2))
         addView(k.gap(12))
         addView(k.flow(10).apply {
-            Coach.FOCUS.forEach { (key, label) -> addView(k.chip(label, key == now) { store.setAnswer("focus_$me", "focus", if (key == now) "" else key); render() }) }
+            choices.forEach { (key, label) -> addView(k.chip(label, key == now) { store.setAnswer("focus_$me", "focus", if (key == now) "" else key); render() }) }
         })
-        if (store.diariesOf(me).isNotEmpty()) {
-            addView(k.gap(12))
-            addView(k.button("차에게 물어보기", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, k.WRAP))
-        }
     }
 }
 
@@ -141,5 +142,29 @@ internal fun MainActivity.carSawCard(d: Diary): View? {
         else addView(k.groupOf(keys.map { key ->
             k.item(Coach.about(key, d.drive, before), Coach.label(key) + if (key == focus) " · 신경 쓰인다고 한 것" else "", Coach.icon(key), if (key == focus) Ink.accent else Ink.text2)
         }).apply { background = k.rounded(Ink.fill, 18) })
+    }
+}
+
+
+/** 홈: 평소의 나. 최근 주행에서 차가 본 습관 두 가지. 누르면 흐름을 본다. 기록이 모자라면 무엇이 쌓이는지 알려 준다. */
+internal fun MainActivity.usualCard(): View {
+    val k = kit
+    val ds = store.diariesOf(store.driver).filter { !it.drive.sim }
+    val u = Coach.usual(ds)
+    fun stat(value: String, label: String) = k.col(2).apply { addView(k.text(value, Type.Large)); addView(k.text(label, Type.Caption, Ink.text2)) }
+    return k.card(pad = 22, onClick = if (ds.size >= 2) ({ go(MainActivity.ANALYSIS) }) else null) {
+        addView(k.row(10).apply {
+            addView(k.icon("car", Ink.accent, 22))
+            addView(k.text("평소의 나", Type.Headline), k.lp(0, k.WRAP, 1f))
+            addView(k.text(if (u.drives == 0) "아직 기록이 없어요" else "최근 ${u.drives}번", Type.Sub, Ink.text2))
+            if (ds.size >= 2) addView(k.icon("chevron", Ink.text3, 20))
+        })
+        addView(k.gap(10))
+        if (u.signalPct == null && u.laneWait == null) addView(k.text("달릴수록 차가 본 내 습관이 여기에 쌓여요. 돌기 전 깜빡이, 차선 변경 전 기다림.", Type.Sub, Ink.text2))
+        else addView(k.row(28).apply {
+            gravity = Gravity.TOP
+            addView(stat(u.signalPct?.let { "${it.toInt()}%" } ?: "–", "돌기 전 깜빡이"))
+            addView(stat(u.laneWait?.let { "${it.toInt()}초" } ?: "–", "차선 변경 전 기다림"))
+        })
     }
 }

@@ -146,7 +146,7 @@ internal fun MainActivity.driveScreen(): View {
             addView(routeCard)
             addView(k.fill())
             // 글레오에게 말로 묻는 것과 같은 답 (멈춰 있을 때만 누를 수 있다)
-            addView(k.button("차에게 물어보기", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, k.WRAP))
+            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, k.WRAP))
             addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))
@@ -171,12 +171,15 @@ internal fun MainActivity.refreshDrive() {
     // 기록 상태를 분명히: 차 신호가 끊기면 무엇만 적고 있는지 말한다
     val vehicleOk = Car.offline || !car.failures.containsKey("vehicle")
     V.status?.text = (if (trip.sim) "모의 주행 기록 중" else "기록 중") + (if (sec < 60) " · 방금 출발" else " · ${sec / 60}분") + (if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else "") +   // 초가 계속 움직이지 않게 분 단위
+        // 멈춰 있을 때는 차가 지금까지 적은 조작을 보여 준다 (조작이 실제로 적히고 있는지 눈으로 확인할 수 있게)
+        (if (!limits.restricted) listOfNotNull(trip.recorder.brakesNow().takeIf { it > 0 }?.let { "브레이크 ${it}번" }, trip.recorder.signalsNow().takeIf { it > 0 }?.let { "깜빡이 ${it}번" }).joinToString("") { " · $it" } else "") +
         (if (!vehicleOk) " · 차량 신호가 없어 시간과 위치만 적어요" else if (!car.naviConnected && !trip.sim) " · 내비 연결 안 됨" else "")
 
     // 다음 회전
     val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }
     val prompt = trip.prompt
     when {
+        car.beltKnown && !car.belt -> { V.turnIcon?.set("seat", Ink.warn); V.turnText?.text = "안전벨트를 매 주세요"; V.turnSub?.text = "매면 이 안내는 사라져요" }
         prompt != null -> { V.turnIcon?.set(if (prompt.startsWith("왼")) "turnLeft" else "turnRight", Ink.signal); V.turnText?.text = "지금 $prompt"; V.turnSub?.text = "돌기 전에 미리" }
         // 길 안내는 내비의 몫이다 (Pleos Single Route Policy). 여기서는 거리·방향을 다시 말하지 않고 깜빡이 코칭만 한다.
         side != null && car.turnMeters in 1..300 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "곧 돌아요"; V.turnSub?.text = "깜빡이를 미리 켜 두면 편해요" }
@@ -191,7 +194,7 @@ internal fun MainActivity.refreshDrive() {
     val meters = if (side != null) car.turnMeters else 0
     V.turnBar?.visibility = View.GONE   // 거리 막대는 내비와 겹치는 길 안내라 쓰지 않는다
     // 일이 없을 때는 조용히
-    V.turnText?.setTextColor(if (prompt == null && side == null && !trip.arrived) Ink.text2 else Ink.text)
+    V.turnText?.setTextColor(if (prompt == null && side == null && !trip.arrived && !(car.beltKnown && !car.belt)) Ink.text2 else Ink.text)
 
     // 한마디
     V.tipWho?.text = when {

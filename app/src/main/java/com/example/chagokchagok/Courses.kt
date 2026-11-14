@@ -79,13 +79,17 @@ internal fun MainActivity.myRouteHero(): View {
 }
 
 /**
- * 홈의 큰 시작 단추: 카드 하나 크기로 따로 둔다. 누구나 한눈에 찾고 누르기 쉽게.
- * 받은 길이 있으면 그 길로, 없으면 지금 길로. 기어를 D에 놓아도 똑같이 시작된다.
+ * 홈 맨 위 "출발 준비": 지금 차가 알려 주는 것(안전벨트, 연료·배터리, 내비 목적지)을 그대로 보여 준다.
+ * 기록은 기어를 D에 놓으면 저절로 시작한다. 기어 신호를 받지 못하는 차에서만 이 카드를 눌러 직접 시작한다.
  */
 internal fun MainActivity.startCard(guide: Guide?): View {
     val k = kit
-    val title = if (guide != null) "이 길로 기록 시작" else "기록 시작"
-    val sub = if (guide != null) "${Writer.subj(guide.owner)} 건넨 길 · 출발 전 확인으로 가요" else if (ui.narrow) "D에 놓아도 시작돼요" else "기어를 D에 놓으면 저절로 시작돼요"
+    val auto = car.gearKnown
+    fun pill(icon: String, label: String, ok: Boolean?) = k.row(8).apply {
+        setPadding(ui.dp(14), ui.dp(9), ui.dp(16), ui.dp(9)); background = k.rounded(Ink.alpha(Ink.onAccent, .14f), 22)
+        addView(k.icon(if (ok == true) "checkCircle" else if (ok == false) "warning" else icon, Ink.onAccent, 20))
+        addView(k.text(label, Type.Sub, Ink.onAccent))
+    }
     return k.col().apply {
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = ui.dp(112)
@@ -93,35 +97,34 @@ internal fun MainActivity.startCard(guide: Guide?): View {
         addView(k.row(20).apply {
             addView(android.widget.FrameLayout(context).apply {
                 background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Ink.onAccent) }
-                addView(IconView(context, "play", Ink.accent), android.widget.FrameLayout.LayoutParams(ui.dp(30), ui.dp(30), Gravity.CENTER))
+                addView(IconView(context, if (auto) "steering" else "play", Ink.accent), android.widget.FrameLayout.LayoutParams(ui.dp(32), ui.dp(32), Gravity.CENTER))
             }, k.lp(ui.dp(64), ui.dp(64)))
             addView(k.col(4).apply {
-                addView(k.text(title, Type.Title, Ink.onAccent))
-                addView(k.text(sub, Type.Sub, Ink.alpha(Ink.onAccent, .8f)))
+                addView(k.text(if (auto) "기어를 D에 놓으면 기록을 시작해요" else "기록 시작", Type.Title, Ink.onAccent))
+                addView(k.text(if (auto) "누를 것은 없어요. 달리는 동안은 말로 알려 줄게요." else "기어 신호를 받지 못했어요. 누르면 바로 기록을 시작해요.", Type.Sub, Ink.alpha(Ink.onAccent, .8f)))
             }, k.lp(0, k.WRAP, 1f))
         })
+        // 지금 차가 알려 주는 것 (받은 신호만 보여 준다)
+        val pills = listOfNotNull(
+            if (car.beltKnown) pill("seat", if (car.belt) "안전벨트 맸어요" else "안전벨트를 매 주세요", car.belt) else null,
+            car.energy?.let { pill("fuel", (if (car.isEv == true) "배터리 " else "연료 ") + "$it%", if (it < 20) false else null) },
+            car.destName?.takeIf { it.isNotBlank() }?.let { pill("pin", it, null) },
+        )
+        if (pills.isNotEmpty()) { addView(k.gap(14)); addView(k.flow(8).apply { pills.forEach { addView(it) } }) }
         k.pressable(this, k.rounded(Ink.accent, 26)) { if (guide != null) depart(guide) else beginTrip() }
     }
 }
 
-/** 지금 길로 기록 시작. 초보는 출발 전에 안내 한 장만 (다음부터 바로 시작을 고를 수 있다) */
+/**
+ * 기록 시작. 기어 신호를 받는 차에서 아직 P면 시작하지 않고(기록은 D에서 시작한다) 안전벨트만 확인해 알려 준다.
+ * 기어 신호가 없는 차에서는 여기서 바로 시작한다.
+ */
 internal fun MainActivity.beginTrip() {
-    fun go() { trip.guide = null; if (!car.destName.isNullOrBlank()) trip.routeSent = true; trip.start() }
-    val d = store.driver
-    if (store.typeOf(d) != "초보" || store.flag("start_guide_off_$d")) { go(); return }
-    sheets.sheet("출발 전에 이것만 확인해요", null) { close ->
-        val k = kit
-        addView(k.groupOf(listOf(
-            k.item("안전벨트", "뒷자리까지 모두", "check", Ink.go),
-            k.item("의자와 거울", "발이 브레이크 끝까지 닿고, 사이드미러에 차 옆이 조금 보이게", "seat"),
-            k.item("주변을 보고 기어 D", "브레이크를 밟은 채로", "gear"),
-            k.item("달리는 동안은 말로 알려 줘요", "화면은 멈췄을 때만 봐요", "speaker"),
-        )).apply { background = k.rounded(Ink.fill, 18) })
-        addView(k.buttons(
-            k.button("시작하기", Kit.Btn.Primary, "play") { close(); go() },
-            k.button("다음부터 바로 시작", Kit.Btn.Plain) { store.setFlag("start_guide_off_$d"); close(); go() },
-            stack = false))
+    if (car.gearKnown && car.gear != "D") {
+        say(if (car.beltKnown && !car.belt) "안전벨트를 매고, 기어를 D에 놓으면 기록을 시작해요." else "기어를 D에 놓으면 기록을 시작해요.")
+        return
     }
+    trip.guide = null; if (!car.destName.isNullOrBlank()) trip.routeSent = true; trip.start()
 }
 
 /** 다녀온 곳에 다시 가기. 지난번의 내가 남긴 한마디가 있으면 그 길로 */

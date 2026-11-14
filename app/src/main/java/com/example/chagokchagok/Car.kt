@@ -40,6 +40,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     companion object {
         /** 화면 확인 테스트처럼 차 없이 앱을 띄울 때 true. 실제 앱에서는 쓰지 않는다. */
         @JvmStatic var offline = false
+        const val SPEED_PERMISSION = "android.car.permission.CAR_SPEED"
     }
 
     interface Listener {
@@ -62,6 +63,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     var wiper = false; private set
     var lowBeam = false; private set
     var belt = false; private set
+    /** 안전벨트 신호를 한 번이라도 받았는지 */
+    var beltKnown = false; private set
     var cruise = false; private set
     var passenger = false; private set
     /** 남은 연료(%) 또는 전기차의 배터리(%). 읽히지 않으면 null. */
@@ -154,6 +157,28 @@ class Car(private val ctx: Context, private val listener: Listener) {
         }
         override fun onErrorEvent(propId: Int, zone: Int) { failures[Evt.GEAR] = "GEAR_SELECTION 오류" }
     }
+    // 속도: Pleos 문서 안내대로 AAOS 표준 PERF_VEHICLE_SPEED (m/s). 권한 android.car.permission.CAR_SPEED 는 실행 중 허락이 필요하다.
+    /** 지금 속도 (km/h). 받지 못했으면 null */
+    var speedKmh: Float? = null; private set
+    var onSpeed: ((Float) -> Unit)? = null
+    private var speedOn = false
+    private val speedCb = object : android.car.hardware.property.CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: android.car.hardware.CarPropertyValue<*>) = ui {
+            val v = (value.value as? Float) ?: return@ui
+            val kmh = kotlin.math.abs(v) * 3.6f; speedKmh = kmh; onSpeed?.invoke(kmh)
+        }
+        override fun onErrorEvent(propId: Int, zone: Int) { failures[Evt.SPEED] = "PERF_VEHICLE_SPEED 오류" }
+    }
+    /** 속도 받기 시작 (권한을 받은 뒤 다시 불러도 된다) */
+    fun startSpeed() {
+        if (speedOn || offline) return
+        if (ctx.checkSelfPermission(SPEED_PERMISSION) != android.content.pm.PackageManager.PERMISSION_GRANTED) { failures[Evt.SPEED] = "속도 권한을 아직 받지 않음"; return }
+        attempt(Evt.SPEED) {
+            val pm = props ?: return@attempt
+            if (pm.registerCallback(speedCb, android.car.VehiclePropertyIds.PERF_VEHICLE_SPEED, android.car.hardware.property.CarPropertyManager.SENSOR_RATE_NORMAL)) { speedOn = true; failures.remove(Evt.SPEED) }
+            else failures[Evt.SPEED] = "PERF_VEHICLE_SPEED 를 지원하지 않음"
+        }
+    }
     private val wiperL = object : WiperStateListener {
         override fun onWiperStateUpdated(state: WiperState?) = ui {
             wiper = state == WiperState.ON; listener.onCarEvent(Evt.WIPER, if (wiper) "on" else "off")
@@ -168,7 +193,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     }
     private val beltL = object : SeatBeltBuckledStateListener {
         override fun onSeatBeltBuckledStateUpdated(buckled: Boolean?) = ui {
-            belt = buckled == true; listener.onCarEvent("belt", if (belt) "on" else "off")
+            beltKnown = buckled != null; belt = buckled == true; listener.onCarEvent("belt", if (belt) "on" else "off")
         }
         override fun onFailed(e: Exception) { failures["belt"] = e.message ?: "실패" }
     }
@@ -253,6 +278,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
             if (!pm.registerCallback(gearCb, android.car.VehiclePropertyIds.GEAR_SELECTION, android.car.hardware.property.CarPropertyManager.SENSOR_RATE_ONCHANGE))
                 failures[Evt.GEAR] = "GEAR_SELECTION 을 지원하지 않음"
         }
+        startSpeed()
         // 연비: Vehicle SDK Fuel(현재 연비) / EvBattery(현재 전비). 드라이빙 뷰의 "현 주행 정보" 연비와 같은 종류의 값
         cap("economy", { ok, no -> vehicle.getFuel().checkCurrentFuelEconomyCapabilities(ok, no) }) { vehicle.getFuel().registerCurrentFuelEconomy(econL) }
         cap("evEconomy", { ok, no -> vehicle.getEvBattery().checkCurrentEvEfficiencyCapabilities(ok, no) }) { vehicle.getEvBattery().registerCurrentEvEfficiency(evEconL) }

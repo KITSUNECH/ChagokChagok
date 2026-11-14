@@ -106,7 +106,7 @@ class Ui(val ctx: Context) {
     val wide = w >= 760 && w >= h
     /** 창이 좁아서 한 줄로 쌓아야 하는지 */
     val narrow = !wide
-    val scale = (if (wide) minOf(w / 1180f, h / 700f) else minOf(w / 560f, h / 820f)).coerceIn(if (wide) 0.72f else 0.9f, 1.35f)   // 내비 옆 좁은 창에서도 글자·버튼은 거의 그대로, 대신 배치를 한 줄로 바꾼다
+    val scale = (if (wide) minOf(w / 1180f, h / 700f) else minOf(w / 560f, h / 820f)).coerceIn(if (wide) 0.72f else 0.9f, 1.5f)   // 내비 옆 좁은 창에서도 글자·버튼은 거의 그대로, 대신 배치를 한 줄로 바꾼다
 
     fun dp(v: Float) = (v * density * scale).toInt()
     fun dp(v: Int) = dp(v.toFloat())

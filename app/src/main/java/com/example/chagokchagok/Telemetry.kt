@@ -12,11 +12,11 @@ import android.view.View
 internal object Telemetry {
     data class Sig(val key: String, val name: String, val sdk: String, val icon: String)
     val SIGNALS = listOf(
-        Sig(Evt.GEAR, "기어", "Vehicle", "steering"), Sig(Evt.SIGNAL, "방향지시등", "Vehicle", "turnRight"), Sig(Evt.BRAKE, "브레이크 페달", "Vehicle", "stop"),
+        Sig(Evt.GEAR, "기어", "AAOS GEAR_SELECTION", "steering"), Sig(Evt.SIGNAL, "방향지시등", "Vehicle", "turnRight"), Sig(Evt.BRAKE, "브레이크 페달", "Vehicle", "stop"),
         Sig(Evt.WIPER, "와이퍼", "Vehicle", "cloud"), Sig(Evt.LIGHT, "전조등", "Vehicle", "sparkle"), Sig("belt", "안전벨트", "Vehicle", "seat"),
         Sig(Evt.SEAT, "좌석 감지", "Vehicle", "people"), Sig(Evt.CRUISE, "크루즈", "Vehicle", "speed"), Sig(Evt.LAMP, "표시등", "Vehicle", "warning"),
         Sig("odometer", "주행거리", "Vehicle", "road"), Sig(Evt.NAVI, "내비 안내", "NaviHelper", "pin"), Sig(Evt.LOST, "경로 재탐색", "NaviHelper", "pin"),
-        Sig("location", "위치", "FusedLocation", "pin"),
+        Sig("location", "위치", "FusedLocation", "pin"), Sig(Evt.SPEED, "속도", "AAOS PERF_VEHICLE_SPEED", "speed"),
     )
     val count = mutableMapOf<String, Int>()
     val last = mutableMapOf<String, String>()

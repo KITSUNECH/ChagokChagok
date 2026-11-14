@@ -15,7 +15,6 @@ internal fun MainActivity.diaryScreen(id: String?): View {
     val d = store.diaries().firstOrNull { it.id == id } ?: return todayScreen()
     val guide = store.guide(d.guideId)
     val prev = previousSame(d)
-    if (!diaryDetail) return diaryPage(d, prev)
     val paper = readPage(d, guide, prev)
     val side = k.col().apply {
         addView(k.section("오늘의 숫자"))
@@ -39,9 +38,8 @@ internal fun MainActivity.diaryScreen(id: String?): View {
         addView(actions(d, guide))
     }
     return k.col().apply {
-        addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { diaryDetail = false; render() },
-            trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(store.feeling(d.id), d.text).joinToString(". ")) }))
-        addView(k.gap(18))
+        addView(diaryPage(d, prev))
+        addView(k.section("지나온 길과 기록"))
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(paper, k.lp(0, k.WRAP, 1.15f)); addView(side, k.lp(0, k.WRAP, 1f)) })
         else { addView(paper); addView(side) }
     }
@@ -93,22 +91,6 @@ private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
             addView(k.row(16).apply {
                 addView(View(context).apply { background = k.rounded(Ink.accent, 2) }, k.lp(ui.dp(4), k.MATCH))
                 addView(k.text(d.highlight, Type.Title).apply { typeface = ui.batang; setLineSpacing(0f, 1.3f) }, k.lp(0, k.WRAP, 1f))
-            })
-        }
-        // 일기에 '나'가 있어야 내 일기다. 내 한 줄이 먼저, 차가 적어 둔 것은 그 아래에 둔다.
-        addView(k.gap(18))
-        val mine = store.feeling(d.id)
-        if (mine != null) {
-            addView(k.row(8).apply { addView(k.icon("pencil", Ink.accent, 18)); addView(k.text("내 한 줄", Type.Sub, Ink.accent), k.lp(0, k.WRAP, 1f)); addView(k.text("고치기", Type.Sub, Ink.accent).apply { gravity = Gravity.CENTER_VERTICAL; minHeight = ui.touch(48); setPadding(ui.dp(12), 0, 0, 0); setOnClickListener { askFeeling(d) } }) })
-            addView(k.voice("“$mine”", if (ui.wide) 28f else 24f))
-        } else if (d.driver == store.driver) {
-            addView(k.text("오늘 운전은 어땠어요?", Type.Headline))
-            addView(k.gap(4))
-            addView(k.text("한 줄만 남기면 내 일기가 돼요.", Type.Sub, Ink.text2))
-            addView(k.gap(10))
-            addView(k.flow(10).apply {
-                FEELS.forEach { f -> addView(k.chip(f, false) { store.setFeeling(d.id, f); render() }) }
-                addView(k.chip("직접 쓰기", false, "pencil") { sheets.input("한 줄", "예: 주차장 들어갈 때 손에 땀이 났다") { store.setFeeling(d.id, it); render() } })
             })
         }
         addView(k.gap(20))

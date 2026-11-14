@@ -99,6 +99,8 @@ internal data class Judgement(
 
 /** 차선 변경 전 기다림의 하한(초). 이보다 짧아진 것은 실력이 아니라 서두른 것일 수 있다. */
 internal const val LANE_FLOOR = 3f
+/** 급정거로 보는 감속도 (m/s²). 1초에 시속 약 11km 넘게 줄어든 것 */
+internal const val HARD_BRAKE = 3f
 
 internal object Growth {
     /** 같은 길의 지난 기록 (오래된 것부터). 끝까지 다녀온 실제 주행만 (예시 기록 포함) */

@@ -28,6 +28,8 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w1280dp-h720dp-land-mdpi") fun wide() = shoot("wide")
     /** 밤 */
     @Test @Config(qualifiers = "w1280dp-h720dp-land-night-mdpi") fun night() = shoot("night", short = true)
+    /** 에뮬레이터에서 실제로 본 큰 창 (1682×1210dp) */
+    @Test @Config(qualifiers = "w1682dp-h1210dp-land-mdpi") fun big() = shoot("big", short = true)
     /** 내비 옆 앱 영역처럼 좁고 긴 창 */
     @Test @Config(qualifiers = "w420dp-h700dp-port-mdpi") fun panel() = shoot("panel")
 
@@ -55,7 +57,8 @@ class ScreenshotTest {
         }
         Onboard.step = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
         Onboard.step = 1; a.go(MainActivity.ONBOARD); snap("00b_onboard_name")
-        Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00c_onboard_settings")
+        Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00c_onboard_kind")
+        Onboard.step = 3; a.go(MainActivity.ONBOARD); snap("00d_onboard_settings")
         val store = a.store
         store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setLocationConsent("나", true); store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true
         store.setType("나", "초보")
@@ -94,9 +97,8 @@ class ScreenshotTest {
         if (!short) {
             val last = store.diariesOf("나").last()
             a.giveTitle = ""; a.giveKind = "길"; a.go(MainActivity.GIVE, last.id); snap("07_give")
-            a.journalTab = 0; a.go(MainActivity.JOURNAL); snap("08_journal_roads")
-            a.journalTab = 1; a.go(MainActivity.JOURNAL); snap("08b_journal_dates")
-            a.journalTab = 2; a.go(MainActivity.JOURNAL); snap("09_analysis")
+            a.go(MainActivity.JOURNAL); snap("08_journal")
+            a.go(MainActivity.ANALYSIS); snap("09_analysis")
             a.go(MainActivity.TOGETHER); snap("10_together")
             store.demoOn = true; a.go(MainActivity.TOGETHER); snap("15_social_demo")
             a.convoyWith(Demo.friends[0], store.guide("sample")); a.trip.start(); snap("16_convoy_drive"); a.onCarEvent(Evt.GEAR, "P"); store.demoOn = false
@@ -117,7 +119,7 @@ class ScreenshotTest {
             val dj = Growth.judge(store.diariesOf("나"), demoDiary)
             org.junit.Assert.assertEquals(Verdict.UP, dj?.verdict); org.junit.Assert.assertEquals(1, demoDiary.drive.lanes().size); org.junit.Assert.assertTrue(store.heardTips(demoDiary.id).isNotEmpty()); org.junit.Assert.assertTrue(demoDiary.drive.sim)
             DemoCommute.clear(a)
-        } else { a.journalTab = 0; a.go(MainActivity.JOURNAL); snap("08_journal_roads") }
+        } else { a.go(MainActivity.JOURNAL); snap("08_journal") }
         ctrl.pause().stop().destroy()
     }
 }

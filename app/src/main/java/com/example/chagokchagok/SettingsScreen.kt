@@ -39,9 +39,6 @@ internal fun MainActivity.settingsScreen(): View {
                 sheets.choose("말 거는 정도", "운전이 익숙해지면 줄여도 돼요. 경고는 언제나 알려 줘요.", TALK.map { it.second + " · " + it.third }, selected = TALK.indexOfFirst { it.first == talkOf(me) }) { i -> store.setType(me, TALK[i].first); render() }
             },
             k.item("목소리 들어 보기", voice.status, "play", chevron = true) { speak("안녕하세요. 차곡차곡이에요. 오늘도 같이 가요.") },
-            k.item("일기 말투", "다음 일기부터 바뀌어요", "pencil", value = store.tone(me), chevron = true) {
-                sheets.choose("일기 말투", null, listOf("담백하게", "다정하게"), selected = if (store.tone(me) == "다정하게") 1 else 0) { i -> store.setTone(me, listOf("담백하게", "다정하게")[i]); render() }
-            },
         )))
         addView(k.section("위치와 개인정보"))
         addView(k.groupOf(listOf(
@@ -51,10 +48,6 @@ internal fun MainActivity.settingsScreen(): View {
                 render()
             },
             k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
-            k.item("일기 문장 다듬기 (생성형 AI)", if (AiDiary.enabled) "일기 초안만 Anthropic API로 가요" else "키를 넣으면 켜져요. 키는 이 차에만 암호화해 둬요", "sparkle", value = if (AiDiary.enabled) "켜짐" else "꺼짐", chevron = true) {
-                if (AiDiary.enabled) sheets.confirm("AI 다듬기를 끌까요?", "넣어 둔 키를 이 차에서 지워요.", "끄기", true) { store.aiKey = null; AiDiary.key = null; toast("AI 다듬기를 껐어요. 키를 지웠어요."); render() }
-                else sheets.input("Anthropic API 키", "sk-ant-…", ok = "저장") { v -> store.aiKey = v; AiDiary.key = v; toast("키를 암호화해 저장했어요. 다음 일기부터 다듬어요."); render() }
-            },
             k.item("개인정보·위치정보 안내", "무엇을 어디에 두고, 누구에게 보이는지", "lock", chevron = true) { go(MainActivity.LEARN, "privacy") },
         )))
         addView(k.section("연결"))
@@ -97,6 +90,11 @@ internal fun MainActivity.testSignals() {
 // ═══════════════ 함께 쓰는 사람 ═══════════════
 
 /** 말 거는 정도 (저장은 예전 '운전 경험' 값 그대로: 초보 = 자주, 오랜만·새 차 = 필요할 때, 익숙 = 경고만) */
+/** 받지 못한 신호의 사람 말 이름 */
+internal val SIGNAL_NAMES = mapOf("washer" to "워셔액", "oil" to "엔진오일", "brakeFluid" to "브레이크액", "fuel" to "연료량", "battery" to "배터리 잔량", "economy" to "연비", "evEconomy" to "전비",
+    Evt.SPEED to "속도", Evt.GEAR to "기어", Evt.SIGNAL to "방향지시등", Evt.BRAKE to "브레이크", "steering" to "조향각", Evt.WIPER to "와이퍼", Evt.LIGHT to "전조등", "belt" to "안전벨트",
+    Evt.CRUISE to "크루즈", Evt.SEAT to "좌석 감지", "seatPos" to "운전석 위치", "distance" to "주행거리", "navi" to "내비", "vin" to "차대번호", "vehicle" to "차량 연결")
+
 internal val TALK = listOf(Triple("초보", "자주", "돌기 전 깜빡이, 잘한 것까지"), Triple("오랜만", "필요할 때", "한마디와 경고"), Triple("익숙", "경고만", "꼭 필요한 것만"))
 internal fun MainActivity.talkOf(n: String) = when (store.typeOf(n)) { "초보" -> "초보"; "익숙" -> "익숙"; else -> "오랜만" }
 
@@ -264,7 +262,7 @@ internal fun MainActivity.checkScreen(): View {
         addView(k.groupOf(Telemetry.SIGNALS.map { s ->
             val n = Telemetry.count[s.key] ?: 0
             val ago = Telemetry.at[s.key]?.let { ((System.currentTimeMillis() - it) / 1000).let { sec -> if (sec < 60) "${sec}초 전" else "${sec / 60}분 전" } }
-            k.item(s.name, "${s.sdk} SDK" + (Telemetry.last[s.key]?.let { " · 마지막 값 $it" } ?: "") + (ago?.let { " · $it" } ?: ""), s.icon, if (n > 0) Ink.go else Ink.text3,
+            k.item(s.name, (if (s.sdk.startsWith("AAOS")) s.sdk else "${s.sdk} SDK") + (Telemetry.last[s.key]?.let { " · 마지막 값 $it" } ?: "") + (ago?.let { " · $it" } ?: ""), s.icon, if (n > 0) Ink.go else Ink.text3,
                 value = if (n > 0) "${n}건" else "아직 없음", valueColor = if (n > 0) Ink.text else Ink.text3)
         }))
         addView(k.section("연결 상태 · 차량 (Vehicle SDK)"))
@@ -276,7 +274,10 @@ internal fun MainActivity.checkScreen(): View {
             k.item("경고 (엔진오일·브레이크액)", "Safety · CAR_SAFETY", "warning", value = car.lampsOn.joinToString().ifEmpty { "없음" }),
             k.item("표시등 · 타이어 공기압", "Pleos 비공개 권한(PRIVATE_CAR_SAFETY)이라 써드파티 앱은 받을 수 없어요 · 시험용 신호로만", "car", value = "쓰지 않음"),
             k.item("운전석 위치", null, "seat", value = car.seatPos?.toString() ?: "읽지 못함"),
-            if (car.failures.isNotEmpty()) k.item("실패한 신호", car.failures.entries.joinToString("\n") { "${it.key}: ${it.value}" }, "info", Ink.warn) else null,
+            // 이 차(또는 에뮬레이터)가 주지 않는 신호: 오류 글을 그대로 쏟지 않고 이름만. 앱은 그 값 없이 동작한다.
+            car.failures.keys.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() }?.let { ks ->
+                k.item("이 차에서 받지 못한 신호 ${ks.size}가지", ks.joinToString(" · ") { SIGNAL_NAMES[it] ?: it } + "\n없어도 기록은 돼요. 그 값이 필요한 문장만 빼고 말해요.", "info", Ink.text2)
+            },
         )))
         addView(k.section("내비 (NaviHelper SDK)"))
         addView(k.groupOf(listOf(
@@ -296,7 +297,7 @@ internal fun MainActivity.checkScreen(): View {
         )))
         // 공모전 시연 도구 (마켓판에는 없음)
         if (BuildConfig.DEMOS) {
-            addView(k.section("시연 도구 · 공모전판"))
+            addView(k.section("시연 도구 (공모전 심사용, 정식판에는 없어요)"))
             addView(k.groupOf(listOf(
                 k.toggleItem("아이디어 시연: 다른 차의 가족·친구와 잇기", "지금 Pleos에는 차와 차를 잇는 기능이 없어요. 그 기능이 열린다면 이렇게 쓰겠다는 생각을 가상의 친구로만 보여 줘요. 실제 기능이 아니에요.", store.demoOn, "people") { store.demoOn = it; render() },
                 *(if (store.demoOn) arrayOf(k.item("아이디어 시연 열기", "함께 차곡 · 화면에 모두 시연용으로 표시돼요", "people", chevron = true) { go(MainActivity.TOGETHER) }) else emptyArray()),

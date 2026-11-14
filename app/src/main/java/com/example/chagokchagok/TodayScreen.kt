@@ -42,7 +42,7 @@ internal fun MainActivity.todayScreen(): View {
     val head = k.header(if (d == "나") "안녕하세요" else "$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · 오늘 주행도 차가 적어 둘게요.",
         trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
     // 오른쪽: 지금 할 일만 (경고 → 돌아볼 일기 → 요즘 신경 쓰이는 것)
-    val side = listOfNotNull(carCard(), reviewCard(), focusCard())
+    val side = listOfNotNull(carCard(), reviewCard(), focusCard(), usualCard())
     return k.col().apply {
         addView(head); addView(k.gap(if (ui.wide) 20 else 16))
         if (ui.wide) addView(k.row(20).apply {
@@ -441,7 +441,7 @@ internal fun MainActivity.readyScreen(): View {
         })
         addView(k.gap(16))
         addView(k.buttons(*listOfNotNull(
-            k.button("기록 시작", Kit.Btn.Primary, "play") { trip.start() },
+            k.button("기록 시작", Kit.Btn.Primary, "play") { if (car.gearKnown && car.gear != "D") say(if (car.beltKnown && !car.belt) "안전벨트를 매고, 기어를 D에 놓으면 기록을 시작해요." else "기어를 D에 놓으면 기록을 시작해요.") else trip.start() },
             if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null,
             if (BuildConfig.DEMOS) k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() } else null,   // 마켓판에는 없음
         ).toTypedArray()))
