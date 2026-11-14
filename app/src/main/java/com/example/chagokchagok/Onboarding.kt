@@ -113,7 +113,7 @@ internal fun MainActivity.onboardScreen(): View {
                 addView(k.text("내 운전을 아는 차가 달리는 동안 말을 걸어 주고,\n같은 길에서 내가 늘었는지 보여 줘요.\n첫 운전도 같이 해 봐요.", Type.Body, Ink.text2))
                 addView(k.gap(6))
                 // 운전석에서 가운데 화면까지는 멀다: 작은 줄 네 개 대신 큰 상자 하나에 한 가지씩, 몇 초마다 넘긴다
-                side(IntroSlides(this@onboardScreen, ui, k, LOOP_STEPS))
+                side(IntroSlides(this@onboardScreen, ui, k, INTRO_WORDS))
                 nextLabel = "다음"
             }
             1 -> {
@@ -327,7 +327,7 @@ internal class IntroSlides(ctx: android.content.Context, private val ui: Ui, pri
     private var index = 0
     private val icon = IconView(ctx, items[0].first, Ink.accent)
     private val step = k.text("", Type.Sub, Ink.accent)
-    private val title = k.text("", Type.Display)
+    private val title = k.text("", Type.Display).apply { textSize = ui.sp(60f) }
     private val body = k.text("", Type.Headline, Ink.text2).apply { typeface = ui.regular }
     private val dots = k.row(8)
     private val next = Runnable { show((index + 1) % items.size, true) }
@@ -351,7 +351,7 @@ internal class IntroSlides(ctx: android.content.Context, private val ui: Ui, pri
         index = i
         val (ic, t, s) = items[i]
         fun fill() {
-            icon.set(ic, Ink.accent); step.text = "${i + 1} / ${items.size}"; title.text = t; body.text = s
+            icon.set(ic, Ink.accent); step.text = "${i + 1} / ${items.size}"; title.text = t; body.text = s; body.visibility = if (s.isEmpty()) View.GONE else View.VISIBLE
             dots.removeAllViews()
             items.indices.forEach { j -> dots.addView(View(context).apply { background = k.rounded(if (j == i) Ink.accent else Ink.line, 4) }, LayoutParams(ui.dp(if (j == i) 28 else 10), ui.dp(6))) }
         }

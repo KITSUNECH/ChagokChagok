@@ -38,8 +38,65 @@ internal fun MainActivity.journalScreen(): View {
             journalRoad?.let { r -> shown.firstOrNull()?.takeIf { shown.size >= 2 }?.let { last ->
                 addView(k.button("‘$r’에서 내가 늘었는지 보기", Kit.Btn.Tinted, "chart") { go(MainActivity.ROAD, last.id) }, k.lp(if (ui.wide) k.WRAP else k.MATCH, k.WRAP)); addView(k.gap(14)) } }
         }
-        addView(diaryList(shown))
+        addView(dayList(shown))
     }
+}
+
+/**
+ * 하루를 한 면으로: 출근·잠깐 들른 곳·퇴근처럼 하루에 여러 번 주차해도 그날의 일기는 한 장이다.
+ * 맨 위에 그날을 한 줄로 요약하고(차가 본 것을 합쳐서), 아래에 주행마다 한 줄씩. 누르면 그 주행의 일기 한 장으로 간다.
+ */
+private fun MainActivity.dayList(list: List<Diary>): View {
+    val k = kit
+    if (list.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면 일기 한 장이 생겨요.")) }
+    val all = store.diariesOf(store.driver)
+    val gray = android.graphics.Color.parseColor("#7A766C")
+    val days = list.groupBy { dateText(it.date, "yyyyMMdd") }.values   // list 가 최근 순이라 묶음도 최근 날부터
+    val cards = days.map { ds ->
+        val day = ds.first()
+        val km = ds.sumOf { it.drive.distKm.toDouble() }
+        val turns = ds.sumOf { it.drive.turns }; val signaled = ds.sumOf { it.drive.turnsSignaled }
+        val lanes = ds.sumOf { it.drive.lanes().size }; val hard = ds.sumOf { it.drive.hardBrakes() }
+        val summary = listOfNotNull(
+            "주행 ${ds.size}번" + if (km > 0.05) String.format(Locale.KOREA, " · %.1fkm", km) else "",
+            if (turns > 0) "돌기 전 깜빡이 $signaled/$turns" else null,
+            if (lanes > 0) "차선 변경 ${lanes}번" else null,
+            if (hard > 0) "급하게 선 것 ${hard}번" else null,
+        ).joinToString(" · ")
+        k.row(18).apply {
+            gravity = Gravity.TOP
+            setPadding(ui.dp(22), ui.dp(20), ui.dp(18), ui.dp(14)); background = k.rounded(Ink.paper, 20, 1, Ink.line)
+            addView(k.col(0).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                addView(k.text(dateText(day.date, "d"), Type.Display, Ink.ink).apply { gravity = Gravity.CENTER })
+                addView(k.text(dateText(day.date, "M월 E요일"), Type.Micro, gray).apply { gravity = Gravity.CENTER })
+            }, k.lp(ui.dp(84), k.WRAP))
+            addView(View(context).apply { setBackgroundColor(Ink.grid) }, k.lp(ui.dp(2), k.MATCH))
+            addView(k.col(4).apply {
+                addView(k.text(summary, Type.Caption, gray))
+                ds.sortedBy { it.date }.forEach { d ->
+                    val mine = store.feeling(d.id); val j = Growth.judge(all, d)
+                    addView(k.row(10).apply {
+                        minimumHeight = ui.touch(56)
+                        addView(k.text(dateText(d.date, "a h:mm"), Type.Caption, gray), k.lp(ui.dp(86), k.WRAP))
+                        addView(k.col(2).apply {
+                            addView(k.voice(mine?.let { "“$it”" } ?: (d.drive.place ?: d.title), 19f, Ink.ink).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                            val tags = listOfNotNull(
+                                if (mine != null) d.drive.place?.let { it to Ink.accent } else null,
+                                if (j != null && !j.early) ("차: " + j.verdict.word) to when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> gray; Verdict.DOWN -> Ink.warn } else null,
+                                if (d.drive.sim) "모의 주행" to Ink.warn else null,
+                                if (store.isSample(d.id)) "예시" to gray else null,
+                            )
+                            if (tags.isNotEmpty()) addView(k.flow(6).apply { tags.forEach { (t, c) -> addView(k.tag(t, c)) } })
+                        }, k.lp(0, k.WRAP, 1f))
+                        addView(k.icon("chevron", gray, 18))
+                        k.pressable(this, null) { go(MainActivity.DIARY, d.id) }
+                    })
+                }
+            }, k.lp(0, k.WRAP, 1f))
+        }
+    }
+    return k.grid(if (ui.wide) 2 else 1, cards, 16)
 }
 
 /** 일기 면: 왼쪽에 날짜를 크게, 오른쪽에 내 한 줄(없으면 차가 적은 첫 문장), 아래에 길과 차의 판단 */

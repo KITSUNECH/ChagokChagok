@@ -168,3 +168,24 @@ internal fun MainActivity.usualCard(): View {
         })
     }
 }
+
+
+/** 홈의 "내비 열기": 어디로 갈지 받아서 내비의 장소 검색 화면으로 넘긴다 (주차 중에만 글자를 받는다) */
+internal fun MainActivity.findInNavi() {
+    sheets.input("어디로 갈까요?", "예: 회사, 양재 코스트코", ok = "내비에서 찾기") { q -> showNavi(q.trim().ifEmpty { null }) }
+}
+
+/**
+ * 내비를 앞으로 부른다. ① 차에 깔린 지도·내비 앱을 표준 안드로이드 방식으로 실행해 앞으로 가져오고,
+ * ② Pleos 내비에 화면을 요청한다 (검색어가 있으면 장소 검색 화면: NaviHelper requestNavigationScreen).
+ * 화면을 좌우로 나누는 것은 차(시스템)가 정한다. 앱이 시킬 수는 없다.
+ */
+internal fun MainActivity.showNavi(keyword: String?) {
+    val launched = try {
+        startActivity(android.content.Intent.makeMainSelectorActivity(android.content.Intent.ACTION_MAIN, android.content.Intent.CATEGORY_APP_MAPS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); true
+    } catch (_: Throwable) { false }
+    window.decorView.postDelayed({
+        val asked = car.openNavi(keyword)
+        if (!asked && !launched) toast(if (car.naviConnected) "내비 화면을 열지 못했어요. 아래 내비 단추로 열어 주세요." else "내비가 연결되지 않았어요. 아래 내비 단추로 열어 주세요.")
+    }, if (launched) 700L else 0L)
+}

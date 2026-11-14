@@ -2,7 +2,7 @@
   "packageName": "com.example.chagokchagok",
   "appDescription": "A driving diary app that records each drive from vehicle signals, tells the driver how their driving is changing on roads they repeat, and plays notes left at specific places on the route.",
   "invokeWord": "차곡차곡",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "actionCalls": [
     {
       "type": "function",

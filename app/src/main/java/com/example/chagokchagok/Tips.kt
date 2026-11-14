@@ -16,6 +16,9 @@ internal val LOOP_STEPS = listOf(
     Triple("chart", "쌓이면", "같은 길에서 내가 늘었는지 보여 줘요"),
 )
 
+/** 첫 화면의 큰 상자: 한 번에 한 낱말만 크게 */
+internal val INTRO_WORDS = listOf(Triple("speaker", "달리고", ""), Triple("book", "주차하고", ""), Triple("quote", "다시 가면", ""), Triple("chart", "차곡차곡", ""))
+
 internal val APP_TIPS = listOf(
     AppTip("loop", "차곡차곡은 이렇게 써요", "D로 달리면 차가 기억하고, P에서 돌아보고, 다시 갈 때 그 근처에서 들려주고, 늘었는지는 차와 내가 함께 봐요.", "layers") { store.diariesOf(store.driver).size < 2 },
     AppTip("no_dest", "목적지가 없어도 기록돼요", "기어를 D에 놓으면 기록이 시작되고, P에 놓으면 일기가 생겨요.", "play") { store.diariesOf(store.driver).isEmpty() },

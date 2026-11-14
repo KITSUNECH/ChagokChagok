@@ -53,10 +53,24 @@ internal fun MainActivity.settingsScreen(): View {
         addView(k.section("연결"))
         addView(k.groupOf(listOf(
             k.item("차량 연결 상태", "차량·내비·위치·음성이 잘 이어졌는지", "car", chevron = true) { go(MainActivity.CHECK) },
-            *(if (BuildConfig.DEMOS) arrayOf(k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개와 모의 주행 · 공모전판에만 있어요", "play", chevron = true) { DemoCommute.start(this@settingsScreen) }) else emptyArray()),
         )))
+        if (BuildConfig.DEMOS) {
+            addView(k.section("시연 (공모전 심사용)"))
+            addView(k.groupOf(listOf(
+                k.item("네 번째 출근 보기", "예시 출근 기록 3개를 넣고, 모의 주행으로 ‘늘었어요’ 화면까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@settingsScreen) },
+                k.item("시연 도구", "시연 기록 지우기, 시험용 신호, 아이디어 시연", "list", chevron = true) { go(MainActivity.DEMO) },
+            )))
+        }
         addView(k.section("데이터"))
         addView(k.groupOf(listOf(
+            k.item("권한 다시 묻기", "위치·속도·알림 권한을 지워요. 앱을 완전히 껐다 켜면 처음처럼 물어봐요", "lock", chevron = true) {
+                sheets.confirm("권한을 다시 물을까요?", "위치, 속도, 알림 권한을 지워요. 앱을 완전히 껐다가 다시 켜면 처음처럼 물어봐요. 기록은 지워지지 않아요.", "지우기") {
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= 33) { revokeSelfPermissionsOnKill(listOf(Places.PERMISSION, Car.SPEED_PERMISSION, android.Manifest.permission.POST_NOTIFICATIONS)); toast("지웠어요. 앱을 완전히 껐다가 다시 켜 주세요.") }
+                        else toast("이 차에서는 앱이 권한을 지울 수 없어요. 차 설정의 앱 권한에서 바꿔 주세요.")
+                    } catch (_: Throwable) { toast("이 차에서는 앱이 권한을 지울 수 없어요. 차 설정의 앱 권한에서 바꿔 주세요.") }
+                }
+            },
             k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) { confirmClearAll() },
         )))
         addView(k.gap(24))
@@ -246,72 +260,63 @@ internal fun MainActivity.privacyScreen(): View {
 
 internal fun MainActivity.checkScreen(): View {
     val k = kit
-    fun ok(b: Boolean) = if (b) Ink.go else Ink.text3
     val vehicleOk = !car.failures.containsKey("vehicle") && !Car.offline
+    fun tile(icon: String, name: String, state: String, ok: Boolean, onClick: (() -> Unit)? = null) = k.card(pad = 18, onClick = onClick) {
+        addView(k.row(12).apply {
+            addView(k.icon(icon, if (ok) Ink.go else Ink.text3, 26))
+            addView(k.col(2).apply { addView(k.text(name, Type.BodyStrong)); addView(k.text(state, Type.Caption, if (ok) Ink.go else Ink.text2, lines = 1)) }, k.lp(0, k.WRAP, 1f))
+        })
+    }
+    val missing = car.failures.keys.filter { it.isNotEmpty() }
     return k.col().apply {
-        addView(k.header("차량 연결 상태", "이 앱이 실제로 받은 차량 신호예요." + if (Telemetry.simulated > 0) " 시연·시험으로 만든 신호 ${Telemetry.simulated}번은 여기에 세지 않았어요." else " 시연·시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
+        addView(k.header("차량 연결 상태", "이 앱이 차에서 실제로 받은 신호예요." + if (Telemetry.simulated > 0) " 시연으로 만든 신호 ${Telemetry.simulated}번은 세지 않았어요." else "", onBack = { back() },
+            trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
         addView(k.gap(16))
-        val mins = ((System.currentTimeMillis() - Telemetry.since) / 60000).coerceAtLeast(1)
+        // 네 가지 연결
         addView(k.grid(if (ui.wide) 4 else 2, listOf(
-            k.stat("${Telemetry.total}", "받은 신호"),
-            k.stat("${Telemetry.kinds} / ${Telemetry.SIGNALS.size}", "신호 종류"),
-            k.stat("${Telemetry.perMinute()}", "최근 1분"),
-            k.stat("${mins}분", "앱을 켠 뒤"),
-        ), 14))
-        addView(k.section("신호별"))
-        addView(k.groupOf(Telemetry.SIGNALS.map { s ->
-            val n = Telemetry.count[s.key] ?: 0
-            val ago = Telemetry.at[s.key]?.let { ((System.currentTimeMillis() - it) / 1000).let { sec -> if (sec < 60) "${sec}초 전" else "${sec / 60}분 전" } }
-            k.item(s.name, (if (s.sdk.startsWith("AAOS")) s.sdk else "${s.sdk} SDK") + (Telemetry.last[s.key]?.let { " · 마지막 값 $it" } ?: "") + (ago?.let { " · $it" } ?: ""), s.icon, if (n > 0) Ink.go else Ink.text3,
-                value = if (n > 0) "${n}건" else "아직 없음", valueColor = if (n > 0) Ink.text else Ink.text3)
-        }))
-        addView(k.section("연결 상태 · 차량 (Vehicle SDK)"))
-        addView(k.groupOf(listOfNotNull(
-            k.item("차량 신호", if (vehicleOk) "연결됨" else "연결 안 됨", "car", ok(vehicleOk)),
-            k.item("기어", null, "steering", value = car.gear),
-            k.item("주행거리계", null, "road", value = car.odometerKm?.let { String.format("%.1fkm", it) } ?: "읽지 못함"),
-            k.item("연료/배터리", null, "fuel", value = car.energy?.let { "$it%" } ?: "읽지 못함"),
-            k.item("경고 (엔진오일·브레이크액)", "Safety · CAR_SAFETY", "warning", value = car.lampsOn.joinToString().ifEmpty { "없음" }),
-            k.item("표시등 · 타이어 공기압", "Pleos 비공개 권한(PRIVATE_CAR_SAFETY)이라 써드파티 앱은 받을 수 없어요 · 시험용 신호로만", "car", value = "쓰지 않음"),
-            k.item("운전석 위치", null, "seat", value = car.seatPos?.toString() ?: "읽지 못함"),
-            // 이 차(또는 에뮬레이터)가 주지 않는 신호: 오류 글을 그대로 쏟지 않고 이름만. 앱은 그 값 없이 동작한다.
-            car.failures.keys.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() }?.let { ks ->
-                k.item("이 차에서 받지 못한 신호 ${ks.size}가지", ks.joinToString(" · ") { SIGNAL_NAMES[it] ?: it } + "\n없어도 기록은 돼요. 그 값이 필요한 문장만 빼고 말해요.", "info", Ink.text2)
-            },
-        )))
-        addView(k.section("내비 (NaviHelper SDK)"))
-        addView(k.groupOf(listOf(
-            k.item("내비", if (car.naviConnected) "연결됨" else "연결 안 됨", "pin", ok(car.naviConnected)),
-            k.item("경로 안내", null, "road", value = if (car.routeStarted) "안내 중" else "없음"),
-            k.item("다음 회전", null, "turnRight", value = car.turn?.let { "$it ${car.turnMeters}m" } ?: "없음"),
-            k.item("제한속도", null, "speed", value = if (car.speedLimit > 0) "${car.speedLimit}" else "없음"),
-        )))
-        addView(k.section("위치 · 음성 · 주행 제한"))
-        addView(k.groupOf(listOf(
-            k.item("위치 (FusedLocation SDK)", places.status + if (places.lat != null) " · ${places.source}" else "", "pin", ok(places.lat != null),
-                value = places.lat?.let { String.format("%.4f, %.4f", it, places.lng) }),
-            k.item("위치 권한", if (places.permitted()) "허용됨" else "아직 허용 안 됨", "lock", ok(places.permitted())) { if (!places.permitted()) askLocation() },
-            k.item("음성 (TextToSpeech SDK)", voice.status, "speaker", ok(voice.ready), chevron = true) { speak("목소리 시험이에요. 잘 들리나요?") },
-            k.item("주행 제한 (CarUxRestrictions)", limits.status, "lock", ok(!limits.status.startsWith("연결 실패"))),
-            k.item("화면", "${ui.w}×${ui.h}dp · ${if (ui.wide) "넓은 창" else "좁은 창"} · ${if (Ink.night) "밤" else "낮"}", "eye"),
-        )))
-        // 공모전 시연 도구 (마켓판에는 없음)
-        if (BuildConfig.DEMOS) {
-            addView(k.section("시연 도구 (공모전 심사용, 정식판에는 없어요)"))
+            tile("car", "차량", if (vehicleOk) "연결됨 · 기어 ${car.gear}" else "연결 안 됨", vehicleOk),
+            tile("navi", "내비", if (car.naviConnected) (if (car.routeStarted) "경로 안내 중" else "연결됨") else "연결 안 됨", car.naviConnected),
+            tile("pin", "위치", if (places.lat != null) "받는 중" else if (places.permitted()) "허락됨 · 기다리는 중" else "허락 안 됨", places.lat != null) { if (!places.permitted()) askLocation() },
+            tile("speaker", "음성", if (voice.ready) "준비됨 · 눌러서 듣기" else voice.status, voice.ready) { speak("목소리 시험이에요. 잘 들리나요?") },
+        ), 12))
+        // 지금 받는 신호: 한 줄에 네 개씩, 마지막 값과 받은 횟수만
+        addView(k.section("받은 신호 ${Telemetry.total}번"))
+        addView(k.grid(if (ui.wide) 4 else 2, Telemetry.SIGNALS.map { sig ->
+            val n = Telemetry.count[sig.key] ?: 0
+            k.col(2).apply {
+                setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(if (n > 0) Ink.surface else Ink.fill, 16)
+                addView(k.row(8).apply { addView(k.icon(sig.icon, if (n > 0) Ink.go else Ink.text3, 18)); addView(k.text(sig.name, Type.Sub, if (n > 0) Ink.text else Ink.text2, lines = 1)) })
+                addView(k.text(if (n > 0) (Telemetry.last[sig.key]?.take(18) ?: "") + " · ${n}번" else "아직 없음", Type.Caption, Ink.text2, lines = 1))
+            }
+        }, 10))
+        if (missing.isNotEmpty()) {
+            addView(k.gap(14))
+            addView(k.row(10).apply {
+                gravity = Gravity.TOP
+                addView(k.icon("info", Ink.text2, 18))
+                addView(k.text("이 차가 주지 않는 신호 ${missing.size}가지: " + missing.joinToString(", ") { SIGNAL_NAMES[it] ?: it } + ". 없어도 기록은 되고, 그 값이 필요한 말만 빼요.", Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f))
+            })
+        }
+        addView(k.gap(10))
+        addView(k.text("화면 ${ui.w}×${ui.h}dp · 주행 제한 ${limits.status}", Type.Caption, Ink.text3))
+    }
+}
+
+/** 시연 도구 (공모전 심사용): 위치가 움직이지 않는 에뮬레이터에서 앱의 흐름을 끝까지 보여 주려고 만든 것. 정식판에는 들어가지 않는다. */
+internal fun MainActivity.demoScreen(): View {
+    val k = kit
+    return k.col().apply {
+        addView(k.header("시연 도구", "공모전 심사에서 흐름을 끝까지 보여 주려고 만든 메뉴예요. 여기서 만든 기록과 신호는 화면에 모두 ‘예시’·‘시연용’으로 표시되고, 정식판에는 들어가지 않아요.", onBack = { back() }))
+        addView(k.gap(16))
             addView(k.groupOf(listOf(
                 k.toggleItem("아이디어 시연: 다른 차의 가족·친구와 잇기", "지금 Pleos에는 차와 차를 잇는 기능이 없어요. 그 기능이 열린다면 이렇게 쓰겠다는 생각을 가상의 친구로만 보여 줘요. 실제 기능이 아니에요.", store.demoOn, "people") { store.demoOn = it; render() },
                 *(if (store.demoOn) arrayOf(k.item("아이디어 시연 열기", "함께 차곡 · 화면에 모두 시연용으로 표시돼요", "people", chevron = true) { go(MainActivity.TOGETHER) }) else emptyArray()),
-                k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@checkScreen) },
+                k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@demoScreen) },
                 k.item("시연 기록 지우기", "예시 출근 기록과 시연으로 달린 모의 주행을 지워요", "trash", chevron = true) {
-                    sheets.confirm("시연 기록을 지울까요?", "예시 출근 기록 3개, 남겨 둔 한마디, 시연으로 달린 모의 주행이 지워져요.", "지우기", danger = true) { DemoCommute.clear(this@checkScreen); toast("시연 기록을 지웠어요."); render() }
+                    sheets.confirm("시연 기록을 지울까요?", "예시 출근 기록 3개, 남겨 둔 한마디, 시연으로 달린 모의 주행이 지워져요.", "지우기", danger = true) { DemoCommute.clear(this@demoScreen); toast("시연 기록을 지웠어요."); render() }
                 },
                 k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
                 k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
             )))
-        }
     }
 }
-
-
-// 지금 Pleos에서 실제로 되는 것과, 플랫폼이 이렇게 발전하면 차곡車곡이 할 수 있는 것을 나눠 보여 준다.
-

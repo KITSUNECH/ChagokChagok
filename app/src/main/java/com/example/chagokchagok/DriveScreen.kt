@@ -69,7 +69,7 @@ internal fun MainActivity.driveScreen(): View {
         if (trip.sim) addView(k.tag("모의 주행 · 시연용", Ink.warn))
         // Pleos 내비를 앞으로 (NaviHelper requestNavigationScreen). 분할 화면이면 옆 창에 뜬다.
         addView(k.gap(8))
-        addView(k.button("내비", Kit.Btn.Secondary, "navi", enabled = !limits.restricted) { if (!car.openNavi()) say("내비가 연결되지 않았어요.") })
+        addView(k.button("내비", Kit.Btn.Secondary, "navi", enabled = !limits.restricted) { showNavi(null) })
     }
 
     // 다음 회전 (내비)
@@ -178,8 +178,9 @@ internal fun MainActivity.refreshDrive() {
     // 다음 회전
     val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }
     val prompt = trip.prompt
+    val beltNag = car.beltKnown && !car.belt && sec < 20
     when {
-        car.beltKnown && !car.belt -> { V.turnIcon?.set("seat", Ink.warn); V.turnText?.text = "안전벨트를 매 주세요"; V.turnSub?.text = "매면 이 안내는 사라져요" }
+        beltNag -> { V.turnIcon?.set("seat", Ink.warn); V.turnText?.text = "안전벨트를 매 주세요"; V.turnSub?.text = "매면 이 안내는 사라져요" }
         prompt != null -> { V.turnIcon?.set(if (prompt.startsWith("왼")) "turnLeft" else "turnRight", Ink.signal); V.turnText?.text = "지금 $prompt"; V.turnSub?.text = "돌기 전에 미리" }
         // 길 안내는 내비의 몫이다 (Pleos Single Route Policy). 여기서는 거리·방향을 다시 말하지 않고 깜빡이 코칭만 한다.
         side != null && car.turnMeters in 1..300 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "곧 돌아요"; V.turnSub?.text = "깜빡이를 미리 켜 두면 편해요" }
@@ -194,7 +195,7 @@ internal fun MainActivity.refreshDrive() {
     val meters = if (side != null) car.turnMeters else 0
     V.turnBar?.visibility = View.GONE   // 거리 막대는 내비와 겹치는 길 안내라 쓰지 않는다
     // 일이 없을 때는 조용히
-    V.turnText?.setTextColor(if (prompt == null && side == null && !trip.arrived && !(car.beltKnown && !car.belt)) Ink.text2 else Ink.text)
+    V.turnText?.setTextColor(if (prompt == null && side == null && !trip.arrived && !beltNag) Ink.text2 else Ink.text)
 
     // 한마디
     V.tipWho?.text = when {

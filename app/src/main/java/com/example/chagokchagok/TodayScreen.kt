@@ -39,7 +39,7 @@ internal fun MainActivity.todayScreen(): View {
     val k = kit; val d = store.driver
     car.refreshNavi()
     val guide = todaysGuide()
-    val head = k.header(if (d == "나") "안녕하세요" else "$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · 오늘 주행도 차가 적어 둘게요.",
+    val head = k.header(if (d == "나") "안녕하세요, 차곡차곡이에요" else "$d 님, 안녕하세요. 차곡차곡이에요", "${dateText(System.currentTimeMillis())} · 오늘 주행도 제가 적어 둘게요.",
         trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
     // 오른쪽: 지금 할 일만 (경고 → 돌아볼 일기 → 요즘 신경 쓰이는 것)
     val side = listOfNotNull(carCard(), reviewCard(), focusCard(), usualCard())
@@ -91,7 +91,7 @@ internal fun MainActivity.againCard(guide: Guide?): View {
         addView(k.row(12).apply {
             addView(k.icon("pin", if (dest != null) Ink.accent else Ink.text3, 22))
             addView(k.text(dest?.let { "내비 목적지 · $it" } ?: "새로운 곳은 내비에 목적지를 넣고 출발해요", Type.Sub, if (dest != null) Ink.text else Ink.text2, lines = 2), k.lp(0, k.WRAP, 1f))
-            if (dest == null) addView(k.button("내비 열기", Kit.Btn.Tinted, "navi") { if (!car.openNavi()) toast("내비가 연결되지 않았어요. 내비 앱에서 목적지를 골라 주세요.") })
+            if (dest == null) addView(k.button("내비 열기", Kit.Btn.Tinted, "navi") { findInNavi() })
         })
     }
 }
@@ -405,6 +405,7 @@ internal fun MainActivity.readyScreen(): View {
         Session.forecast?.let { f -> check(f.rainChance < 50, "도착지 ${f.sky} ${f.tempC}°", "도착지 ${f.sky} ${f.tempC}° · 3시간 안 비 올 확률 ${f.rainChance}%", "", "cloud") },
     ) + car.lampsOn.mapNotNull { Lamps.warn(it) }.map { check(false, "", "${it.name} 표시등이 켜져 있어요", "", "warning")!! }
 
+    val demoRoad0 = BuildConfig.DEMOS && g.title == DemoCommute.PLACE && DemoCommute.loaded(this)
     val placed = g.tips.count { it.placed }
     val canPlace = store.locationOn && (places.lat != null || places.status == "켜짐")
     val tipRows = g.tips.mapIndexed { i, t ->
@@ -434,16 +435,19 @@ internal fun MainActivity.readyScreen(): View {
             addView(k.row(14).apply {
                 addView(k.icon("steering", Ink.accent, 28))
                 addView(k.col(2).apply {
-                    addView(k.text("기어를 D에 놓으면 기록을 시작해요", Type.Headline))
-                    addView(k.text("달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요.", Type.Sub, Ink.text2))
+                    addView(k.text(if (demoRoad0) "아래 ‘모의 주행 시작’을 누르면 네 번째 출근을 끝까지 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요", Type.Headline))
+                    addView(k.text(if (demoRoad0) "실제로 달릴 때는 기어를 D에 놓으면 기록을 시작해요." else "달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요.", Type.Sub, Ink.text2))
                 }, k.lp(0, k.WRAP, 1f))
             })
         })
         addView(k.gap(16))
+        val demoRoad = demoRoad0
         addView(k.buttons(*listOfNotNull(
-            k.button("기록 시작", Kit.Btn.Primary, "play") { if (car.gearKnown && car.gear != "D") say(if (car.beltKnown && !car.belt) "안전벨트를 매고, 기어를 D에 놓으면 기록을 시작해요." else "기어를 D에 놓으면 기록을 시작해요.") else trip.start() },
+            // 시연 길: 에뮬레이터에서는 위치가 움직이지 않으므로 모의 주행으로 끝까지 본다
+            if (BuildConfig.DEMOS) k.button(if (demoRoad) "모의 주행 시작 (시연용)" else "모의 주행 (시연용)", if (demoRoad) Kit.Btn.Primary else Kit.Btn.Plain, if (demoRoad) "play" else null) { trip.startSim() } else null,   // 마켓판에는 없음
+            // 기어 신호를 받는 차에서는 D에 놓으면 시작하므로 단추를 두지 않는다
+            if (!car.gearKnown) k.button("기록 시작", if (demoRoad) Kit.Btn.Secondary else Kit.Btn.Primary, "play") { trip.start() } else null,
             if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null,
-            if (BuildConfig.DEMOS) k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() } else null,   // 마켓판에는 없음
         ).toTypedArray()))
     }
 }

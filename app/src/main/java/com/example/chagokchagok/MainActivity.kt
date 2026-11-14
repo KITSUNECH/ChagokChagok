@@ -37,10 +37,10 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     companion object {
         const val TODAY = "today"; const val JOURNAL = "journal"; const val TOGETHER = "together"; const val ROADS = "roads"; const val SETTINGS = "settings"
         const val PREP = "prep"; const val READY = "ready"; const val DIARY = "diary"; const val GIVE = "give"; const val LEARN = "learn"
-        const val PEOPLE = "people"; const val ONBOARD = "onboard"; const val DRIVE = "drive"; const val ANALYSIS = "analysis"; const val CHECK = "check"; const val PROPOSE = "propose"; const val ROAD = "road"
+        const val PEOPLE = "people"; const val ONBOARD = "onboard"; const val DRIVE = "drive"; const val ANALYSIS = "analysis"; const val CHECK = "check"; const val PROPOSE = "propose"; const val DEMO = "demo"; const val ROAD = "road"
         val TABS = listOf(TODAY, JOURNAL, SETTINGS)
         /** 주차 중에만 여는 화면 */
-        val PARKED_ONLY = setOf(ROAD, PREP, READY, DIARY, GIVE, LEARN, PEOPLE, JOURNAL, TOGETHER, ROADS, SETTINGS, ANALYSIS, CHECK, PROPOSE)
+        val PARKED_ONLY = setOf(ROAD, PREP, READY, DIARY, GIVE, LEARN, PEOPLE, JOURNAL, TOGETHER, ROADS, SETTINGS, ANALYSIS, CHECK, PROPOSE, DEMO)
         const val REQ_LOCATION = 7
     }
 
@@ -196,6 +196,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         ANALYSIS -> analysisScreen()
         ROAD -> roadScreen(route.arg)
         CHECK -> checkScreen()
+        DEMO -> demoScreen()
         else -> todayScreen()
     }
 
