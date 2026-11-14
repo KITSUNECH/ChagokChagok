@@ -144,7 +144,7 @@ private fun MainActivity.heroCard(): View {
     if (g == null) return k.card {
         addView(k.empty("road", "아직 건네받은 길이 없어요",
             "가족이나 친구가 이 차로 평소 길을 달린 뒤 ‘이 길 건네주기’를 누르면 여기에 나타나요. 기다리지 않아도 돼요. 기어를 D에 놓으면 오늘 주행도 바로 일기가 돼요.",
-            k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() },
+            *(if (BuildConfig.DEMOS) arrayOf(k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() }) else emptyArray()),
             k.button("지금 기록 시작", Kit.Btn.Primary) { trip.guide = null; trip.start() }))
     }
     val followed = store.timesFollowed(d, g.id)
@@ -434,11 +434,11 @@ internal fun MainActivity.readyScreen(): View {
             })
         })
         addView(k.gap(16))
-        addView(k.buttons(
+        addView(k.buttons(*listOfNotNull(
             k.button("지금 기록 시작", Kit.Btn.Primary, "play") { trip.start() },
             k.button("출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) },
-            k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() },
-        ))
+            if (BuildConfig.DEMOS) k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() } else null,   // 마켓판에는 없음
+        ).toTypedArray()))
     }
 }
 

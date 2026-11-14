@@ -50,13 +50,12 @@
         </activity>
 
         <!-- 글레오가 호출하는 기능 세 가지 (assets/schema.json 과 이름이 같아야 한다) -->
-        <!-- 공모전 참가팀은 Gleo Interface(App Schema) 검토·승인을 신청할 수 없어 제출판에서는 꺼 둔다.
-             켜면 다른 앱이 일기 내용을 요청할 수 있으므로, 승인 절차가 열리면 권한과 함께 다시 켠다. -->
-        <receiver android:name=".GleoReceiver" android:exported="true" android:enabled="false">
+        <!-- Gleo AI 연동 (App Integration Guide). 공모전 참가팀은 Gleo Interface 를 별도 승인 없이 쓸 수 있다 (공모전 공지). -->
+        <receiver android:name=".GleoReceiver" android:exported="true" android:enabled="true">
             <intent-filter>
+                <action android:name="TAKE_A_BREATH" />
+                <action android:name="SAVE_NOTE_HERE" />
                 <action android:name="READ_LATEST_DIARY" />
-                <action android:name="GET_NEXT_ROUTE" />
-                <action android:name="CHECK_DRIVING_PROGRESS" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>

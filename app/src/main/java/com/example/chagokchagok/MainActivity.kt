@@ -68,6 +68,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         setContentView(root)
         sheets = Overlay(root) { kit }
         AiDiary.key = store.aiKey
+        Live.activity = java.lang.ref.WeakReference(this)   // 글레오 요청을 진행 중인 주행에 전한다
         car = Car(this, this)
         trip = Trip(store, car, this)
         voice = Voice(this)
@@ -97,6 +98,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     }
 
     override fun onDestroy() {
+        if (Live.activity?.get() === this) Live.activity = null
         trip.save(force = true)
         car.stop(); voice.release(); places.stop(); limits.stop(); sound?.release()
         super.onDestroy()

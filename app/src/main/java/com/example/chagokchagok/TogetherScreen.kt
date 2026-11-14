@@ -33,7 +33,7 @@ internal fun MainActivity.togetherScreen(): View {
         addView(k.gap(18))
         if (shown.isEmpty()) addView(k.card { addView(k.empty("people", "아직 함께 쓰는 사람이 없어요", "혼자서도 괜찮아요. 내가 다녀온 길이 차곡이 되고, 다음의 나에게 한마디를 남길 수 있어요. 누군가 이 차를 함께 쓰게 되면 여기에 그 사람의 길이 쌓여요.",
             k.button("사람 추가", Kit.Btn.Secondary, "plus") { addPerson() },
-            k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() })) })
+            *(if (BuildConfig.DEMOS) arrayOf(k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() }) else emptyArray()))) })
         else addView(k.grid(if (ui.wide) 2 else 1, shown.map { it.view() }, 18))
     }
 }

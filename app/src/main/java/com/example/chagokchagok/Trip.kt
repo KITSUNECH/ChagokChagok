@@ -187,6 +187,19 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
 
     private val brakeTimes = mutableListOf<Long>()
 
+    /** 글레오로 말해서 남긴 한마디 (글, 그때 지나온 길의 점 번호, 위도, 경도) */
+    private val voiceNotes = mutableListOf<VoiceNote>()
+    private data class VoiceNote(val text: String, val at: Int, val lat: Double?, val lng: Double?)
+
+    /** 달리는 중 말로 남긴 한마디. 지금 위치가 있으면 true. 주차하면 이 목적지의 "다음의 나에게"에 붙는다. */
+    fun voiceNote(text: String): Boolean {
+        val fix = lastFix ?: path.lastOrNull()?.let { Triple(it.first, it.second, null) }
+        voiceNotes.add(VoiceNote(text, (path.size - 1).coerceAtLeast(0), fix?.first, fix?.second))
+        recorder.add(Evt.SAY, text)
+        host.chime()
+        return fix != null
+    }
+
     fun start() {
         recorder.start(car.odometerKm)
         recorder.add(Evt.GEAR, car.gear)
@@ -194,7 +207,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.lowBeam) recorder.add(Evt.LIGHT, "on")
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
-        heard.clear(); inZone.clear(); lastFix = null; currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
+        heard.clear(); inZone.clear(); lastFix = null; voiceNotes.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
         praised = 0; spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
         // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
         support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
@@ -244,6 +257,14 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
         saveHandover(driver, "")
         main.postDelayed({ saveHandover(driver, store.handover()?.takeIf { it.from == driver }?.note ?: "") }, 1500) // 차 상태 값이 조금 늦게 온다
+        // 말로 남긴 한마디 → 이 목적지의 "다음의 나에게" 길에 붙인다 (다음에 같은 곳에 가면 그 자리에서 들려준다)
+        val dest = drive.place ?: again?.title
+        if (voiceNotes.isNotEmpty() && dest != null && !wasSim) {
+            val old = store.selfGuide(driver, dest)
+            val last = (route.size - 1).coerceAtLeast(1)
+            val tips = (old?.tips.orEmpty() + voiceNotes.map { Tip((it.at.toFloat() / last).coerceIn(0f, 1f), it.text, it.lat, it.lng) }).distinctBy { it.text }.sortedBy { it.p }
+            store.addGuide(Guide(old?.id ?: "self_${driver}_${dest.hashCode()}", driver, dest, drive.placeLat ?: old?.lat, drive.placeLng ?: old?.lng, drive, tips, (old?.times ?: 0) + 1, kind = "나"))
+        }
         val written = Writer.write(drive, store.diariesOf(driver), g, heard.size, store.tone(driver), seasoned = store.typeOf(driver) == "익숙")
         // 처음이라면(길잡이) 중 이번에 해낸 것이 있으면 일기에 적는다
         val courses = store.newlyDoneCourses(driver, drive)

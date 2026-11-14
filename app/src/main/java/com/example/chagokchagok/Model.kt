@@ -259,7 +259,7 @@ class Store(ctx: Context) {
 
     /** Pleos 계정 연동 미리보기 (시연용 가상 친구) */
     var demoOn: Boolean
-        get() = prefs.getBoolean("demo_on", false)
+        get() = BuildConfig.DEMOS && prefs.getBoolean("demo_on", false)
         set(v) = prefs.edit().putBoolean("demo_on", v).apply()
     fun demoAdded(): Set<String> = prefs.getStringSet("demo_added", emptySet()) ?: emptySet()
     fun demoAdd(id: String) = prefs.edit().putStringSet("demo_added", demoAdded() + id).apply()

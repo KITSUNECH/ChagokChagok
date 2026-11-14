@@ -62,13 +62,14 @@ internal fun MainActivity.settingsScreen(): View {
             k.item("면허시험 차와 다른 곳", null, "steering", chevron = true) { go(MainActivity.LEARN, "newcar") },
             k.item("경고등 색 읽는 법", null, "warning", chevron = true) { go(MainActivity.LEARN, "lamp") },
         )))
-        addView(k.section("연결과 시연"))
-        addView(k.groupOf(listOf(
-            k.toggleItem("Pleos 발전 제안 보기 (시연용)", "친구·가족 계정 연동이 생기면 어떻게 쓸지 가상의 친구로 보여 줘요. 지금 되는 기능과 따로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() },
+        addView(k.section(if (BuildConfig.DEMOS) "연결과 시연" else "연결"))
+        addView(k.groupOf(listOfNotNull(
+            if (BuildConfig.DEMOS) k.toggleItem("Pleos 발전 제안 보기 (시연용)", "친구·가족 계정 연동이 생기면 어떻게 쓸지 가상의 친구로 보여 줘요. 지금 되는 기능과 따로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() } else null,
             k.item("Pleos에 제안하는 것", "지금 되는 것과 앞으로 바라는 것", "sparkle", chevron = true) { go(MainActivity.PROPOSE) },
             k.item("차량 데이터", "지금 받고 있는 차량 신호와 연결 상태", "car", chevron = true) { go(MainActivity.CHECK) },
-            k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
-            k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
+            // 시연·시험 도구는 공모전판에만 (마켓판은 실제 신호만)
+            if (BuildConfig.DEMOS) k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() } else null,
+            if (BuildConfig.DEMOS) k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") } else null,
         )))
         addView(k.section("데이터"))
         addView(k.groupOf(listOf(
@@ -319,7 +320,7 @@ internal fun MainActivity.proposeScreen(): View {
             row("휴대폰 연동", "차 밖에서 일기를 보고 응원 보내기", false, "share"),
         )))
         addView(k.gap(16))
-        addView(k.buttons(k.button(if (store.demoOn) "제안 시연 끄기" else "제안 시연 켜기", Kit.Btn.Primary, "people") { store.demoOn = !store.demoOn; render() },
+        if (BuildConfig.DEMOS) addView(k.buttons(k.button(if (store.demoOn) "제안 시연 끄기" else "제안 시연 켜기", Kit.Btn.Primary, "people") { store.demoOn = !store.demoOn; render() },
             k.button("함께 차곡 보기", Kit.Btn.Secondary) { go(MainActivity.TOGETHER) }, stack = false))
         addView(k.gap(10))
         addView(k.text("제안 시연에서 보이는 친구, 다른 차의 글, 같이 가기 위치는 모두 가상이며 화면에 '시연용'으로 표시돼요.", Type.Caption, Ink.text3))

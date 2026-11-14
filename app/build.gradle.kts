@@ -22,6 +22,13 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    // 판 나누기: contest(공모전 시연용 기능 포함, 기본은 꺼짐) · market(Pleos App Market 탑재용, 시연용·가상 데이터 없음)
+    // Pleos 심사 가이드의 "테스트용 더미 데이터 금지"에 맞춰 market 판에는 시연 기능이 아예 들어가지 않는다.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("contest") { dimension = "edition"; buildConfigField("boolean", "DEMOS", "true") }
+        create("market") { dimension = "edition"; buildConfigField("boolean", "DEMOS", "false"); versionNameSuffix = "-market" }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { buildConfig = true }

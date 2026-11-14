@@ -211,7 +211,7 @@ internal fun MainActivity.onboardScreen(): View {
                     addView(k.col(4).apply {
                         addView(k.text("다른 차의 가족·친구와 잇기", Type.BodyStrong, Ink.text2))
                         addView(k.row().apply { addView(k.tag("Pleos 계정 연동 필요 · 추후", Ink.warn)) })
-                        addView(k.text("지금 Pleos는 차 한 대 안의 계정이라, 이 차를 함께 쓰는 사람끼리만 이어져요. 다른 차와 잇는 모습은 설정에서 시연용으로 미리 볼 수 있어요.", Type.Caption, Ink.text2))
+                        addView(k.text("지금 Pleos는 차 한 대 안의 계정이라, 이 차를 함께 쓰는 사람끼리만 이어져요." + if (BuildConfig.DEMOS) " 다른 차와 잇는 모습은 설정에서 시연용으로 미리 볼 수 있어요." else " Pleos가 계정 연동을 지원하면 다른 차와도 이어질 수 있어요.", Type.Caption, Ink.text2))
                     }, k.lp(0, k.WRAP, 1f))
                 })
                 canNext = O.solo != null

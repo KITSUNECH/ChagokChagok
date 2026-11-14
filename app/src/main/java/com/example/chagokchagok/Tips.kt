@@ -18,7 +18,8 @@ internal val APP_TIPS = listOf(
     AppTip("seat", "운전석을 바꿀 수 있어요", "함께 쓰는 차라면 이름을 눌러 운전석을 바꿔요. 기록은 사람마다 따로 쌓여요.", "people") { store.drivers.size > 1 },
     AppTip("give", "다니는 길을 건네주세요", "일기에서 ‘이 길 건네주기’를 누르면 함께 쓰는 사람이 같은 길을 달리며 그 자리에서 한마디를 들어요.", "gift") { store.diariesOf(store.driver).isNotEmpty() },
     AppTip("paper", "원고지로도 읽을 수 있어요", "일기 위의 ‘원고지’를 누르면 그림일기처럼 보여요.", "book") { store.diariesOf(store.driver).isNotEmpty() },
-    AppTip("parked", "달리는 동안은 말로만", "화면 조작은 멈췄을 때만 돼요. 달리는 동안 필요한 건 소리로 알려 줘요.", "speaker"),
+    AppTip("voice", "달리는 동안은 말로", "글레오에게 “차곡차곡, 숨 고를래” 또는 “차곡차곡, 여기 한마디 남겨 줘”라고 말해 보세요. 남긴 말은 다음에 같은 곳에서 들려줘요.", "speaker"),
+    AppTip("parked", "화면은 멈췄을 때만", "화면 조작은 멈췄을 때만 돼요. 달리는 동안 필요한 건 소리로 알려 줘요.", "speaker"),
 )
 
 /** 지금 보여 줄 팁 하나 (닫지 않았고, 지금 쓸모 있는 것) */
