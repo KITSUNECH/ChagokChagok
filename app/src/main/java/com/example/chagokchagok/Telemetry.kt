@@ -64,20 +64,55 @@ object ChaGlyph {
 }
 
 /** 브랜드 마크: 검정 정사각형에 샌드색 차곡 / 車곡. 車은 Active Blue로, 한글과 같은 굵기의 획으로 그린다 */
+/**
+ * 로고 배치: 앱 아이콘(검정 타일 + 안쪽 흰 선 + 차·곡 / 車·곡)과 같은 비율. 앱 안의 마크와 시작 모션이 함께 쓴다.
+ * 값은 타일 한 변(s)에 대한 비율이다. 흰 선은 아이콘의 adaptive 전경과 같은 자리(안쪽 5.6%, 모서리 19%).
+ */
+internal object LogoLayout {
+    const val TILE_R = .22f        // 타일 모서리
+    const val RING_INSET = .056f   // 흰 선의 안쪽 여백
+    const val RING_R = .19f        // 흰 선 모서리
+    const val RING_W = .022f       // 흰 선 두께
+    const val TEXT = .31f          // 글자 크기
+    const val COL_L = .31f; const val COL_R = .69f
+    const val ROW_T = .44f; const val ROW_B = .80f
+    val SAND = android.graphics.Color.parseColor("#E4DCD3")
+    val BLUE = android.graphics.Color.parseColor("#00AAD2")
+
+    /** 흰 선의 사각형 경로 (위 가운데에서 시작해 시계 방향) — 시작 모션이 이 경로를 따라 그린다 */
+    fun ring(ox: Float, oy: Float, s: Float): android.graphics.Path {
+        val i = s * RING_INSET; val r = s * RING_R
+        val l = ox + i; val t = oy + i; val rr = ox + s - i; val b = oy + s - i
+        return android.graphics.Path().apply {
+            moveTo((l + rr) / 2, t)
+            lineTo(rr - r, t); arcTo(rr - 2 * r, t, rr, t + 2 * r, -90f, 90f, false)
+            lineTo(rr, b - r); arcTo(rr - 2 * r, b - 2 * r, rr, b, 0f, 90f, false)
+            lineTo(l + r, b); arcTo(l, b - 2 * r, l + 2 * r, b, 90f, 90f, false)
+            lineTo(l, t + r); arcTo(l, t, l + 2 * r, t + 2 * r, 180f, 90f, false)
+            close()
+        }
+    }
+}
+
 internal class BrandMark(ctx: android.content.Context, private val ui: Ui) : View(ctx) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(c: Canvas) {
+        val L = LogoLayout
         val s = minOf(width, height).toFloat()
         val ox = (width - s) / 2; val oy = (height - s) / 2
         p.style = Paint.Style.FILL; p.color = android.graphics.Color.BLACK
-        c.drawRoundRect(ox, oy, ox + s, oy + s, s * .22f, s * .22f, p)
-        p.typeface = ui.bold; p.textAlign = Paint.Align.CENTER; p.textSize = s * .34f
-        p.color = android.graphics.Color.parseColor("#E4DCD3")
-        c.drawText("차", ox + s * .30f, oy + s * .42f, p)
-        c.drawText("곡", ox + s * .70f, oy + s * .42f, p)
-        c.drawText("곡", ox + s * .70f, oy + s * .82f, p)
-        val b = ChaGlyph.box(p, ox + s * .30f, oy + s * .82f)
-        p.color = android.graphics.Color.parseColor("#00AAD2")
+        c.drawRoundRect(ox, oy, ox + s, oy + s, s * L.TILE_R, s * L.TILE_R, p)
+        // 앱 아이콘과 같은 안쪽 흰 선 (작은 크기에서도 1px 이상)
+        p.style = Paint.Style.STROKE; p.color = android.graphics.Color.WHITE; p.strokeWidth = maxOf(1f, s * L.RING_W)
+        c.drawPath(L.ring(ox, oy, s), p)
+        p.style = Paint.Style.FILL
+        p.typeface = ui.bold; p.textAlign = Paint.Align.CENTER; p.textSize = s * L.TEXT
+        p.color = L.SAND
+        c.drawText("차", ox + s * L.COL_L, oy + s * L.ROW_T, p)
+        c.drawText("곡", ox + s * L.COL_R, oy + s * L.ROW_T, p)
+        c.drawText("곡", ox + s * L.COL_R, oy + s * L.ROW_B, p)
+        val b = ChaGlyph.box(p, ox + s * L.COL_L, oy + s * L.ROW_B)
+        p.color = L.BLUE
         ChaGlyph.draw(c, p, b[0], b[1], b[2], b[3])
     }
 }

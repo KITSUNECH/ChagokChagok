@@ -1,7 +1,9 @@
 // 차곡車곡 – 시작 모션
 // 천천히, 끊기지 않게: 동작이 서로 겹치며 이어지고, 튕기지 않고 부드럽게 감속한다 (prompt-motion.com의 로고 등장 사례들을 참고).
 // 세 줄이 위에서 미끄러져 내려와 차곡차곡 쌓인다 → 쌓인 세 줄이 로고의 왼쪽 아래 칸으로 옮겨 가고,
-// 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다. 화면 전체는 내내 아주 천천히 다가온다. 눌러도 끝까지 보여 준다.
+// 차·곡·곡이 떠오르는 것과 동시에 가운데 줄이 상자로 벌어지고 세로 획이 꿰뚫어 車이 완성된다. 마지막 글자와 車이 함께 완성된다.
+// 그 끝에 흰 선이 도장을 찍듯 한 번에 눌려 생기며 앱 아이콘과 같은 모습이 된다.
+// 화면 전체는 내내 아주 천천히 다가온다. 눌러도 끝까지 보여 준다.
 package com.example.chagokchagok
 
 import android.animation.ValueAnimator
@@ -27,10 +29,10 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
     private var finished = false
 
     companion object {
-        const val DURATION = 4000L
+        const val DURATION = 4400L
         // 로고 G3: 검정 바탕, 현대 샌드 글자, 車은 Active Blue. 화면은 검정, 로고 정사각형은 살짝 떠 보이게
         val STROKE = Color.parseColor("#00AAD2")
-        val INK = Color.parseColor("#161616")
+        val INK = Color.parseColor("#0C0C0C")   // 아이콘처럼 검정에 가깝게, 흰 선이 타일을 드러낸다
         val BG = Color.parseColor("#000000")
         val SAND = Color.parseColor("#E4DCD3")
         val SKY = Color.parseColor("#9C958D")
@@ -39,7 +41,7 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
     fun play() {
         anim = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = DURATION; interpolator = LinearInterpolator()
-            addUpdateListener { t = it.animatedValue as Float; alpha = 1f - ((t - .93f) / .07f).coerceIn(0f, 1f) }
+            addUpdateListener { t = it.animatedValue as Float; alpha = 1f - ((t - .95f) / .05f).coerceIn(0f, 1f) }
             addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(a: android.animation.Animator) { finish() } })
             start()
         }
@@ -71,29 +73,55 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
         val sq = cubicOut(seg(.34f, .56f))
         if (sq > 0f) {
             p.shader = null; p.style = Paint.Style.FILL; p.color = INK; p.alpha = (255 * sq).toInt()
-            val sc = .94f + .06f * sq
+            // 도장이 닿는 순간 타일이 아주 살짝 눌렸다 돌아온다 (한 번, 튕김 없이)
+            val dent = kotlin.math.sin(Math.PI.toFloat() * seg(.79f, .87f)) * .015f
+            val sc = (.94f + .06f * sq) * (1f - dent)
             c.save(); c.scale(sc, sc, ox + S / 2, oy + S / 2)
-            c.drawRoundRect(ox, oy, ox + S, oy + S, S * .22f, S * .22f, p)
+            c.drawRoundRect(ox, oy, ox + S, oy + S, S * LogoLayout.TILE_R, S * LogoLayout.TILE_R, p)
             c.restore()
         }
 
         // 車: 처음엔 가운데에 크게, 모일 때 왼쪽 아래 칸의 "차"에 맞춘 상자로
         val move = quintInOut(seg(.32f, .56f))
-        p.typeface = face; p.textSize = S * .34f
-        val fin = ChaGlyph.box(p, ox + S * .30f, oy + S * .82f)
+        p.typeface = face; p.textSize = S * LogoLayout.TEXT
+        val fin = ChaGlyph.box(p, ox + S * LogoLayout.COL_L, oy + S * LogoLayout.ROW_B)
         val bigW = S * .80f; val bigH = bigW * fin[3] / fin[2]
         val bx = w / 2 - bigW / 2; val by = oy + S / 2 - bigH / 2
         drawCha(c, bx + (fin[0] - bx) * move, by + (fin[1] - by) * move, bigW + (fin[2] - bigW) * move, bigH + (fin[3] - bigH) * move)
 
         // 차 · 곡 · 곡 이 차례로 떠오른다 (겹치며)
-        p.shader = null; p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * .34f; p.color = SAND
-        listOf(Triple("차", .30f, .42f), Triple("곡", .70f, .42f), Triple("곡", .70f, .82f)).forEachIndexed { i, (ch, u, v) ->
+        p.shader = null; p.style = Paint.Style.FILL; p.typeface = face; p.textAlign = Paint.Align.CENTER; p.textSize = S * LogoLayout.TEXT; p.color = SAND
+        val L = LogoLayout
+        listOf(Triple("차", L.COL_L, L.ROW_T), Triple("곡", L.COL_R, L.ROW_T), Triple("곡", L.COL_R, L.ROW_B)).forEachIndexed { i, (ch, u, v) ->
             val k = cubicOut(seg(.50f + i * .06f, .66f + i * .06f)); if (k <= 0f) return@forEachIndexed
             p.alpha = (255 * k).toInt()
             c.drawText(ch, ox + S * u, oy + S * v + (1 - k) * S * .07f, p)
         }
+        // 흰 선: 도장을 찍듯 한 번에. 조금 크고 옅은 채로 내려와 제자리에 닿고(가속), 닿는 순간 인주가 번지듯 옅은 빛이 퍼졌다 사라진다.
+        val press = seg(.70f, .79f)
+        if (press > 0f) {
+            val k = press * press * press                  // 내려올수록 빨라져 '탁' 하고 닿는다
+            val sc = 1.16f - .16f * k
+            val cx = ox + S / 2; val cy = oy + S / 2
+            c.save(); c.scale(sc, sc, cx, cy)
+            p.shader = null; p.style = Paint.Style.STROKE; p.color = Color.WHITE
+            p.strokeWidth = S * LogoLayout.RING_W; p.alpha = (255 * minOf(1f, .15f + .85f * k)).toInt()
+            c.drawPath(LogoLayout.ring(ox, oy, S), p)
+            c.restore()
+            // 닿은 뒤: 옅은 빛이 바깥으로 번지며 사라진다
+            val spread = seg(.79f, .90f)
+            if (spread > 0f && spread < 1f) {
+                val e = cubicOut(spread)
+                val g = 1f + .07f * e
+                c.save(); c.scale(g, g, cx, cy)
+                p.strokeWidth = S * LogoLayout.RING_W * (1f + 2.5f * e); p.alpha = (110 * (1 - e)).toInt()
+                c.drawPath(LogoLayout.ring(ox, oy, S), p)
+                c.restore()
+            }
+            p.style = Paint.Style.FILL; p.alpha = 255
+        }
         // 한 줄 소개
-        val tag = cubicOut(seg(.80f, .92f))
+        val tag = cubicOut(seg(.82f, .93f))
         if (tag > 0f) {
             p.textSize = S * .085f; p.color = SKY; p.alpha = (255 * tag).toInt()
             c.drawText("차로 쓰는 성장일기", w / 2, oy + S + S * .22f + (1 - tag) * S * .03f, p)
