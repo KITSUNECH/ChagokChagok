@@ -37,56 +37,61 @@ internal fun MainActivity.todaysGuide(): Guide? {
 
 internal fun MainActivity.todayScreen(): View {
     val k = kit; val d = store.driver
-    val diaries = store.diariesOf(d)
-    val greeting = "오늘 주행도 차가 적어 둘게요."
-    val head = k.header(if (d == "나") "안녕하세요" else "$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · $greeting",
-        trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
-
     car.refreshNavi()
-    // 주인공: 내가 다녀온 곳이 있으면 "다시 갈 곳"(같은 길, 다른 날)이 먼저. 없으면 건네받은 길, 그것도 없으면 가고 싶은 곳
-    val hasPlaces = diaries.any { it.ownTrip() && it.drive.place != null && !it.drive.sim && it.drive.placeLat != null && it.drive.completed }
-    val guideHero = todaysGuide() != null && !hasPlaces
-    val hero = if (guideHero) heroCard() else myRouteHero()
-    // 옆 카드는 지금 필요한 것 두 장까지만. 위에 있을수록 먼저 (경고 → 소식 → 운전자 유형에 맞는 것 → 요약)
-    val type = store.typeOf(d)
-    fun small(icon: String, title: String, sub: String, onClick: () -> Unit) = k.card(onClick = onClick) {
-        addView(k.row(14).apply {
-            addView(k.icon(icon, Ink.accent, 28))
-            addView(k.col(4).apply { addView(k.text(title, Type.Headline)); addView(k.text(sub, Type.Sub, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
-            addView(k.icon("chevron", Ink.text3, 20))
-        })
-    }
-    val candidates = listOf<() -> View?>(
-        { carCard() },
-        { reviewCard() },
-        { focusCard() },
-        { if (!guideHero) todaysGuide()?.let { g -> small("road", "${Writer.subj(g.owner)} 건네준 길", g.title + " · 한마디 ${g.tips.size}개") { depart(g) } } else null },
-        { newsCard() },
-        { if (diaries.isEmpty()) loopCard() else null },
-    )
-    val side = mutableListOf<View>()
-    for (c in candidates) { if (side.size >= 3) break; c()?.let { side.add(it) } }
-    // 아래 줄: 이번 주의 나 (있을 때, 전체 폭)
-    val bottom = listOfNotNull(weekCard())
-
+    val guide = todaysGuide()
+    val head = k.header(if (d == "나") "안녕하세요" else "$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · 오늘 주행도 차가 적어 둘게요.",
+        trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
+    // 오른쪽: 지금 할 일만 (경고 → 돌아볼 일기 → 요즘 신경 쓰이는 것)
+    val side = listOfNotNull(carCard(), reviewCard(), focusCard())
     return k.col().apply {
-        addView(head); addView(k.gap(24))
-        if (ui.wide) {
-            // 위 줄: 큰 카드와 옆 카드 묶음의 밑단을 맞춘다. 옆 묶음의 마지막 카드가 남는 높이를 채운다.
-            addView(k.row(20).apply {
-                gravity = Gravity.TOP
-                // 왼쪽: 큰 카드 + 큰 시작 단추(남는 높이를 채운다). 오른쪽 묶음과 밑단이 맞는다.
-                // 시작 단추를 맨 위에: 처음 쓰는 사람도 스크롤 없이 바로 찾는다. 아래 큰 카드가 남는 높이를 채운다.
-                addView(k.col(16).apply {
-                    addView(startCard(if (guideHero) todaysGuide() else null), k.lp(k.MATCH, k.WRAP))
-                    addView(hero, k.lp(k.MATCH, 0, 1f))
-                }, k.lp(0, k.MATCH, 1.55f))
-                if (side.isNotEmpty()) addView(k.col(16).apply { side.forEach { v -> addView(v, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
-            })
-            bottom.forEach { addView(k.gap(20)); addView(it, k.lp(k.MATCH, k.WRAP)) }
-        } else addView(k.col(16).apply {
-            // 좁은 창(분할 화면): 시작 단추를 맨 위에 두어 스크롤하지 않아도 보이게
-            addView(startCard(if (guideHero) todaysGuide() else null)); addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) }
+        addView(head); addView(k.gap(if (ui.wide) 20 else 16))
+        if (ui.wide) addView(k.row(20).apply {
+            gravity = Gravity.TOP
+            addView(k.col(16).apply { addView(startCard(null), k.lp(k.MATCH, k.WRAP)); addView(againCard(guide), k.lp(k.MATCH, k.WRAP)) }, k.lp(0, k.WRAP, 1.4f))
+            addView(k.col(16).apply { side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
+        }) else addView(k.col(16).apply { addView(startCard(null)); addView(againCard(guide)); side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
+    }
+}
+
+/**
+ * 다시 갈 길: 내가 다녀온 곳(같은 길을 다시 달리면 지난번과 견준다)과 건네받은 길을 한 목록에.
+ * 아직 다녀온 곳이 없으면 앱이 하는 일을 네 줄로 보여 준다.
+ */
+internal fun MainActivity.againCard(guide: Guide?): View {
+    val k = kit; val me = store.driver
+    val dest = car.destName?.takeIf { it.isNotBlank() }
+    val places = store.diariesOf(me).filter { it.ownTrip() && it.drive.place != null && !it.drive.sim && it.drive.placeLat != null && it.drive.completed }
+        .groupBy { it.drive.place!! }.entries.sortedByDescending { e -> e.value.last().date }.take(if (guide != null) 2 else 3)
+    val rows = places.map { (place, ds) ->
+        val note = store.selfGuide(me, place)?.tips?.firstOrNull()?.text
+        k.item(place, (if (note != null) "지난번 한마디 “$note”" else "지난번 ${dateText(ds.last().date, "M월 d일")}") + " · ${ds.size}번 다녀옴", if (note != null) "quote" else "pin",
+            trailing = if (ds.size >= 2) k.iconButton("chart", Ink.accent, Ink.accentSoft, 48) { go(MainActivity.ROAD, ds.last().id) } else k.icon("chevron", Ink.text3, 20)) { goAgain(place, ds.last()) }
+    } + listOfNotNull(guide?.let { g -> k.item(g.title, "${Writer.subj(g.owner)} 건네준 길 · 한마디 ${g.tips.size}개" + if (g.sample) " · 예시" else "", "road", chevron = true) { depart(g) } })
+    return k.card(24) {
+        if (rows.isNotEmpty()) {
+            addView(k.text("다시 갈 길", Type.Headline))
+            addView(k.gap(4))
+            addView(k.text("같은 길을 다시 달리면 지난번의 나와 견줘 줘요.", Type.Sub, Ink.text2))
+            addView(k.gap(12))
+            addView(k.groupOf(rows).apply { background = k.rounded(Ink.fill, 18) })
+        } else {
+            addView(k.text("이렇게 써요", Type.Headline))
+            addView(k.gap(6))
+            LOOP_STEPS.forEach { (ic, t, s) ->
+                addView(k.row(14).apply {
+                    setPadding(0, ui.dp(7), 0, ui.dp(7))
+                    addView(k.icon(ic, Ink.accent, 24))
+                    addView(k.text(t, Type.BodyStrong), k.lp(ui.dp(if (ui.wide) 130 else 108), k.WRAP))
+                    addView(k.text(s, Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
+                })
+            }
+        }
+        addView(k.gap(12))
+        // 새로운 곳: 실제 Pleos 내비의 화면을 연다 (NaviHelper requestNavigationScreen)
+        addView(k.row(12).apply {
+            addView(k.icon("pin", if (dest != null) Ink.accent else Ink.text3, 22))
+            addView(k.text(dest?.let { "내비 목적지 · $it" } ?: "새로운 곳은 내비에 목적지를 넣고 출발해요", Type.Sub, if (dest != null) Ink.text else Ink.text2, lines = 2), k.lp(0, k.WRAP, 1f))
+            if (dest == null) addView(k.button("내비 열기", Kit.Btn.Tinted, "navi") { if (!car.openNavi()) toast("내비가 연결되지 않았어요. 내비 앱에서 목적지를 골라 주세요.") })
         })
     }
 }

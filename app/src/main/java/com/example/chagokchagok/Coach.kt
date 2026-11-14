@@ -133,7 +133,7 @@ internal fun MainActivity.carSawCard(d: Diary): View? {
         addView(k.gap(4))
         addView(k.text(when {
             real == 0 -> "첫 일기예요. 오늘이 기준이 되고, 다음 주행부터 견줘 드릴게요."
-            d.drive.place != null -> "이 길은 처음이라 지난번과는 견줄 수 없어요. 습관은 평소의 나와 견줬어요."
+            d.drive.place != null || d.guideId != null -> "이 길은 처음이라 지난번과는 견줄 수 없어요. 습관은 평소의 나와 견줬어요."
             else -> "습관은 평소의 나와 견줬어요. 주차한 곳에 이름을 붙이면 다음부터 같은 길끼리 견줘요."
         }, Type.Sub, Ink.text2))
         addView(k.gap(14))

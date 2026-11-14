@@ -15,6 +15,7 @@ internal fun MainActivity.diaryScreen(id: String?): View {
     val d = store.diaries().firstOrNull { it.id == id } ?: return todayScreen()
     val guide = store.guide(d.guideId)
     val prev = previousSame(d)
+    if (!diaryDetail) return diaryPage(d, prev)
     val paper = readPage(d, guide, prev)
     val side = k.col().apply {
         addView(k.section("오늘의 숫자"))
@@ -38,13 +39,9 @@ internal fun MainActivity.diaryScreen(id: String?): View {
         addView(actions(d, guide))
     }
     return k.col().apply {
-        addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
+        addView(k.header(d.title, "${d.driver} · ${dateText(d.date)}" + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { diaryDetail = false; render() },
             trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(store.feeling(d.id), d.text).joinToString(". ")) }))
         addView(k.gap(18))
-        // 주차 후 첫 화면: 돌아보기(한마디가 도움이 됐는지, 지난번보다 어땠는지, 돌아볼 만한 순간)가 일기보다 먼저
-        // 같은 길의 지난 기록이 없는 날(첫 주행, 처음 간 길): 기준에 비춘 사실과 평소의 나
-        if (Growth.judge(store.diariesOf(d.driver), d) == null) carSawCard(d)?.let { addView(it, k.lp(k.MATCH, k.WRAP)); addView(k.gap(18)) }
-        arrivalCard(d, prev)?.let { addView(it, k.lp(k.MATCH, k.WRAP)); addView(k.gap(18)) }
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(paper, k.lp(0, k.WRAP, 1.15f)); addView(side, k.lp(0, k.WRAP, 1f)) })
         else { addView(paper); addView(side) }
     }

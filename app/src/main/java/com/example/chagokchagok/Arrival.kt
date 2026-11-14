@@ -6,6 +6,7 @@
 //  3. 오늘 돌아볼 만한 순간 → 이곳에서 기억해 둘 일이 있었나요? → 다음에 이 근처에서 들려준다
 package com.example.chagokchagok
 
+import android.view.Gravity
 import android.view.View
 
 internal const val Q_HELPED = "helped"
@@ -162,5 +163,75 @@ internal fun MainActivity.reviewCard(): View? {
             }, k.lp(0, k.WRAP, 1f))
             addView(k.icon("chevron", Ink.text3, 20))
         })
+    }
+}
+
+
+// ═══════════════ 일기 한 장 ═══════════════
+
+/**
+ * 주차 후 처음 보는 화면. 스크롤 없이 한눈에: 왼쪽은 차가 본 것(같은 길의 판정, 없으면 오늘 본 사실),
+ * 오른쪽은 나(느낌, 한 줄, 다음의 나에게 한마디). 질문은 한 번에 하나만 묻고, 답하면 다음 것이 나온다.
+ * 지나온 길 그림·타임라인·근거는 "자세히 보기"에 있다.
+ */
+internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
+    val k = kit
+    val all = store.diariesOf(d.driver)
+    val mine = d.driver == store.driver
+    val judge = Growth.judge(all, d)
+    val vs = store.answer(d.id, Q_VS_LAST); val helped = store.answer(d.id, Q_HELPED)
+    val heard = store.heardTips(d.id)
+    val handled = store.skippedMoments(d.id) + store.keptMoments(d.id)
+    val open = TipSuggest.moments(d.drive).filter { it.why !in handled }
+    val feeling = store.feeling(d.id)
+
+    fun ask(title: String, sub: String?, options: List<String>, write: String? = null, onPick: (String) -> Unit) = k.card(pad = 22) {
+        addView(k.text(title, Type.Headline))
+        sub?.let { addView(k.gap(4)); addView(k.text(it, Type.Sub, Ink.text2, lines = 2)) }
+        addView(k.gap(12))
+        addView(k.flow(10).apply {
+            options.forEach { o -> addView(k.chip(o, false) { onPick(o) }) }
+            if (write != null) addView(k.chip("직접 쓰기", false, "pencil") { sheets.input(write, "") { t -> if (t.isNotBlank()) onPick(t.trim()) } })
+        })
+    }
+    // 한 번에 하나: 지난번과 견준 느낌 → 들은 한마디 → 이곳의 이름 → 오늘 한 줄
+    val question: View? = when {
+        !mine -> null
+        prev != null && vs == null -> ask("내 느낌은 어땠어요?", "${dateText(prev.date, "M월 d일")}에도 다녀온 길이에요. 차가 본 것과 합쳐서 보여 줄게요.", VS_LAST) { store.setAnswer(d.id, Q_VS_LAST, it); render() }
+        heard.isNotEmpty() && helped == null -> ask("길에서 들은 한마디, 도움이 됐나요?", "“${heard.first()}”", HELPED) { store.setAnswer(d.id, Q_HELPED, it); render() }
+        unnamed(d) -> ask("여기를 뭐라고 부를까요?", "이름을 붙이면 다음에 같은 곳으로 알아보고 지난번과 견줘요.", PLACE_NAMES, "이곳의 이름") { n ->
+            val end = d.drive.path.last(); val name = n.take(20)
+            val n0 = all.count { it.drive.place == name && !it.drive.sim && it.id != d.id }
+            store.addDiary(d.copy(title = "$name · ${n0 + 1}번째", drive = d.drive.copy(place = name, placeLat = end.lat, placeLng = end.lng)))
+            toast("‘$name’로 기억해 둘게요."); render()
+        }
+        feeling == null -> ask("오늘 운전은 어땠어요?", "한 줄만 남기면 내 일기가 돼요.", FEELS, "한 줄") { store.setFeeling(d.id, it); render() }
+        else -> null
+    }
+    val left: View = if (judge != null) judgementView(judge, vs).apply { (background as? android.graphics.drawable.GradientDrawable)?.setColor(Ink.surface) }
+        else carSawCard(d) ?: k.card(pad = 26) { addView(k.text(d.text, Type.Body)) }
+    val right = k.col(14).apply {
+        if (feeling != null) addView(k.card(pad = 22) {
+            addView(k.row(8).apply {
+                addView(k.icon("pencil", Ink.accent, 18)); addView(k.text("내 한 줄", Type.Sub, Ink.accent), k.lp(0, k.WRAP, 1f))
+                if (mine) addView(k.text("고치기", Type.Sub, Ink.accent).apply { gravity = Gravity.CENTER_VERTICAL; minHeight = ui.touch(48); setPadding(ui.dp(12), 0, 0, 0); setOnClickListener { askFeeling(d) } })
+            })
+            addView(k.voice("“$feeling”", if (ui.wide) 26f else 22f))
+        })
+        question?.let { addView(it) }
+        if (mine) addView(k.button(if (open.isNotEmpty()) "돌아볼 순간 ${open.size}곳 · 다음의 나에게 한마디" else "다음의 나에게 한마디", if (question == null) Kit.Btn.Primary else Kit.Btn.Tinted, "quote") {
+            if (open.size == 1) reviewMoment(d, open.first()) else noteToSelf(d)
+        }, k.lp(k.MATCH, k.WRAP))
+        addView(k.row(10).apply {
+            addView(k.button("자세히 보기", Kit.Btn.Secondary, "list") { diaryDetail = true; render() }, k.lp(0, k.WRAP, 1f))
+            if (mine && pending(d, prev)) addView(k.button("나중에", Kit.Btn.Plain) { go(MainActivity.TODAY) })
+        }, k.lp(k.MATCH, k.WRAP))
+    }
+    return k.col().apply {
+        addView(k.header(d.title, dateText(d.date) + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
+            trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(feeling, Coach.today(d.drive, all.filter { it.date < d.date }, store.answer(d.id, "focus"))).joinToString(". ")) }))
+        addView(k.gap(16))
+        if (ui.wide) addView(k.row(20).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1.2f)); addView(right, k.lp(0, k.WRAP, 1f)) })
+        else { addView(left); addView(k.gap(14)); addView(right) }
     }
 }

@@ -56,6 +56,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     internal var giveTitle = ""
     internal val giveTips = mutableListOf<Tip>()
     internal var journalTab = 0
+    /** 일기: 한 장(차가 본 것 + 나)이 기본, true 면 자세히 */
+    internal var diaryDetail = false
     internal var prepTab = 0
     /** 같은 화면을 다시 그릴 때 스크롤 위치를 지킨다 (차 신호로 화면이 갱신돼도 읽던 자리가 튀지 않게) */
     private var shownRoute: Route? = null
@@ -151,6 +153,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     internal fun go(name: String, arg: String? = null) {
         if (driving && name in PARKED_ONLY) { toast("달리는 중에는 열지 않아요. 주차하면 볼 수 있어요."); return }
         val r = Route(name, arg)
+        if (name == DIARY) diaryDetail = false
         if (name in TABS || name == ONBOARD || name == DRIVE) { stack.clear() }
         else if (stack.isEmpty()) stack.add(Route(TODAY))
         stack.add(r); route = r
@@ -207,7 +210,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         pageScroll = body as? android.widget.ScrollView
         if (ui.wide) return k.row().apply {
             gravity = Gravity.TOP
-            addView(sidebar(), k.lp(ui.dp(268), k.MATCH))
+            addView(sidebar(), k.lp(ui.dp(112), k.MATCH))
             addView(View(this@MainActivity).apply { setBackgroundColor(Ink.line) }, k.lp(ui.dp(1), k.MATCH))
             addView(body, k.lp(0, k.MATCH, 1f))
         }
@@ -221,26 +224,31 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     private val tabIcons = mapOf(TODAY to ("today" to "오늘"), JOURNAL to ("book" to "일기장"), TOGETHER to ("people" to "함께"), ROADS to ("road" to "내 길"), SETTINGS to ("settings" to "설정"))
 
     private fun sidebar(): View {
-        val k = kit; val tab = currentTab()
+        val k = kit; val tab = currentTab(); val d = store.driver
         return k.col().apply {
-            setBackgroundColor(Ink.surface)
-            setPadding(ui.dp(18), ui.dp(30), ui.dp(18), ui.dp(22))
-            addView(brand().apply { setPadding(ui.dp(10), 0, 0, 0) })
-            addView(k.text("차로 쓰는 성장일기", Type.Caption, Ink.text2).apply { setPadding(ui.dp(10), ui.dp(2), 0, ui.dp(22)) })
-            addView(profileButton())
+            setBackgroundColor(Ink.surface); gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(ui.dp(10), ui.dp(22), ui.dp(10), ui.dp(14))
+            addView(BrandMark(context, ui), k.lp(ui.dp(52), ui.dp(52)))
             addView(k.gap(20))
             TABS.forEach { t ->
                 val (icon, label) = tabIcons.getValue(t)
                 val on = t == tab
-                addView(k.row(14).apply {
-                    minimumHeight = ui.dp(54); setPadding(ui.dp(14), 0, ui.dp(14), 0)
-                    addView(k.icon(icon, if (on) Ink.accent else Ink.text2, 24))
-                    addView(k.text(label, Type.Body, if (on) Ink.accent else Ink.text).apply { typeface = if (on) ui.semibold else ui.regular })
-                    k.pressable(this, if (on) k.rounded(Ink.accentSoft, 14) else null) { go(t) }
-                }, k.lp(k.MATCH, k.WRAP).apply { bottomMargin = ui.dp(4) })
+                addView(k.col(6).apply {
+                    gravity = Gravity.CENTER; minimumHeight = ui.dp(86)
+                    addView(k.icon(icon, if (on) Ink.accent else Ink.text2, 28))
+                    addView(k.text(label, Type.Caption, if (on) Ink.accent else Ink.text2).apply { typeface = if (on) ui.semibold else ui.regular; gravity = Gravity.CENTER })
+                    k.pressable(this, if (on) k.rounded(Ink.accentSoft, 18) else null) { go(t) }
+                }, k.lp(k.MATCH, k.WRAP).apply { bottomMargin = ui.dp(6) })
             }
             addView(k.fill())
-            addView(carStatus())
+            // 지금 운전석에 앉은 사람 (누르면 바꾼다)
+            addView(k.col(4).apply {
+                gravity = Gravity.CENTER; minimumHeight = ui.dp(76)
+                addView(k.avatar(d, 44))
+                addView(k.text(d, Type.Micro, Ink.text2, lines = 1).apply { gravity = Gravity.CENTER })
+                k.pressable(this, null) { switchDriver() }
+            }, k.lp(k.MATCH, k.WRAP))
+            addView(carStatus(), k.lp(k.MATCH, k.WRAP))
         }
     }
 
@@ -281,28 +289,18 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         }
     }
 
-    /** 사이드바 아래: 무엇과 연결돼 있는지 */
-    /** 사이드바 맨 아래: Pleos 연결 상태. 숫자 대신 무엇이 연결됐는지만 점으로 (누르면 설정 › 차량 데이터) */
+    /** 레일 맨 아래: Pleos 연결 상태를 점 하나로 (누르면 차량 연결 상태) */
     private fun carStatus(): View {
         val k = kit
         val vehicleOk = !Car.offline && !car.failures.containsKey("vehicle")
-        val parts = listOf("차량" to vehicleOk, "내비" to car.naviConnected, "위치" to (store.locationOn && places.permitted()), "음성" to voice.ready)
-        val all = parts.count { it.second }
-        return k.col(6).apply {
-            setPadding(ui.dp(14), ui.dp(12), ui.dp(12), ui.dp(12))
-            addView(k.row().apply {
-                addView(k.status(if (all == 0) "Pleos 연결 안 됨" else "Pleos 연결됨", if (all == 0) Ink.text3 else Ink.go), k.lp(0, k.WRAP, 1f))
-            })
-            addView(k.row(10).apply {
-                parts.forEach { (name, ok) -> addView(k.row(4).apply {
-                    addView(View(context).apply { background = k.rounded(if (ok) Ink.go else Ink.line, 3) }, k.lp(ui.dp(6), ui.dp(6)))
-                    addView(k.text(name, Type.Micro, if (ok) Ink.text2 else Ink.text3))
-                }) }
-            })
+        val any = vehicleOk || car.naviConnected || (store.locationOn && places.permitted()) || voice.ready
+        return k.col(4).apply {
+            gravity = Gravity.CENTER; minimumHeight = ui.touch(56)
+            addView(View(context).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (any) Ink.go else Ink.text3) } }, k.lp(ui.dp(9), ui.dp(9)))
+            addView(k.text(if (any) "차와 연결됨" else "연결 안 됨", Type.Micro, Ink.text2).apply { gravity = Gravity.CENTER })
             k.pressable(this, null) { go(CHECK) }
         }
     }
-
 
     private fun tabBar(): View {
         val k = kit; val tab = currentTab()
@@ -368,7 +366,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         TripService.start(this, trip.guide?.let { "${it.title} · P에 놓으면 기록을 마쳐요" })
     }
     override fun tripChanged() { if (route.name == DRIVE) refreshDrive() }
-    override fun tripEnded(d: Diary) { TripService.stop(this); places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
+    override fun tripEnded(d: Diary) { TripService.stop(this); places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); diaryDetail = false; render() }
     override fun tripDiscarded() { TripService.stop(this); places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); go(TODAY) }
     override fun diaryUpdated(d: Diary) { if (route.name == DIARY && route.arg == d.id) render() }
     override fun lampsChanged() { if (route.name == TODAY) render() }
