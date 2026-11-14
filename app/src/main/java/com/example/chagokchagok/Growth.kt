@@ -86,6 +86,8 @@ internal data class Judgement(
     /** 비교에 쓴 지난 기록 수 */
     val history: Int, val baseCount: Int, val condDiffers: Boolean, val today: Cond,
 ) {
+    /** 지난 기록이 한 번뿐이면 늘었다·줄었다를 말하지 않는다 (한 번의 차이는 우연일 수 있다) */
+    val early get() = history < 2
     val confidence get() = when { history >= 4 -> "믿을 만해요"; history >= 2 -> "보통"; else -> "참고" }
     /** 판정에 가장 크게 기여한 변화 (최대 n개) */
     fun top(n: Int = 3) = changes.filter { it.weight > 0f && (it.better || it.worse) }.sortedByDescending { abs(it.score) * it.weight }.take(n)
@@ -128,6 +130,7 @@ internal object Growth {
 
     /** 앱의 판단과 운전자의 답을 합친 한 줄. answer 가 없으면 앱의 판단만 */
     fun combined(j: Judgement, answer: String?): String {
+        if (j.early) return "지난번 한 번과 견준 값이에요. 같은 길을 한 번 더 달리면 늘었는지 판단해요."
         val up = j.verdict == Verdict.UP
         val main = j.top(1).firstOrNull()
         val why = main?.let { "${it.metric.label}이 ${it.text()}" } ?: ""
@@ -148,7 +151,7 @@ internal object Growth {
     }
 
     /** 앱과 운전자가 둘 다 늘었다고 했는지 (성장 바의 칸) */
-    fun bothUp(j: Judgement?, answer: String?) = j?.verdict == Verdict.UP && answer == "더 편했어요"
+    fun bothUp(j: Judgement?, answer: String?) = j != null && !j.early && j.verdict == Verdict.UP && answer == "더 편했어요"
 }
 
 /** 한 지표의 방문별 추이: 선 하나, 점, 첫 기록들의 평균(점선), 마지막 점 강조. 축은 하나. */
@@ -170,7 +173,7 @@ internal class MetricTrend(ctx: Context, private val ui: Ui, private val values:
         p.pathEffect = DashPathEffect(floatArrayOf(ui.dp(4).toFloat(), ui.dp(4).toFloat()), 0f); p.color = Ink.text3
         c.drawLine(padL, y(base), padL + w, y(base), p); p.pathEffect = null
         p.style = Paint.Style.FILL; p.textSize = ui.sp(12f); p.color = Ink.text3
-        c.drawText("처음 " + metric.fmt(base), padL + ui.dp(14), y(base) - ui.dp(8), p)
+        c.drawText("처음 " + metric.fmt(base), padL + ui.dp(14), if (pts.first().second >= base) y(base) + ui.dp(16) else y(base) - ui.dp(8), p)
         // 선
         p.style = Paint.Style.STROKE; p.strokeWidth = ui.dp(2).toFloat(); p.color = Ink.accent; p.strokeCap = Paint.Cap.ROUND
         val path = Path(); pts.forEachIndexed { i, (ix, v) -> if (i == 0) path.moveTo(x(ix), y(v)) else path.lineTo(x(ix), y(v)) }
@@ -197,11 +200,11 @@ internal class MetricTrend(ctx: Context, private val ui: Ui, private val values:
 /** 앱의 판단 카드 (주차 후 · 일기 · 이 길의 나에서 함께 쓴다) */
 internal fun MainActivity.judgementView(j: Judgement, answer: String?, compact: Boolean = false): View {
     val k = kit
-    val col = when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> Ink.text2; Verdict.DOWN -> Ink.warn }
+    val col = if (j.early) Ink.text2 else when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> Ink.text2; Verdict.DOWN -> Ink.warn }
     return k.col(8).apply {
         addView(k.row(10).apply {
             addView(k.icon(when (j.verdict) { Verdict.UP -> "chart"; Verdict.SAME -> "compare"; Verdict.DOWN -> "info" }, col, 22))
-            addView(k.text("차가 본 변화 · ${j.verdict.word}", Type.Headline, col), k.lp(0, k.WRAP, 1f))
+            addView(k.text(if (j.early) "차가 본 변화 · 지난번과 견줘 보면" else "차가 본 변화 · ${j.verdict.word}", Type.Headline, col), k.lp(0, k.WRAP, 1f))
             addView(k.tag("확신 ${j.confidence}", Ink.text2))
         })
         addView(k.text(Growth.combined(j, answer), Type.Body))
@@ -255,7 +258,7 @@ internal fun MainActivity.roadScreen(anchorId: String?): View {
     val rows = visits.reversed().map { v ->
         val j = Growth.judge(all, v); val ans = store.answer(v.id, Q_VS_LAST)
         k.item("${dateText(v.date, "M월 d일 a h:mm")} · ${v.drive.cond().label()}" + (if (store.isSample(v.id)) " · 예시" else "") + if (v.drive.sim) " · 시연" else "",
-            listOfNotNull(j?.let { "차: ${it.verdict.word}" }, ans?.takeIf { it != "답하지 않음" }?.let { "나: $it" }).joinToString(" · ").ifEmpty { "첫 기록" },
+            listOfNotNull(j?.let { if (it.early) "차: 판단은 다음부터" else "차: ${it.verdict.word}" }, ans?.takeIf { it != "답하지 않음" }?.let { "나: $it" }).joinToString(" · ").ifEmpty { "첫 기록" },
             if (Growth.bothUp(j, ans)) "checkCircle" else "circle", if (Growth.bothUp(j, ans)) Ink.go else Ink.text3, chevron = true) { go(MainActivity.DIARY, v.id) }
     }
     val last = visits.last(); val lj = Growth.judge(all, last)

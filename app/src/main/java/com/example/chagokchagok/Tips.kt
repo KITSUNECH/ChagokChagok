@@ -10,10 +10,10 @@ internal data class AppTip(val id: String, val title: String, val body: String, 
 
 /** 차곡차곡이 하는 일 네 단계 (첫 화면, 홈, 팁, 기획서가 같은 말을 쓴다) */
 internal val LOOP_STEPS = listOf(
-    Triple("play", "D · 차가 기억해요", "깜빡이·브레이크·차선 변경·내비 재탐색을 그 자리와 함께. 누를 것은 없어요"),
-    Triple("flag", "P · 돌아봐요", "차가 본 순간을 보고 기억해 둘 말을 남겨요. 바쁘면 나중에"),
-    Triple("quote", "다시 갈 때 · 그 근처에서", "지난번의 나와 가족이 남긴 한마디를 소리로 들려줘요"),
-    Triple("chart", "늘었는지 · 차와 내가 함께", "같은 길의 변화를 그래프로, 내 느낌과 합쳐서 보여 줘요"),
+    Triple("play", "D · 차가 기억해요", "깜빡이·브레이크·차선 변경을 그 자리와 함께"),
+    Triple("flag", "P · 돌아봐요", "차가 본 순간에 한마디를 남겨요"),
+    Triple("quote", "다시 갈 때 · 그 근처에서", "남긴 한마디를 소리로 들려줘요"),
+    Triple("chart", "늘었는지 · 차와 내가 함께", "같은 길의 변화를 그래프로 보여 줘요"),
 )
 
 internal val APP_TIPS = listOf(

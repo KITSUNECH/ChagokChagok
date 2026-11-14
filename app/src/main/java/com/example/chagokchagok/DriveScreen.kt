@@ -142,13 +142,14 @@ internal fun MainActivity.driveScreen(): View {
         gravity = Gravity.TOP
         addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard) }, k.lp(0, k.MATCH, 1.7f))
         addView(k.col(18).apply {
-            addView(limitCard, k.lp(k.MATCH, k.WRAP)); addView(statsCard, k.lp(k.MATCH, k.WRAP)); addView(k.fill())
+            // 제한속도·주행 통계는 차의 드라이빙 뷰와 내비가 이미 보여 준다. 겹쳐 그리지 않는다
+            addView(k.fill())
             addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
         addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard)
-        addView(k.row(14).apply { addView(limitCard, k.lp(0, k.WRAP, 1f)); addView(statsCard, k.lp(0, k.WRAP, 1f)); addView(breathe, k.lp(0, ui.dp(84), 1.2f)) })
+        addView(breathe, k.lp(k.MATCH, ui.dp(84)))
         stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
     }
     return FrameLayout(this).apply {

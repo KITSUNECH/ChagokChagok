@@ -395,7 +395,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                     if (car.signal != "OFF" && !laneBusy && (next == null || meters > 250)) car.simEvent(Evt.SIGNAL, "OFF")
                     // 합류 구간: 깜빡이를 켜고 6초 만에 차선 변경 (지난번 12~15초)
                     if (!laneDone && at >= .50f) { laneDone = true; laneBusy = true; car.simLaneChange("LEFT", 6f, main); main.postDelayed({ laneBusy = false }, 9_000) }
-                    listOf(.30f, .70f).forEachIndexed { bi, bp -> if (at >= bp && braked.add(bi)) { car.simEvent(Evt.BRAKE, "on"); main.postDelayed({ car.simEvent(Evt.BRAKE, "off") }, 800) } }
+                    listOf(.06f, .11f, .17f, .22f, .28f, .33f, .39f, .44f, .49f, .56f, .61f, .66f, .71f, .76f, .81f, .86f, .91f, .96f).forEachIndexed { bi, bp -> if (at >= bp && braked.add(bi)) { car.simEvent(Evt.BRAKE, "on"); main.postDelayed({ car.simEvent(Evt.BRAKE, "off") }, 800) } }
                 }
                 val cam = ((0.66f - at) * total * 1000).toInt()
                 car.setAhead(50, if (cam in 1..600) cam else 0, 50)

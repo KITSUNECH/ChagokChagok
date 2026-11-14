@@ -129,7 +129,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     // ───────── 위치 권한 ─────────
 
-    internal fun askLocation() { try { requestPermissions(arrayOf(Places.PERMISSION), REQ_LOCATION) } catch (_: Throwable) {} }
+    /** 위치 권한과 함께, 기록 중 알림을 보여 줄 알림 권한도 주차 중에 한 번에 묻는다 (달리는 중에는 묻지 않는다) */
+    internal fun askLocation() { try { requestPermissions(if (android.os.Build.VERSION.SDK_INT >= 33) arrayOf(Places.PERMISSION, android.Manifest.permission.POST_NOTIFICATIONS) else arrayOf(Places.PERMISSION), REQ_LOCATION) } catch (_: Throwable) {} }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         if (requestCode == REQ_LOCATION && places.permitted()) places.listen()

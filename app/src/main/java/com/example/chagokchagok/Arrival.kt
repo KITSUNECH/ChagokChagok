@@ -112,7 +112,7 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
         })
         val open = moments.filter { it.why !in skipped && it.why !in kept }
         if (open.isNotEmpty()) blocks.add(k.col(10).apply {
-            addView(k.text("오늘 돌아볼 만한 순간", Type.Headline))
+            addView(k.text("돌아볼 만한 순간", Type.Headline))
             open.forEach { m ->
                 addView(k.row(14).apply {
                     setPadding(ui.dp(16), ui.dp(12), ui.dp(12), ui.dp(12)); background = k.rounded(Ink.fill, 16)
@@ -145,7 +145,7 @@ private fun MainActivity.reviewMoment(d: Diary, m: TipIdea) {
 
 /** 아직 돌아보지 않은 길 (최근 7일, 내 기록). 출근길처럼 바로 내려야 했던 날을 저녁에 몰아서 돌아본다 */
 internal fun MainActivity.pendingReviews(): List<Diary> {
-    val weekAgo = System.currentTimeMillis() - 7 * 86400000L
+    val weekAgo = System.currentTimeMillis() - 3 * 86400000L   // 사흘 지난 길은 숙제처럼 쌓아 두지 않는다
     return store.diariesOf(store.driver).filter { it.date >= weekAgo && pending(it, previousSame(it)) }.sortedBy { it.date }
 }
 
