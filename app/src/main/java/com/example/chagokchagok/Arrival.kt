@@ -89,12 +89,12 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
         })
         addView(k.text("차가 본 것을 먼저 보여 드려요. 바쁘면 나중에 홈에서 이어서 해요.", Type.Sub, Ink.text2))
         val blocks = mutableListOf<View>()
-        if (heard.isNotEmpty() && helped == null) blocks.add(question(
-            "길 위에서 들은 한마디, 도움이 됐나요?", heard.joinToString("  ·  ") { "“$it”" }, HELPED, helped) { store.setAnswer(d.id, Q_HELPED, it); render() })
-        // 앱이 먼저 판단하고, 운전자의 느낌을 묻는다. 둘을 합쳐 한 줄로 보여 준다
+        // 앱이 먼저 판단하고(이 화면의 결론이라 맨 위), 바로 아래에서 운전자의 느낌을 묻는다. 둘을 합쳐 한 줄로 보여 준다
         if (judge != null) blocks.add(judgementView(judge, vs))
         if (prev != null && vs == null) blocks.add(question(
             "내 느낌은 어땠어요?", "${dateText(prev.date, "M월 d일")}에도 같은 곳에 다녀왔어요. 차의 판단과 합쳐서 보여 드려요.", VS_LAST, vs) { store.setAnswer(d.id, Q_VS_LAST, it); render() })
+        if (heard.isNotEmpty() && helped == null) blocks.add(question(
+            "길 위에서 들은 한마디, 도움이 됐나요?", heard.joinToString("  ·  ") { "“$it”" }, HELPED, helped) { store.setAnswer(d.id, Q_HELPED, it); render() })
         if (unnamed(d)) blocks.add(k.col(10).apply {
             addView(k.text("여기를 뭐라고 부를까요?", Type.Headline))
             addView(k.text("이름을 붙이면 다음에 내비 없이 와도 같은 곳으로 알아보고 지난번과 비교해요.", Type.Sub, Ink.text2, lines = 2))
@@ -125,7 +125,7 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
                 })
             }
         })
-        blocks.forEach { addView(k.gap(8)); addView(it) }
+        blocks.forEach { addView(k.gap(14)); addView(it) }
     }
 }
 

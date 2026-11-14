@@ -294,7 +294,6 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             setPadding(ui.dp(14), ui.dp(12), ui.dp(12), ui.dp(12))
             addView(k.row().apply {
                 addView(k.status(if (all == 0) "Pleos 연결 안 됨" else "Pleos 연결됨", if (all == 0) Ink.text3 else Ink.go), k.lp(0, k.WRAP, 1f))
-                addView(k.text("α0.2", Type.Micro, Ink.text3))
             })
             addView(k.row(10).apply {
                 parts.forEach { (name, ok) -> addView(k.row(4).apply {

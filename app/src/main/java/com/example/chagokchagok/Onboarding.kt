@@ -253,12 +253,15 @@ internal fun MainActivity.onboardScreen(): View {
     }
 
     // 아래 단추 줄
-    val bar = k.row(12).apply {
+    val prepFirst = if (O.step == Onboard.LAST && O.type in listOf("초보", "새 차")) k.button("출발 준비부터", Kit.Btn.Secondary, "steering") { finishOnboarding(true) } else null
+    val barRow = k.row(12).apply {
         if (O.step > 0) addView(k.button("뒤로", Kit.Btn.Plain, "back") { prev() })
         addView(k.fill())
-        if (O.step == Onboard.LAST && O.type in listOf("초보", "새 차")) addView(k.button("출발 준비부터", Kit.Btn.Secondary, "steering") { finishOnboarding(true) })
+        if (prepFirst != null && ui.wide) addView(prepFirst)
         addView(k.button(nextLabel, Kit.Btn.Primary, enabled = canNext) { onNext() })
     }
+    // 좁은 창(내비 옆)에서는 단추 셋이 한 줄에 들어가지 않는다: '출발 준비부터'를 윗줄로 올린다
+    val bar = if (prepFirst != null && ui.narrow) k.col(10).apply { addView(prepFirst, k.lp(k.MATCH, k.WRAP)); addView(barRow, k.lp(k.MATCH, k.WRAP)) } else barRow
     val progress = k.row(6).apply {
         repeat(Onboard.LAST + 1) { i -> addView(View(context).apply { background = k.rounded(if (i <= O.step) Ink.accent else Ink.line, 4) }, k.lp(ui.dp(if (i == O.step) 28 else 10), ui.dp(6))) }
         addView(k.gap(6))
@@ -291,7 +294,7 @@ internal fun MainActivity.onboardScreen(): View {
     val cap = Gauge.cap(levelOf(O.type))
     val target = if (O.step == Onboard.LAST) cap else Math.round(cap * (O.step + 1).toFloat() / (Onboard.LAST + 1)).coerceIn(1, cap)
     val from = O.gaugeShown; O.gaugeShown = target
-    val labelW = ui.dp(if (ui.wide) 70 else 52)
+    val labelW = ui.dp(if (ui.wide) 70 else 64)
     val rail = k.col(10).apply {
         // 홈 바(stackRail)와 같은 안쪽 여백: 위 24 · 옆 14 · 아래 20
         setPadding(ui.dp(14), ui.dp(24), ui.dp(14), ui.dp(20))

@@ -59,15 +59,20 @@ internal fun MainActivity.myRouteHero(): View {
         if (dest != null) {
             addView(k.item(dest, "내비에 넣은 목적지 · 아래 단추로 출발해요", "pin").apply { background = k.rounded(Ink.accentSoft, 18) })
         } else {
-            addView(k.row(14).apply {
-                setPadding(ui.dp(18), ui.dp(14), ui.dp(14), ui.dp(14)); background = k.rounded(Ink.surface, 18, 1, Ink.line)
+            // 실제 Pleos 내비의 장소 검색 화면을 연다 (NaviHelper requestNavigationScreen)
+            val find = k.button("내비에서 찾기", Kit.Btn.Tinted, "navi") { if (!car.openNavi()) toast("내비가 연결되지 않았어요. 내비 앱에서 목적지를 골라 주세요.") }
+            val words = k.row(14).apply {
                 addView(k.icon("pin", Ink.accent, 26))
                 addView(k.col(2).apply {
                     addView(k.text("목적지가 아직 없어요", Type.BodyStrong))
                     addView(k.text("없어도 괜찮아요. 기어를 D에 놓으면 오늘 주행이 기록돼요.", Type.Caption, Ink.text2))
                 }, k.lp(0, k.WRAP, 1f))
-                // 실제 Pleos 내비의 장소 검색 화면을 연다 (NaviHelper requestNavigationScreen)
-                addView(k.button("내비에서 찾기", Kit.Btn.Tinted, "navi") { if (!car.openNavi()) toast("내비가 연결되지 않았어요. 내비 앱에서 목적지를 골라 주세요.") })
+            }
+            // 좁은 창(내비 옆)에서는 글과 단추를 위아래로 쌓는다 (옆으로 두면 글이 한 글자씩 꺾인다)
+            addView((if (ui.narrow) k.col(12) else k.row(14)).apply {
+                setPadding(ui.dp(18), ui.dp(14), ui.dp(14), ui.dp(14)); background = k.rounded(Ink.surface, 18, 1, Ink.line)
+                addView(words, if (ui.narrow) k.lp(k.MATCH, k.WRAP) else k.lp(0, k.WRAP, 1f))
+                addView(find, if (ui.narrow) k.lp(k.MATCH, k.WRAP) else k.lp(k.WRAP, k.WRAP))
             })
         }
     }

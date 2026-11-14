@@ -201,14 +201,36 @@ internal class MetricTrend(ctx: Context, private val ui: Ui, private val values:
 internal fun MainActivity.judgementView(j: Judgement, answer: String?, compact: Boolean = false): View {
     val k = kit
     val col = if (j.early) Ink.text2 else when (j.verdict) { Verdict.UP -> Ink.go; Verdict.SAME -> Ink.text2; Verdict.DOWN -> Ink.warn }
-    return k.col(8).apply {
+    val tops = j.top(3)
+    // 가장 큰 변화 하나는 큰 숫자로 (한눈에: 13초 → 6초). 나머지는 아래 작은 줄로.
+    val main = if (compact) null else tops.firstOrNull()
+    return k.col(10).apply {
+        setPadding(ui.dp(22), ui.dp(18), ui.dp(22), ui.dp(12)); background = k.rounded(Ink.alpha(col, if (Ink.night) .16f else .08f), 20)
         addView(k.row(10).apply {
-            addView(k.icon(when (j.verdict) { Verdict.UP -> "chart"; Verdict.SAME -> "compare"; Verdict.DOWN -> "info" }, col, 22))
-            addView(k.text(if (j.early) "차가 본 변화 · 지난번과 견줘 보면" else "차가 본 변화 · ${j.verdict.word}", Type.Headline, col), k.lp(0, k.WRAP, 1f))
+            addView(k.text("차가 본 변화", Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
             addView(k.tag("확신 ${j.confidence}", Ink.text2))
         })
-        addView(k.text(Growth.combined(j, answer), Type.Body))
-        if (!compact) j.top(3).forEach { c ->
+        addView(k.row(12).apply {
+            addView(k.icon(when (j.verdict) { Verdict.UP -> "chart"; Verdict.SAME -> "compare"; Verdict.DOWN -> "info" }, col, if (compact) 24 else 30))
+            addView(k.text(if (j.early) "지난번과 견줘 보면" else j.verdict.word, if (compact || j.early) Type.Title else Type.Large, col), k.lp(0, k.WRAP, 1f))
+        })
+        if (main != null) {
+            val delta = main.text().substringAfter("(", "").substringBefore(")")
+            addView(k.col(2).apply {
+                setPadding(0, ui.dp(4), 0, ui.dp(4))
+                addView(k.text(main.metric.label, Type.Sub, Ink.text2))
+                addView(k.row(12).apply {
+                    addView(k.text(main.metric.fmt(main.base), Type.Title, Ink.text3))
+                    addView(k.text("→", Type.Title, Ink.text3))
+                    addView(k.text(main.metric.fmt(main.now), if (ui.narrow) Type.Large else Type.Display))
+                    if (delta.isNotEmpty()) addView(k.tag(delta, if (main.better) Ink.go else Ink.text2))
+                })
+            })
+        }
+        // 큰 숫자가 이미 말한 내용("가장 큰 변화는 …")은 되풀이하지 않는다
+        val line = Growth.combined(j, answer)
+        if (main == null || !line.startsWith("가장 큰 변화는")) addView(k.text(line, Type.Body))
+        if (!compact) tops.drop(if (main != null) 1 else 0).forEach { c ->
             // 좁은 창에서는 이름 위, 값 아래 (이름이 글자 단위로 꺾이지 않게)
             addView((if (ui.narrow) k.col(0) else k.row(8)).apply {
                 addView(k.text(c.metric.label, Type.Sub, Ink.text2), if (ui.narrow) k.lp(k.WRAP, k.WRAP) else k.lp(0, k.WRAP, 1f))
@@ -218,7 +240,7 @@ internal fun MainActivity.judgementView(j: Judgement, answer: String?, compact: 
                 })
             })
         }
-        addView(k.text("왜 이렇게 판단했나요", Type.Sub, Ink.accent).apply { setPadding(0, ui.dp(6), 0, ui.dp(6)); setOnClickListener { evidenceSheet(j) } })
+        addView(k.text("왜 이렇게 판단했나요", Type.Sub, Ink.accent).apply { gravity = android.view.Gravity.CENTER_VERTICAL; minHeight = ui.touch(48); setOnClickListener { evidenceSheet(j) } })
     }
 }
 
@@ -265,7 +287,7 @@ internal fun MainActivity.roadScreen(anchorId: String?): View {
     return k.col().apply {
         addView(k.header("이 길의 나 · $name", "${visits.size}번 다녀왔어요. 같은 길을 다시 달릴 때마다 차가 본 변화가 쌓여요.", onBack = { back() }))
         addView(k.gap(16))
-        lj?.let { addView(k.card(pad = 22) { addView(judgementView(it, store.answer(last.id, Q_VS_LAST))) }); addView(k.gap(16)) }
+        lj?.let { addView(judgementView(it, store.answer(last.id, Q_VS_LAST)).apply { (background as? android.graphics.drawable.GradientDrawable)?.setColor(Ink.surface) }); addView(k.gap(16)) }
         if (charts.isEmpty()) addView(k.card { addView(k.text("두 번 넘게 다녀오면 지표마다 그래프가 그려져요.", Type.Sub, Ink.text2)) })
         else addView(k.grid(if (ui.wide) 2 else 1, charts, 14))
         addView(k.section("다녀온 기록"))

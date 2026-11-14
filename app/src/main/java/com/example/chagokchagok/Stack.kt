@@ -23,7 +23,7 @@ internal data class Block(val id: String, val stage: Int, val title: String, val
 /** 단계 이름: 그 단계에서 하는 일 (차를 익히고, 다닐 길을 넓히고, 같은 길을 다시 달리며 차곡차곡 쌓는다) */
 internal val STAGES = listOf("익히기", "넓히기", "차곡차곡")
 /** 단계 색: 현대자동차 CI 전용색상에서 (익히기 Active Blue · 넓히기 Hyundai Blue/밤에는 Sky Blue · 차곡차곡 Active Red). 색약 구분 검사 통과 */
-internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#00AAD2", "#AACAE6", "#E63312")[stage] else listOf("#00AAD2", "#002C5F", "#E63312")[stage])
+internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#00AAD2", "#AACAE6", "#3DCB8B")[stage] else listOf("#00AAD2", "#002C5F", "#12855A")[stage])
 
 /** 운전 경험 → 시작 단계 (1 익히기까지 · 2 넓히기까지 · 3 차곡차곡까지) */
 internal fun levelOf(type: String) = when (type) { "초보" -> 1; "오랜만", "새 차" -> 2; else -> 3 }

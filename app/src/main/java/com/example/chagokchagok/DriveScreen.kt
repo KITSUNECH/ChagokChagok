@@ -140,17 +140,21 @@ internal fun MainActivity.driveScreen(): View {
         } else k.col(14).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(k.fill()); addView(breathe, k.lp(k.MATCH, ui.dp(84))) }
     } else if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
-        addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard) }, k.lp(0, k.MATCH, 1.7f))
+        addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }, k.lp(0, k.MATCH, 1.5f))
         addView(k.col(18).apply {
             // 제한속도·주행 통계는 차의 드라이빙 뷰와 내비가 이미 보여 준다. 겹쳐 그리지 않는다
+            addView(routeCard)
             addView(k.fill())
             addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
         addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard)
-        addView(breathe, k.lp(k.MATCH, ui.dp(84)))
-        stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
+        addView(k.fill())
+        addView(k.row(10).apply {
+            addView(breathe, k.lp(0, ui.touch(72), 1f))
+            stop?.let { addView(it, k.lp(0, ui.touch(72), 1f)) }
+        }, k.lp(k.MATCH, k.WRAP))
     }
     return FrameLayout(this).apply {
         setBackgroundColor(Ink.bg); setPadding(pad, pad, pad, pad)
@@ -164,7 +168,7 @@ internal fun MainActivity.refreshDrive() {
     val sec = trip.recorder.secondsNow(); val km = trip.recorder.kmNow()
     // 기록 상태를 분명히: 차 신호가 끊기면 무엇만 적고 있는지 말한다
     val vehicleOk = Car.offline || !car.failures.containsKey("vehicle")
-    V.status?.text = (if (trip.sim) "모의 주행 기록 중" else "기록 중") + " · ${sec / 60}분" + (if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else "") +   // 초가 계속 움직이지 않게 분 단위
+    V.status?.text = (if (trip.sim) "모의 주행 기록 중" else "기록 중") + (if (sec < 60) " · 방금 출발" else " · ${sec / 60}분") + (if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else "") +   // 초가 계속 움직이지 않게 분 단위
         (if (!vehicleOk) " · 차량 신호가 없어 시간과 위치만 적어요" else if (!car.naviConnected && !trip.sim) " · 내비 연결 안 됨" else "")
 
     // 다음 회전

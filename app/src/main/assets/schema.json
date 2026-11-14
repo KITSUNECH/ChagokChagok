@@ -8,7 +8,7 @@
       "type": "function",
       "function": {
         "name": "TAKE_IT_SLOW",
-        "description": "Called when the driver says they want to take it slow (e.g. '차곡차곡, 천천히 갈래'). Remembers the current spot so the driver can review it after parking, and asks the navigation for a more comfortable route. It does not change the car's speed.",
+        "description": "Called when the driver says they want to take it slow or feels tense while driving. Remembers the current spot so the driver can review it after parking, and asks the navigation for a more comfortable route. It does not change the car's speed.",
         "parameters": { "type": "object", "properties": {}, "required": [] },
         "component": "service"
       }
