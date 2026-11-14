@@ -94,7 +94,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             if (store.locationOn && !places.permitted() && !Car.offline) askLocation()
         } else go(ONBOARD)
         // 시작 모션: 세 줄이 쌓이고 세로 획이 꿰뚫어 車이 된다 (주행 중 다시 켜졌을 때는 보여 주지 않는다)
-        if (!Car.offline && !trip.active && savedInstanceState == null) {
+        if (!Car.offline && !driving && savedInstanceState == null) {
             var splash: SplashView? = null
             splash = SplashView(this, ui.bold) { root.post { splash?.let { root.removeView(it) } } }
             root.addView(splash, FrameLayout.LayoutParams(-1, -1))
@@ -138,7 +138,12 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     // ───────── 화면 이동 ─────────
 
     /** 지금 운전 중인지: 기록 중이거나, 차가 주행 제한을 걸었을 때 */
-    internal val driving get() = trip.active || limits.restricted
+    /**
+     * 달리는 중인지. 기록 중이거나 주행 제한이 걸렸으면 달리는 중.
+     * 주행 제한 신호를 아직 못 받았으면 기어로 판단하고(D·R), 기어도 모르면 달리는 중으로 본다 (안전한 쪽).
+     */
+    internal val driving get() = trip.active || limits.restricted ||
+        (!Car.offline && !limits.known && (!car.gearKnown || car.gear == "D" || car.gear == "R"))
 
     internal fun go(name: String, arg: String? = null) {
         if (driving && name in PARKED_ONLY) { toast("달리는 중에는 열지 않아요. 주차하면 볼 수 있어요."); return }
@@ -321,10 +326,12 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         Telemetry.hit(type, value)
         if (route.name == CHECK) render()
         // 연습 중 기어 조작(R·P)은 주행으로 치지 않는다. D에 놓으면 실제 출발로 보고 기록을 시작한다.
-        if (route.name == PREP && !trip.active && !(type == Evt.GEAR && value == "D")) { onPrep(type, value); return }
+        if (route.name == PREP && !trip.active && type != Evt.GEAR) { onPrep(type, value); return }
         val wasActive = trip.active
         trip.onCar(type, value)
         if (wasActive != trip.active) return   // 시작/끝은 tripStarted/tripEnded 가 화면을 바꾼다
+        // 주행 제한 신호가 없을 때는 기어가 주행 여부를 정하므로 화면을 다시 그린다
+        if (type == Evt.GEAR && !limits.known && !Car.offline) { render(); return }
         when (route.name) {
             DRIVE -> refreshDrive()
             READY -> if (type == "belt" || type == Evt.SEAT || (type == Evt.NAVI && value == "route")) render()
@@ -343,9 +350,9 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     // ───────── TripHost ─────────
 
-    override fun speak(text: String) { if (store.voiceOn) voice.say(text) }
+    override fun speak(text: String, pri: Int) { if (store.voiceOn) voice.say(text, pri) }
     /** 말로 알리고, 주행 중이 아니거나 소리를 꺼 두었으면 글로도 (주행 중에는 화면을 가리지 않게 말로만) */
-    override fun say(text: String) { speak(text); if (!driving || !store.voiceOn) sheets.toast(text, "speaker") }
+    override fun say(text: String, pri: Int) { speak(text, pri); if (!driving || !store.voiceOn) sheets.toast(text, "speaker") }
     override fun chime() {
         val f = chimeFocus; f?.take()
         sound?.play(chimeId, 1f, 1f, 1, 0, 1f)

@@ -20,8 +20,8 @@ class TripTest {
     private lateinit var trip: Trip
 
     private val host = object : TripHost {
-        override fun speak(text: String) { said.add(text) }
-        override fun say(text: String) { said.add(text) }
+        override fun speak(text: String, pri: Int) { said.add(text) }
+        override fun say(text: String, pri: Int) { said.add(text) }
         override fun chime() {}
         override fun tripStarted() {}
         override fun tripChanged() {}

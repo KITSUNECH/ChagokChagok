@@ -78,7 +78,7 @@ class ScreenshotTest {
         a.go(MainActivity.TODAY); snap("01b_today_solo")
         keep.forEach { store.addGuide(it) }
         a.go(MainActivity.TODAY); snap("02_today")
-        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.carModel = "더 뉴 그랜저 (2026)"; a.onPrep(Evt.GEAR, "R"); a.prepTab = 1; a.render(); snap("03b_prep_gear"); a.prepTab = 2; a.render(); snap("03c_prep_safety"); a.prepTab = 0; store.carModel = null }
+        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.carModel = "더 뉴 그랜저 (2026)"; a.prepTab = 1; a.onPrep("view", "gear"); snap("03b_prep_gear"); a.prepTab = 2; a.render(); snap("03c_prep_safety"); a.prepTab = 0; store.carModel = null }
         a.depart(store.guide("sample")!!); snap("04_ready")
         a.trip.start(); a.onCarEvent(Evt.SIGNAL, "RIGHT"); a.car.setTurn("TURN_RIGHT", 80, ""); a.onCarEvent(Evt.NAVI, "turn")
         a.trip.onLocation(SampleRoute.points[16].first, SampleRoute.points[16].second, null)

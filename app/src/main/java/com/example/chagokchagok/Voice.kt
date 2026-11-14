@@ -41,7 +41,14 @@ class Voice(private val ctx: Context) {
     private var pleos: PleosTts? = null
     private var system: android.speech.tts.TextToSpeech? = null
     private var pending: String? = null
+    private var pendingPri = 0
+    private var pendingAt = 0L
     private var last: String? = null
+    /** 지금 하는 말의 무게와, 대략 끝날 때 (글자 수로 어림) */
+    private var curPri = -1
+    private var busyUntil = 0L
+    /** 같은 말을 30초 안에 되풀이하지 않는다 */
+    private val recent = HashMap<String, Long>()
 
     private val attrs = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
@@ -69,8 +76,8 @@ class Voice(private val ctx: Context) {
     private val events = object : EventListener {
         override fun onStart() {}
         override fun onReady() {}
-        override fun onDone() { focus.give() }
-        override fun onStop() { focus.give() }
+        override fun onDone() { main.post { idle() } }
+        override fun onStop() { main.post { idle() } }
         override fun onUpdatedRms(rms: Double) {}
         override fun onError(errorType: ErrorType) {
             // 이번 문장만 기본 음성으로 다시 읽는다
@@ -93,8 +100,8 @@ class Voice(private val ctx: Context) {
                     t!!.setAudioAttributes(attrs)
                     t!!.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                         override fun onStart(id: String?) {}
-                        override fun onDone(id: String?) { if (id == "chagok") focus.give() }
-                        @Deprecated("기본 콜백") override fun onError(id: String?) { focus.give() }
+                        override fun onDone(id: String?) { if (id == "chagok") main.post { idle() } }
+                        @Deprecated("기본 콜백") override fun onError(id: String?) { main.post { idle() } }
                     })
                     system = t; ready = true; engine = "기본"
                     status += if (lang < 0) " → 기본 음성(한국어 데이터 없음)" else " → 기본 음성"
@@ -104,7 +111,22 @@ class Voice(private val ctx: Context) {
         }
     }
 
-    private fun flush() { pending?.let { pending = null; say(it) } }
+    /** 말을 마쳤다: 포커스를 돌려주고, 기다리던 말이 아직 의미가 있으면 이어서 한다 */
+    private fun idle() { curPri = -1; busyUntil = 0L; focus.give(); flush() }
+
+    /** 기다리던 말. 8초 넘게 기다린 말은 버린다 (그 자리를 이미 지났거나 때가 지난 말) */
+    private fun flush() {
+        val t = pending ?: return
+        pending = null
+        if (android.os.SystemClock.elapsedRealtime() - pendingAt > 8_000 && pendingPri < URGENT) return
+        say(t, pendingPri)
+    }
+
+    private fun hold(text: String, pri: Int) {
+        // 기다리는 자리는 하나. 더 무거운 말이 기다리고 있으면 가벼운 말은 버린다
+        if (pending != null && pendingPri > pri) return
+        pending = text; pendingPri = pri; pendingAt = android.os.SystemClock.elapsedRealtime()
+    }
 
     /** 기본 음성: 포커스를 받고, 앞에 180ms 무음(문서 권장 150–200ms)을 둔 뒤 읽는다 */
     private fun systemSay(text: String) {
@@ -113,24 +135,34 @@ class Voice(private val ctx: Context) {
         t.speak(text, android.speech.tts.TextToSpeech.QUEUE_ADD, null, "chagok")
     }
 
-    fun say(text: String) {
-        last = text
-        if (!ready) { pending = text; return }
-        // 포커스를 받지 못하면(다른 음성이 말하는 중) 말하지 않고, 포커스가 돌아오면 이어 말한다
-        if (!focus.take()) { pending = text; return }
+    /**
+     * 말하기. pri: LOW(칭찬·응원·위로) < NORMAL(출발·도착) < PLACE(그 자리의 한마디·회전 전 깜빡이) < URGENT(빨간 경고등).
+     * 말하는 중에는 더 무거운 말만 끊고 들어간다. 같거나 무거운 말이 나오는 중이면 가벼운 말은 버리고, 나머지는 끝난 뒤에 한다.
+     */
+    fun say(text: String, pri: Int = NORMAL) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        recent[text]?.let { if (now - it < 30_000) return }
+        if (!ready) { hold(text, pri); return }
+        if (now < busyUntil && pri <= curPri) { if (pri > LOW) hold(text, pri); return }
+        // 포커스를 받지 못하면(다른 음성·통화가 쓰는 중) 말하지 않고, 포커스가 돌아오면 이어 말한다
+        if (!focus.take()) { if (pri > LOW) hold(text, pri); return }
+        last = text; recent[text] = now; curPri = pri
+        busyUntil = now + 800 + text.length * 130L
         val p = pleos
         if (p != null) {
             try {
                 p.stop()
                 // 문서(음성 안내 프리롤): 소리가 잘리지 않게 150–200ms 쉬고 말한다
-                main.postDelayed({ try { p.speak(text, true) } catch (e: Throwable) { status = "Pleos 음성 오류: ${e.message}"; focus.give() } }, 180)
+                main.postDelayed({ try { p.speak(text, true) } catch (e: Throwable) { status = "Pleos 음성 오류: ${e.message}"; idle() } }, 180)
                 return
             } catch (e: Throwable) { status = "Pleos 음성 오류: ${e.message}" }
         }
         systemSay(text)
     }
 
-    fun stop() { try { pleos?.stop() } catch (_: Throwable) {}; system?.stop() }
+    fun stop() { try { pleos?.stop() } catch (_: Throwable) {}; system?.stop(); curPri = -1; busyUntil = 0L }
+
+    companion object { const val LOW = 0; const val NORMAL = 1; const val PLACE = 2; const val URGENT = 3 }
 
     fun release() {
         try { pleos?.removeEventListener(events); pleos?.release() } catch (_: Throwable) {}

@@ -12,6 +12,8 @@ import android.os.Looper
 
 class Restrictions(private val ctx: Context, private val onChange: (Boolean) -> Unit) {
     var restricted = false; private set
+    /** 제한 상태를 한 번이라도 받았는지. 모르면 MainActivity 가 기어로 판단한다 */
+    var known = false; private set
     /** 지금 걸린 제한 비트 (CarUxRestrictions.UX_RESTRICTIONS_*) */
     var active = 0; private set
     /** 글 길이 제한이 걸렸을 때 한 줄의 최대 글자 수 */
@@ -44,6 +46,7 @@ class Restrictions(private val ctx: Context, private val onChange: (Boolean) -> 
     }
 
     private fun read(r: CarUxRestrictions?) {
+        if (r != null) known = true
         restricted = r?.isRequiresDistractionOptimization == true
         active = r?.activeRestrictions ?: 0
         r?.maxRestrictedStringLength?.takeIf { it > 0 }?.let { maxString = it }

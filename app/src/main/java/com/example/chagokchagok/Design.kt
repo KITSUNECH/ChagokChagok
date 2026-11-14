@@ -56,7 +56,7 @@ object Ink {
             // 낮: 현대 라이트 샌드 바탕, 샌드 선, 현대 블루 강조
             bg = c("#F6F3F2"); surface = c("#FFFFFF"); fill = c("#F1EDE9"); line = c("#E4DCD3")
             // 대비 4.5:1 이상 (Pleos 디자인 가이드): 흐린 글자도 흰 바탕에서 읽히게
-            text = c("#0B1A2C"); text2 = c("#5E6B7A"); text3 = c("#6E7986")
+            text = c("#0B1A2C"); text2 = c("#5E6B7A"); text3 = c("#636E7A")
             accent = c("#002C5F"); onAccent = c("#FFFFFF"); accentSoft = c("#E2EBF4")
             go = c("#157A37"); warn = c("#9A5300"); danger = c("#E63312")
             signal = c("#eb6834"); brake = c("#e34948"); rain = c("#2a78d6"); beam = c("#1baf7a")

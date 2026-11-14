@@ -55,6 +55,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
 
     // 지금 차의 상태. 화면이 언제든 읽어 간다.
     var gear = "P"; private set
+    /** GEAR_SELECTION 값을 한 번이라도 받았는지 */
+    var gearKnown = false; private set
     var signal = "OFF"; private set
     var brake = false; private set
     var wiper = false; private set
@@ -127,6 +129,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
     private var props: android.car.hardware.property.CarPropertyManager? = null
     private val gearCb = object : android.car.hardware.property.CarPropertyManager.CarPropertyEventCallback {
         override fun onChangeEvent(value: android.car.hardware.CarPropertyValue<*>) = ui {
+            gearKnown = true
             val g = when (value.value as? Int) {
                 android.car.VehicleGear.GEAR_DRIVE -> "D"; android.car.VehicleGear.GEAR_REVERSE -> "R"
                 android.car.VehicleGear.GEAR_NEUTRAL -> "N"; android.car.VehicleGear.GEAR_PARK -> "P"

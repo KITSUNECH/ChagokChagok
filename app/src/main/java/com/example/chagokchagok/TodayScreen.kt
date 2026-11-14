@@ -298,10 +298,11 @@ internal val PREP_ITEMS = listOf(
     Triple("signal", "깜빡이", "왼쪽, 오른쪽 한 번씩"),
     Triple("wiper", "와이퍼", "한 번 켜 보기"),
     Triple("light", "전조등", "한 번 켜 보기"),
-    Triple("gear", "기어", "R에 넣었다가 P로"),
+    Triple("gear", "기어 자리", "눌러서 그림으로 보기"),
     Triple("belt", "안전벨트", "매면 켜져요"),
 )
-/** 안전벨트는 에뮬레이터에서 체결 상태를 바꿀 수 없을 수 있어 마치는 조건에서 뺀다 */
+/** 안전벨트는 에뮬레이터에서 체결 상태를 바꿀 수 없을 수 있어 마치는 조건에서 뺀다.
+ *  기어는 실제로 R에 넣어 보게 하지 않는다 (앱 과제로 후진 기어를 넣게 할 이유가 없다). 그림으로 보면 확인된다. */
 internal val PREP_REQUIRED = listOf("signal", "wiper", "light", "gear")
 
 internal fun MainActivity.prepScreen(): View {
@@ -312,10 +313,10 @@ internal fun MainActivity.prepScreen(): View {
     val sh = Shifters.of(this)
     // 차 안에서 한눈에: 세 갈래로 나눠 한 화면씩 (손에 익히기 · 이 차의 기어 · 안전 조작)
     return k.col().apply {
-        addView(k.header("출발 준비", "주차한 채로 해요. 기어를 바꿔도 주행으로 치지 않아요.", onBack = { back() },
+        addView(k.header("출발 준비", "주차한 채로, 기어는 P에 둔 채로 해요.", onBack = { back() },
             trailing = k.button(if (all) "홈으로" else "나중에", if (all) Kit.Btn.Primary else Kit.Btn.Secondary) { back() }))
         addView(k.gap(18))
-        addView(k.segmented(if (ui.wide) listOf("손에 익히기 $done/${PREP_REQUIRED.size}", "이 차의 기어", "안전 조작") else listOf("익히기 $done/${PREP_REQUIRED.size}", "기어", "안전"), prepTab) { prepTab = it; render() }, k.lp(k.MATCH, k.WRAP))
+        addView(k.segmented(if (ui.wide) listOf("손에 익히기 $done/${PREP_REQUIRED.size}", "이 차의 기어", "안전 조작") else listOf("익히기 $done/${PREP_REQUIRED.size}", "기어", "안전"), prepTab) { prepTab = it; if (it == 1) onPrep("view", "gear") else render() }, k.lp(k.MATCH, k.WRAP))
         addView(k.gap(18))
         when (prepTab) {
             0 -> {
@@ -326,7 +327,7 @@ internal fun MainActivity.prepScreen(): View {
                 addView(k.gap(16))
                 val tiles = PREP_ITEMS.map { (key, name, hint) ->
                     val ok = key in prepDone; val now = key == next
-                    k.card(pad = 20, color = if (now) Ink.accentSoft else Ink.surface) {
+                    k.card(pad = 20, color = if (now) Ink.accentSoft else Ink.surface, onClick = if (key == "gear") ({ prepTab = 1; onPrep("view", "gear") }) else null) {
                         gravity = Gravity.CENTER_HORIZONTAL
                         addView(Telltale(this@prepScreen, key).apply { on = ok; waiting = now }, k.lp(ui.dp(84), ui.dp(84)))
                         addView(k.gap(10))
@@ -336,7 +337,7 @@ internal fun MainActivity.prepScreen(): View {
                     }
                 }
                 addView(k.grid(if (ui.wide) 5 else 2, tiles, 14))
-                if (all) { addView(k.gap(16)); addView(k.button("이 차의 기어 보기", Kit.Btn.Tinted, "gear") { prepTab = 1; render() }) }
+                if (all) { addView(k.gap(16)); addView(k.button("안전 조작 보기", Kit.Btn.Tinted, "warning") { prepTab = 2; render() }) }
             }
             1 -> addView(shifterCard())
             else -> addView(safetySection(sh))
@@ -352,18 +353,18 @@ internal fun MainActivity.onPrep(type: String, value: String) {
         Evt.WIPER -> if (value == "on") prepDone.add("wiper")
         Evt.LIGHT -> if (value == "on") prepDone.add("light")
         "belt" -> if (value == "on") prepDone.add("belt")
-        Evt.GEAR -> { if (value == "R") prepSeen.add("R"); if (value == "P" && "R" in prepSeen) prepDone.add("gear") }
+        "view" -> if (value == "gear") prepDone.add("gear")
     }
     val newly = (prepDone - before).firstOrNull()
     if (newly != null) {
         chime()
         val finished = prepDone.containsAll(PREP_REQUIRED)
-        prepLine = if (finished) "다 됐어요. 이제 출발해도 좋아요." else ""
+        prepLine = if (finished) "네 가지를 다 해 봤어요. 출발할 때는 주변부터 살펴요." else ""
         if (finished && newly in PREP_REQUIRED) speak(prepLine)
     }
     if (prepDone.containsAll(PREP_REQUIRED)) store.setPrepDone(store.driver)
     // 바뀐 것이 있을 때만 다시 그린다 (다른 차 신호마다 그리면 화면이 깜박이고 스크롤이 튄다)
-    if (newly != null || type == Evt.GEAR || (type == Evt.NAVI && value == "vin")) render()
+    if (newly != null || type == "view" || (type == Evt.NAVI && value == "vin")) render()
 }
 
 // ═══════════════ 출발 전 ═══════════════

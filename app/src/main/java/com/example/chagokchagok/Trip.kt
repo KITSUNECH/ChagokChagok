@@ -10,8 +10,10 @@ import android.os.Handler
 import android.os.Looper
 
 interface TripHost {
-    fun speak(text: String)
-    fun say(text: String)
+    /** 소리로만. pri 는 Voice.LOW·NORMAL·PLACE·URGENT */
+    fun speak(text: String, pri: Int = Voice.NORMAL)
+    /** 소리로 (주차 중이거나 음성이 꺼져 있으면 화면 알림도) */
+    fun say(text: String, pri: Int = Voice.NORMAL)
     fun chime()
     fun tripStarted()
     fun tripChanged()
@@ -35,6 +37,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     var nextTipMeters: Int? = null; private set       // 다음 한마디까지 거리
     val heard = mutableSetOf<Int>()
     var arrived = false; private set
+    /** 이 시각까지 오는 재탐색은 앱이 요청한 것 */
+    private var ownRerouteUntil = 0L
     var withPassenger = false; private set
     var aiStatus = if (AiDiary.enabled) "대기 중" else "키 없음 (규칙으로 씀)"
 
@@ -82,17 +86,19 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     // ───────── 차에서 온 신호 ─────────
 
     fun onCar(type: String, value: String) {
+        // 앱이 내비에 직접 요청한 재탐색(숨 고르기 → 편안한 길)은 운전자가 길을 벗어난 것이 아니므로 기록하지 않는다
+        if (type == Evt.LOST && System.currentTimeMillis() < ownRerouteUntil) return
         if (type != Evt.NAVI) recorder.add(type, value)
         if (active && (type == Evt.NAVI || type == Evt.SIGNAL)) {
             val side = coach.update(car.turn, car.turnMeters, if (type == Evt.SIGNAL) value else car.signal)
-            if (side != null && support <= 2) { prompt = if (side == "LEFT") "왼쪽 깜빡이" else "오른쪽 깜빡이"; host.speak("지금 $prompt") }
+            if (side != null && support <= 2) { prompt = if (side == "LEFT") "왼쪽 깜빡이" else "오른쪽 깜빡이"; host.speak("지금 $prompt", Voice.PLACE) }
             else if (prompt != null && ((type == Evt.SIGNAL && value != "OFF") || car.turn == null)) { if (type == Evt.SIGNAL) host.chime(); prompt = null }
         }
-        if (active && type == Evt.LOST) host.say("괜찮아요. 내비가 경로를 다시 찾았어요.")
+        if (active && type == Evt.LOST) host.say("내비가 경로를 다시 찾았어요.", Voice.LOW)
         // 달리는 동안은 화면을 누를 수 없으니(도로교통법 제49조), 15초 안에 브레이크를 세 번 밟으면 먼저 말을 건넨다. 한 주행에 한 번.
         if (active && type == Evt.BRAKE && value == "on") {
             val now = System.currentTimeMillis(); brakeTimes.add(now); brakeTimes.removeAll { now - it > 15000 }
-            if (brakeTimes.size >= 3 && spoken.add("calm_auto")) host.say("괜찮아요. 천천히 가도 돼요.")
+            if (brakeTimes.size >= 3 && spoken.add("calm_auto")) host.say("괜찮아요. 천천히 가도 돼요.", Voice.LOW)
         }
         if (type == Evt.SEAT && value == "on") withPassenger = true
         if (type == Evt.LAMP) onLamp(value)
@@ -156,7 +162,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     private fun play(i: Int, t: Tip) {
         heard.add(i); currentTip = t.text
         host.chime()
-        host.speak("${Writer.poss(guide!!.owner)} 한마디. ${t.text}")
+        host.speak("${Writer.poss(guide!!.owner)} 한마디. ${t.text}", Voice.PLACE)
         host.tripChanged()
     }
 
@@ -165,7 +171,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     /** 칭찬은 그 자리에서. 소리 하나와 짧은 말. 실수는 말하지 않고 일기에만 남긴다. */
     private fun praise() {
         host.chime()
-        if (support <= 2 && praised < 2) { praised++; host.speak(if (praised == 1) "미리 켰어요. 좋아요." else "이번에도 미리 켰어요.") }
+        if (support <= 2 && praised < 2) { praised++; host.speak(if (praised == 1) "미리 켰어요. 좋아요." else "이번에도 미리 켰어요.", Voice.LOW) }
     }
 
     /** 지나는 자리에 맞는 규칙 한 줄. 같은 말은 한 번만. */
@@ -181,8 +187,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val type = value.substringBefore(":"); val on = value.endsWith(":on")
         val lamp = Lamps.all[type]
         if (on && lamp != null) when {
-            lamp.level == "빨강" -> host.say("${lamp.name} 경고등이 켜졌어요. " + if (active) "안전한 곳에 세워요." else "출발 전에 확인해요.")
-            type in Lamps.firstUse && store.diariesOf(store.driver).none { type in it.drive.lamps } -> { host.chime(); if (support <= 2) host.speak("${lamp.name}, 켜졌어요.") }
+            lamp.level == "빨강" -> host.say("${lamp.name} 경고등이 켜졌어요. " + if (active) "안전한 곳에 세워요." else "출발 전에 확인해요.", Voice.URGENT)
+            type in Lamps.firstUse && store.diariesOf(store.driver).none { type in it.drive.lamps } -> { host.chime(); if (support <= 2) host.speak("${lamp.name}, 켜졌어요.", Voice.LOW) }
         }
         host.lampsChanged()
     }
@@ -229,7 +235,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         })
         // 받은 응원이 있으면 출발하고 조금 뒤에 대신 전해 준다
         store.news(store.driver).lastOrNull { it.contains("응원") }?.let { cheer ->
-            main.postDelayed({ if (active) host.speak(cheer.substringAfter("\t").replace("“", "").replace("”", "")) }, 5000)
+            main.postDelayed({ if (active) host.speak(cheer.substringAfter("\t").replace("“", "").replace("”", ""), Voice.LOW) }, 5000)
         }
         main.removeCallbacks(tick); main.postDelayed(tick, 1000)
         save(force = true)
@@ -311,7 +317,9 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     /** 달리는 동안 숨 고르기: 기록하고, 내비에 편안한 길을 요청한다 */
     fun breathe() {
         recorder.add(Evt.CALM, "on")
-        host.say(if (car.comfortable()) "괜찮아요. 내비에 편안한 길로 바꿔 달라고 요청했어요." else "괜찮아요. 천천히 가도 돼요.")
+        val asked = car.comfortable()
+        if (asked) ownRerouteUntil = System.currentTimeMillis() + 60_000
+        host.say(if (asked) "괜찮아요. 내비에 편안한 길로 바꿔 달라고 요청했어요." else "괜찮아요. 천천히 가도 돼요.")
     }
 
     // ───────── 모의 주행 (시연용) ─────────
