@@ -89,8 +89,9 @@ internal fun MainActivity.safetySection(sh: Shifter?): View {
         k.pressable(this, k.rounded(if (it.emergency) Ink.alpha(Ink.danger, if (Ink.night) .18f else .08f) else Ink.surface, 20, if (it.emergency) 2 else 1, if (it.emergency) Ink.danger else Ink.line)) { safetySheet(it) }
     }
     return k.col(12).apply {
-        addView(k.row().apply {
-            addView(k.text("위급할 때 둘, 평소에 여덟", Type.Headline), k.lp(0, k.WRAP, 1f))
+        // 좁은 창에서는 제목과 도움말을 두 줄로 (제목이 글자 단위로 꺾이지 않게)
+        addView((if (ui.wide) k.row() else k.col(2)).apply {
+            addView(k.text("위급할 때 둘, 평소에 여덟", Type.Headline), if (ui.wide) k.lp(0, k.WRAP, 1f) else k.lp(k.MATCH, k.WRAP))
             addView(k.text("눌러서 자세히 · 소리로 듣기", Type.Sub, Ink.text2))
         })
         addView(k.grid(if (ui.wide) 3 else 1, list.map { tile(it) }, 12))

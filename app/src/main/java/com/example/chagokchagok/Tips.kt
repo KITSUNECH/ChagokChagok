@@ -46,7 +46,7 @@ internal fun MainActivity.tipStrip(): View? {
 internal fun MainActivity.tipsScreen(): View {
     val k = kit
     return k.col().apply {
-        addView(k.header("이렇게 쓸 수 있어요", "차곡車곡을 더 잘 쓰는 방법 ${APP_TIPS.size}가지", onBack = { back() }))
+        addView(k.header("이렇게 쓸 수 있어요", "차곡차곡을 더 잘 쓰는 방법 ${APP_TIPS.size}가지", onBack = { back() }))
         addView(k.gap(18))
         addView(k.grid(if (ui.wide) 2 else 1, APP_TIPS.map { t ->
             k.card(pad = 20) {

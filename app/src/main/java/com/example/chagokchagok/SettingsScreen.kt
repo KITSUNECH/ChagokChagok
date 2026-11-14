@@ -72,7 +72,7 @@ internal fun MainActivity.settingsScreen(): View {
             k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) { confirmClearAll() },
         )))
         addView(k.gap(24))
-        addView(k.text("차곡車곡 0.2 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
+        addView(k.text("차곡차곡 0.2 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
     }
 }
 
@@ -238,7 +238,7 @@ internal fun MainActivity.privacyScreen(): View {
         Triple("지우려면", "설정 › 데이터 › 기록 모두 지우기. 이 차에서 바로 지워져요.", "trash"),
     )
     return k.col().apply {
-        addView(k.header("개인정보·위치정보 안내", "차곡車곡이 다루는 정보와 지키는 방법", onBack = { back() }))
+        addView(k.header("개인정보·위치정보 안내", "차곡차곡이 다루는 정보와 지키는 방법", onBack = { back() }))
         addView(k.gap(18))
         addView(k.groupOf(rows.map { (t, b, ic) -> k.item(t, b, ic) }))
     }

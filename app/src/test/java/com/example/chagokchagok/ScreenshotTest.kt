@@ -40,7 +40,7 @@ class ScreenshotTest {
         val dir = File(System.getProperty("shots.dir") ?: "build/shots").apply { mkdirs() }
         fun idle() = shadowOf(Looper.getMainLooper()).idle()
         fun snap(name: String) {
-            idle()
+            idle(); a.sheets.clearToast()
             val v: View = a.window.decorView
             val w = ctx.resources.displayMetrics.widthPixels; val h = ctx.resources.displayMetrics.heightPixels
             v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))

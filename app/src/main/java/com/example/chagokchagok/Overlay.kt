@@ -107,6 +107,9 @@ class Overlay(private val host: FrameLayout, private val kitOf: () -> Kit) {
     /** 주행 중인지 (MainActivity 가 채운다). 주행 중에는 한 줄로만 */
     var driving: () -> Boolean = { false }
 
+    /** 떠 있는 짧은 알림을 바로 걷는다 (화면 테스트 캡처용) */
+    fun clearToast() { banner?.let { host.removeView(it) }; banner = null }
+
     fun toast(s: String, icon: String = "info", undo: (() -> Unit)? = null) {
         val k = kitOf(); val ui = k.ui
         banner?.let { host.removeView(it) }

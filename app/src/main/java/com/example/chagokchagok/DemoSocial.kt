@@ -135,7 +135,7 @@ internal fun MainActivity.addFriendSheet() {
         addView(k.card(pad = 20, color = Ink.fill) {
             addView(k.text("내 초대 코드", Type.Caption, Ink.text2))
             addView(k.text(code, Type.Title).apply { letterSpacing = .08f })
-            addView(k.text("친구의 차곡車곡 › 함께 › 친구 추가에서 이 코드를 넣으면 이어져요.", Type.Caption, Ink.text2))
+            addView(k.text("친구의 차곡차곡 › 함께 › 친구 추가에서 이 코드를 넣으면 이어져요.", Type.Caption, Ink.text2))
         })
         addView(k.button("Pleos ID로 찾기", Kit.Btn.Primary, "people") {
             close()
