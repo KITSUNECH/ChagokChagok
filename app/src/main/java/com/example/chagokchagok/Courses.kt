@@ -59,6 +59,7 @@ internal fun MainActivity.myRouteHero(): View {
                 }
             }))
         }
+        addView(k.fill())   // 옆 카드보다 짧으면 단추를 카드 밑단에 붙인다
         addView(k.gap(20))
         addView(k.buttons(k.button("지금 기록 시작", if (dest == null) Kit.Btn.Primary else Kit.Btn.Secondary, "play") { trip.guide = null; trip.start() }, stack = false))
     }
@@ -104,12 +105,15 @@ internal fun MainActivity.weekCard(): View? {
     if (ds.isEmpty()) return null
     val km = ds.sumOf { it.drive.distKm.toDouble() }
     val places = ds.mapNotNull { it.drive.place }.distinct()
-    return k.card {
+    val stats = k.grid(3, listOf(k.stat("${ds.size}번", "달린 날"), k.stat(if (km >= 10) String.format("%.0fkm", km) else String.format("%.1fkm", km), "거리"), k.stat("${places.size}곳", "다녀온 곳")), 10)
+    val words = k.col(6).apply {
         addView(k.text("이번 주의 나", Type.Headline))
-        addView(k.gap(12))
-        addView(k.grid(3, listOf(k.stat("${ds.size}번", "달린 날"), k.stat(if (km >= 10) String.format("%.0fkm", km) else String.format("%.1fkm", km), "거리"), k.stat("${places.size}곳", "다녀온 곳")), 10))
-        addView(k.gap(10))
         addView(k.text(if (ds.size >= 3) "일주일에 ${ds.size}번 운전석에 앉았어요. 손이 익어 가고 있어요." else "이번 주에도 운전석에 앉았어요. 그게 제일 어려운 일이에요.", Type.Sub, Ink.text2))
+    }
+    // 넓은 창: 전체 폭 한 줄 (말은 왼쪽, 숫자는 오른쪽). 좁은 창: 위아래.
+    return k.card {
+        if (ui.wide) addView(k.row(28).apply { addView(words, k.lp(0, k.WRAP, 1f)); addView(stats, k.lp(0, k.WRAP, 1.3f)) })
+        else { addView(words); addView(k.gap(12)); addView(stats) }
     }
 }
 

@@ -13,6 +13,15 @@ import android.widget.LinearLayout
 internal data class Friend(val id: String, val name: String, val relation: String, val car: String, val career: String, val status: String, val driving: Boolean)
 internal data class DemoPost(val id: String, val friend: Friend, val daysAgo: Int, val kind: String, val title: String, val text: String, val facts: String, val stamp: String? = null, val guide: Guide? = null)
 
+/** 시연용 Pleos 계정 표시 (가상의 Pleos ID) */
+internal val Friend.pleosId get() = "@$id"
+
+/** Pleos 계정 배지: 둥근 표시 + Pleos ID */
+internal fun MainActivity.pleosBadge(f: Friend, short: Boolean = false): View = kit.row(6).apply {
+    addView(View(context).apply { background = kit.rounded(Ink.accent, 3) }, kit.lp(ui.dp(6), ui.dp(6)))
+    addView(kit.text(if (short) f.pleosId else "Pleos ${f.pleosId}", Type.Micro, Ink.accent).apply { maxLines = 1 })
+}
+
 internal object Demo {
     val friends = listOf(
         Friend("minsu", "민수", "친구", "디 올 뉴 아반떼", "면허 2년 차", "지금 운전 중 · 판교 쪽", true),
@@ -88,9 +97,10 @@ internal fun MainActivity.demoFriendsSection(): View {
                             FrameLayout.LayoutParams(ui.dp(18), ui.dp(18), Gravity.BOTTOM or Gravity.END))
                     }, k.lp(ui.dp(56), ui.dp(56)))
                     addView(k.text(f.name, Type.BodyStrong).apply { gravity = Gravity.CENTER })
+                    addView(pleosBadge(f, short = true).apply { gravity = Gravity.CENTER })
                     addView(k.text(f.car.substringBefore(" ("), Type.Micro, Ink.text2).apply { gravity = Gravity.CENTER; maxLines = 1 })
                     k.pressable(this, k.rounded(Ink.surface, 18)) { friendSheet(f) }
-                }, k.lp(ui.dp(132), k.WRAP))
+                }, k.lp(ui.dp(132), k.MATCH))   // 친구 칸 높이를 맞춘다
             }
         }))
     }
@@ -103,8 +113,9 @@ internal fun MainActivity.friendSheet(f: Friend) {
         addView(k.row(14).apply {
             addView(k.avatar(f.name, 64))
             addView(k.col(4).apply {
+                addView(pleosBadge(f))
                 addView(k.status(f.status, if (f.driving) Ink.go else Ink.text3))
-                addView(k.tag("시연용 가상 친구", Ink.warn))
+                addView(k.tag("Pleos 계정 연동 · 시연용 가상 친구", Ink.warn))
             }, k.lp(0, k.WRAP, 1f))
         })
         val posts = Demo.posts.filter { it.friend.id == f.id }
@@ -151,7 +162,7 @@ internal fun MainActivity.demoPostCard(p: DemoPost): View {
         addView(k.row(10).apply {
             addView(k.avatar(p.friend.name, 40))
             addView(k.col(2).apply {
-                addView(k.text(p.friend.name, Type.BodyStrong))
+                addView(k.row(8).apply { addView(k.text(p.friend.name, Type.BodyStrong)); addView(pleosBadge(p.friend)) })
                 addView(k.text("${p.friend.car} · ${if (p.daysAgo <= 1) "어제" else "${p.daysAgo}일 전"}", Type.Caption, Ink.text2))
             }, k.lp(0, k.WRAP, 1f))
             addView(k.tag("$tag · 다른 차 · 시연용", Ink.warn))

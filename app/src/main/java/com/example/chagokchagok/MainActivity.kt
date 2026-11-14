@@ -256,16 +256,28 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     }
 
     /** 사이드바 아래: 무엇과 연결돼 있는지 */
+    /** 사이드바 맨 아래: Pleos 연결 상태. 숫자 대신 무엇이 연결됐는지만 점으로 (누르면 설정 › 차량 데이터) */
     private fun carStatus(): View {
         val k = kit
-        val vehicleOk = !car.failures.containsKey("vehicle") && !Car.offline
-        return k.row(10).apply {
+        val vehicleOk = !Car.offline && !car.failures.containsKey("vehicle")
+        val parts = listOf("차량" to vehicleOk, "내비" to car.naviConnected, "위치" to (store.locationOn && places.permitted()), "음성" to voice.ready)
+        val all = parts.count { it.second }
+        return k.col(6).apply {
             setPadding(ui.dp(14), ui.dp(12), ui.dp(12), ui.dp(12))
-            addView(k.status(if (vehicleOk) "차량 데이터 ${Telemetry.total}건" else "차량 연결 안 됨", if (vehicleOk) Ink.go else Ink.text3), k.lp(0, k.WRAP, 1f))
-            addView(k.text("α0.1", Type.Micro, Ink.text3))
+            addView(k.row().apply {
+                addView(k.status(if (all == 0) "Pleos 연결 안 됨" else "Pleos 연결됨", if (all == 0) Ink.text3 else Ink.go), k.lp(0, k.WRAP, 1f))
+                addView(k.text("α0.2", Type.Micro, Ink.text3))
+            })
+            addView(k.row(10).apply {
+                parts.forEach { (name, ok) -> addView(k.row(4).apply {
+                    addView(View(context).apply { background = k.rounded(if (ok) Ink.go else Ink.line, 3) }, k.lp(ui.dp(6), ui.dp(6)))
+                    addView(k.text(name, Type.Micro, if (ok) Ink.text2 else Ink.text3))
+                }) }
+            })
             k.pressable(this, null) { go(CHECK) }
         }
     }
+
 
     private fun tabBar(): View {
         val k = kit; val tab = currentTab()

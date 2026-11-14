@@ -70,18 +70,21 @@ internal fun MainActivity.todayScreen(): View {
     )
     val side = mutableListOf<View>()
     for (c in candidates) { if (side.size >= 2) break; c()?.let { side.add(it) } }
-    // 아래 줄: 성장 바의 다음 한 칸 + 이번 주 (있을 때)
-    val bottom = listOfNotNull(nextBlockCard(), weekCard())
+    // 옆 묶음의 맨 아래는 성장 바의 다음 한 칸. 남는 높이를 이 카드가 채워 큰 카드와 밑단을 맞춘다.
+    nextBlockCard()?.let { side.add(it) }
+    // 아래 줄: 이번 주의 나 (있을 때, 전체 폭)
+    val bottom = listOfNotNull(weekCard(), tipStrip())
 
     return k.col().apply {
         addView(head); addView(k.gap(24))
         if (ui.wide) {
+            // 위 줄: 큰 카드와 옆 카드 묶음의 밑단을 맞춘다. 옆 묶음의 마지막 카드가 남는 높이를 채운다.
             addView(k.row(20).apply {
                 gravity = Gravity.TOP
-                addView(hero, k.lp(0, k.WRAP, 1.55f))
-                addView(k.col(16).apply { side.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.WRAP, 1f))
+                addView(hero, k.lp(0, k.MATCH, 1.55f))
+                if (side.isNotEmpty()) addView(k.col(16).apply { side.forEachIndexed { i, v -> addView(v, if (i == side.lastIndex) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.MATCH, 1f))
             })
-            if (bottom.isNotEmpty()) { addView(k.gap(20)); addView(k.row(20).apply { gravity = Gravity.TOP; bottom.forEachIndexed { i, v -> addView(v, k.lp(0, k.WRAP, if (i == 0) 1.55f else 1f)) }; if (bottom.size == 1) addView(k.fill(), k.lp(0, 0, 1f)) }) }
+            bottom.forEach { addView(k.gap(20)); addView(it, k.lp(k.MATCH, k.WRAP)) }
         } else addView(k.col(16).apply { addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
     }
 }
@@ -93,22 +96,18 @@ private fun MainActivity.nextBlockCard(): View? {
     val stageBlocks = bs.filter { it.stage == next.stage }
     val col = stageColor(next.stage)
     return k.card(pad = 22, onClick = { stackSheet() }) {
-        addView(k.row(18).apply {
+        gravity = Gravity.CENTER_VERTICAL   // 남는 높이를 채울 때 내용은 가운데
+        addView(k.row(16).apply {
             // 쌓일 칸 미리보기: 단계 색 테두리의 빈 블록
             addView(android.widget.FrameLayout(context).apply {
                 background = k.rounded(Ink.alpha(col, .10f), 10, 2, col)
-                addView(IconView(context, "plus", col), android.widget.FrameLayout.LayoutParams(ui.dp(22), ui.dp(22), Gravity.CENTER))
-            }, k.lp(ui.dp(64), ui.dp(44)))
+                addView(IconView(context, "plus", col), android.widget.FrameLayout.LayoutParams(ui.dp(20), ui.dp(20), Gravity.CENTER))
+            }, k.lp(ui.dp(52), ui.dp(38)))
             addView(k.col(3).apply {
-                addView(k.row(8).apply { addView(k.text("다음 한 칸", Type.Caption, Ink.text2)); addView(k.tag("${STAGES[next.stage]} ${stageBlocks.count { it.done }}/${stageBlocks.size}", col)) })
+                addView(k.text("다음 한 칸 · ${STAGES[next.stage]} ${stageBlocks.count { it.done }}/${stageBlocks.size}", Type.Caption, col))
                 addView(k.text(next.title, Type.Headline))
                 addView(k.text(next.hint, Type.Sub, Ink.text2))
             }, k.lp(0, k.WRAP, 1f))
-            addView(k.col(2).apply {
-                gravity = Gravity.END
-                addView(k.text("${bs.count { it.done }}", Type.Title).apply { gravity = Gravity.END })
-                addView(k.text("/ ${bs.size}칸", Type.Caption, Ink.text2).apply { gravity = Gravity.END })
-            })
         })
     }
 }
@@ -174,6 +173,7 @@ private fun MainActivity.heroCard(): View {
                 addView(k.voice(it.text, 21f), k.lp(0, k.WRAP, 1f))
             })
         }
+        addView(k.fill())   // 옆 카드보다 짧으면 단추를 카드 밑단에 붙인다
         addView(k.gap(22))
         addView(k.buttons(
             k.button("이 길로 출발", Kit.Btn.Primary, "play") { depart(g) },

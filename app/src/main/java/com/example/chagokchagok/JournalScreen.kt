@@ -22,7 +22,7 @@ internal fun MainActivity.journalScreen(): View {
 
 private fun MainActivity.diaryList(all: List<Diary>): View {
     val k = kit
-    if (all.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면, 차가 오늘 주행을 일기로 써 줘요.", k.button("오늘로", Kit.Btn.Tinted) { go(MainActivity.TODAY) })) }
+    if (all.isEmpty()) return k.card { addView(k.empty("book", "첫 일기를 기다리고 있어요", "기어를 D에 놓고 달린 뒤 P에 놓으면, 차가 오늘 주행을 일기로 써 줘요.")) }
     val cards = all.reversed().map { d ->
         k.card(pad = 22, onClick = { go(MainActivity.DIARY, d.id) }) {
             addView(k.row(8).apply {

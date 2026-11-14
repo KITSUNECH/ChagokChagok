@@ -210,12 +210,12 @@ class Kit(val ctx: Context, val ui: Ui) {
         }
     }.apply { layoutParams = lp(MATCH, ui.dp(8)) }
 
-    /** 두 칸 격자 (좁으면 한 칸) */
+    /** 두 칸 격자 (좁으면 한 칸). 한 줄의 칸들은 높이를 맞춰 밑단이 한 줄에 선다. */
     fun grid(cols: Int, views: List<View>, gap: Int = 16) = col(gap).apply {
         views.chunked(cols).forEach { chunk ->
             addView(row(gap).apply {
                 gravity = Gravity.TOP
-                chunk.forEach { addView(it, lp(0, WRAP, 1f)) }
+                chunk.forEach { addView(it, lp(0, MATCH, 1f)) }
                 repeat(cols - chunk.size) { addView(View(ctx), lp(0, 1, 1f)) }
             }, lp(MATCH, WRAP))
         }

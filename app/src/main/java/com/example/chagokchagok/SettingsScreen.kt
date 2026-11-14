@@ -6,6 +6,22 @@ import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 
+/** 혼자 ↔ 함께는 언제든 바꿀 수 있다. 기록과 건넨 길은 지우지 않는다. */
+internal fun MainActivity.changeSharing() {
+    val solo = store.drivers.size <= 1
+    sheets.choose("이 차를 쓰는 방식", "언제든 바꿀 수 있어요. 일기와 건넨 길은 그대로 남아요.", listOf("혼자 써요", "함께 써요"), listOf("steering", "people"), selected = if (solo) 0 else 1) { i ->
+        if (i == 1) {
+            if (solo) sheets.input("함께 쓰는 사람의 이름", "예: 엄마", ok = "추가") { n -> store.addDriver(n.trim()); store.setRelation(n.trim(), "가족"); toast("$n 님을 더했어요. 운전석을 바꾸면 따로 기록돼요."); go(MainActivity.PEOPLE) }
+            else go(MainActivity.PEOPLE)
+        } else if (!solo) {
+            val others = store.drivers.filter { it != store.driver }
+            sheets.confirm("혼자 쓰기로 바꿀까요?", "${others.joinToString(", ")} 님을 운전석 목록에서 빼요. 그동안 쓴 일기와 건넨 길은 남아요.", "혼자 쓰기") {
+                others.forEach { store.removeDriver(it) }; toast("혼자 쓰기로 바꿨어요."); render()
+            }
+        }
+    }
+}
+
 internal fun MainActivity.settingsScreen(): View {
     val k = kit; val me = store.driver
     return k.col().apply {
@@ -13,7 +29,7 @@ internal fun MainActivity.settingsScreen(): View {
         addView(k.section("운전석"))
         addView(k.groupOf(listOf(
             k.item(me, "${store.relation(me)} · ${store.typeOf(me)} · 지금 운전석", trailing = k.avatar(me, 36)) { switchDriver() },
-            k.item("함께 쓰는 사람", store.drivers.joinToString(", "), "people", chevron = true) { go(MainActivity.PEOPLE) },
+            k.item("이 차를 쓰는 방식", if (store.drivers.size > 1) "함께 · ${store.drivers.joinToString(", ")}" else "혼자 · 다음의 나에게 길을 남겨요", "people", value = if (store.drivers.size > 1) "함께" else "혼자", chevron = true) { changeSharing() },
         )))
         addView(k.section("안내"))
         addView(k.groupOf(listOf(
@@ -36,6 +52,7 @@ internal fun MainActivity.settingsScreen(): View {
         )))
         addView(k.section("알아 두기"))
         addView(k.groupOf(listOf(
+            k.item("이렇게 쓸 수 있어요", "앱 사용 팁 ${APP_TIPS.size}가지", "sparkle", chevron = true) { go(MainActivity.LEARN, "tips") },
             k.item("그동안 바뀐 법규", null, "info", chevron = true) { go(MainActivity.LEARN, "law") },
             k.item("면허시험 차와 다른 곳", null, "steering", chevron = true) { go(MainActivity.LEARN, "newcar") },
             k.item("경고등 색 읽는 법", null, "warning", chevron = true) { go(MainActivity.LEARN, "lamp") },
@@ -115,6 +132,7 @@ private fun MainActivity.editPerson(n: String) {
 internal fun MainActivity.learnScreen(key: String?): View {
     val k = kit
     if (key == null || key == "law") return lawScreen()
+    if (key == "tips") return tipsScreen()
     val (title, sub, notes) = when (key) {
         "lamp" -> Triple("경고등 색 읽는 법", "색으로 먼저 판단하고, 자세한 뜻은 차의 설명서를 따라요.", Notes.lamps + car.lampsOn.mapNotNull { Lamps.all[it] }.map { Note("지금 켜진 표시등 · ${it.name} (${it.level})", it.what) })
         "newcar" -> Triple("면허시험 차와 다른 곳", "차마다 다르니 출발 준비에서 직접 해 보세요.", Notes.newCar)

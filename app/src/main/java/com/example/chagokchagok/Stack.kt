@@ -1,10 +1,10 @@
 // 차곡車곡 – 성장 바
-// 해낸 일이 블록 하나씩 아래부터 쌓인다. 초보 → 주행 → 차곡 세 단계, 단계마다 색이 다르다.
+// 해낸 일이 블록 하나씩 아래부터 쌓인다. 익히기 → 달리기 → 건네기 세 단계, 단계마다 색이 다르다.
 // 무엇을 했는지만 센다 (점수나 남과의 비교 없음). 모의 주행은 세지 않는다.
 //
 // 처음 설정에서는 13칸 게이지를 고른 운전 경험만큼 채운다 (초보는 조금, 주행은 절반쯤, 차곡은 가득).
-// 홈에 처음 오면 그 게이지가 압축되며 단계마다 한 칸으로 접힌다: 초보 1칸, 주행 2칸, 차곡 3칸.
-// 접히면서 모두 초보 색으로 바뀐다. 경험이 많아도 홈의 바는 초보 단계에서 시작하고, 칸 수로만 앞서 간다.
+// 홈에 처음 오면 그 게이지가 압축되며 단계마다 한 칸으로 접힌다: 1칸, 2칸, 3칸.
+// 접히면서 모두 익히기 색으로 바뀐다. 경험이 많아도 홈의 바는 익히기 단계에서 시작하고, 칸 수로만 앞서 간다.
 // 처음부터 꽉 찬 바를 주지 않고, 나머지는 직접 해내며 쌓게 한다.
 package com.example.chagokchagok
 
@@ -20,17 +20,18 @@ import kotlin.math.pow
 
 internal data class Block(val id: String, val stage: Int, val title: String, val hint: String, val done: Boolean)
 
-internal val STAGES = listOf("초보", "주행", "차곡")
-/** 단계 색: 현대자동차 CI 전용색상에서 (초보 Active Blue · 주행 Hyundai Blue/밤에는 Sky Blue · 차곡 Active Red). 색약 구분 검사 통과 */
+/** 단계 이름: 그 단계에서 하는 일 (차를 익히고, 내 길을 달리고, 길을 건넨다) */
+internal val STAGES = listOf("익히기", "달리기", "건네기")
+/** 단계 색: 현대자동차 CI 전용색상에서 (익히기 Active Blue · 달리기 Hyundai Blue/밤에는 Sky Blue · 건네기 Active Red). 색약 구분 검사 통과 */
 internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#00AAD2", "#AACAE6", "#E63312")[stage] else listOf("#00AAD2", "#002C5F", "#E63312")[stage])
 
-/** 운전 경험 → 시작 단계 (1 초보 · 2 주행 · 3 차곡) */
+/** 운전 경험 → 시작 단계 (1 익히기까지 · 2 달리기까지 · 3 건네기까지) */
 internal fun levelOf(type: String) = when (type) { "초보" -> 1; "오랜만", "새 차" -> 2; else -> 3 }
 
 /** 처음 설정 게이지: 13칸 중 단계별로 채우는 양 */
 internal object Gauge {
     const val SLOTS = 13
-    /** 단계가 끝나는 칸 (초보 4 · 주행 9 · 차곡 13) */
+    /** 단계가 끝나는 칸 (익히기 4 · 달리기 9 · 건네기 13) */
     val ends = intArrayOf(4, 9, 13)
     fun cap(level: Int) = ends[(level - 1).coerceIn(0, 2)]
     fun stageOfSlot(i: Int) = when { i < ends[0] -> 0; i < ends[1] -> 1; else -> 2 }
@@ -103,7 +104,7 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
 
         if (sq < 1f) {
             // 압축 모션: 게이지에서 채웠던 칸들이 단계별 한 칸으로 모인다 (앞 20%는 게이지 그대로, 겹치듯 부드럽게).
-            // 다 모이면 위 칸들이 아래에서부터 초보 색으로 차오른다. 색을 섞지 않아 중간에 탁한 색이 나오지 않는다.
+            // 다 모이면 위 칸들이 아래에서부터 익히기 색으로 차오른다. 색을 섞지 않아 중간에 탁한 색이 나오지 않는다.
             val counts = IntArray(3); for (i in 0 until squeeze) counts[Gauge.stageOfSlot(i)]++
             val seen = IntArray(3)
             for (i in 0 until squeeze) {
@@ -118,7 +119,7 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
                 p.color = stageColor(s)
                 c.drawRoundRect(RectF(0f, y, w, y + hh + (if (t > .95f) .8f else 0f)), rr, rr, p)
             }
-            // 초보 색으로 차오르기: 주행 칸 다음 차곡 칸 순서로, 아래에서 위로
+            // 익히기 색으로 차오르기: 달리기 칸 다음 건네기 칸 순서로, 아래에서 위로
             for (s in 1..2) {
                 if (counts[s] == 0) continue
                 val f = ease(((sq - (.70f + (s - 1) * .09f)) / .14f).coerceIn(0f, 1f))
@@ -235,7 +236,7 @@ internal fun MainActivity.stackRail(): View {
 
 internal fun MainActivity.stackSheet() {
     val bs = blocks()
-    sheets.sheet("성장 ${bs.count { it.done }} / ${bs.size}", "해낼 때마다 한 칸씩 쌓여요. 초보에서 주행, 주행에서 차곡으로.") { _ ->
+    sheets.sheet("성장 ${bs.count { it.done }} / ${bs.size}", "해낼 때마다 한 칸씩 쌓여요. 차를 익히고, 내 길을 달리고, 길을 건네요.") { _ ->
         val k = kit
         STAGES.forEachIndexed { s, name ->
             val mine = bs.filter { it.stage == s }
