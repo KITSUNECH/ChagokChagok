@@ -173,7 +173,7 @@ private fun MainActivity.analysis(all: List<Diary>): View {
     val turnRatio = ds.map { if (it.drive.turns > 0) it.drive.turnsSignaled * 100f / it.drive.turns else null }
     if (turnRatio.count { it != null } >= 1) charts.add(card("돌기 전에 켠 깜빡이", "내비 회전 안내 + 방향지시등 · 회전 100m 안에서 켰는지", TrendChart(this, ui, turnRatio, labels, { "${it.toInt()}%" }), change(turnRatio) { "${it.toInt()}%" }))
     val brakeKm = ds.map { if (it.drive.distKm >= 0.3f) it.drive.brakes / it.drive.distKm else null }
-    if (brakeKm.count { it != null } >= 1) charts.add(card("1km마다 브레이크", "브레이크 페달 신호 ÷ 달린 거리 · 막히는 길에서는 늘어나요", TrendChart(this, ui, brakeKm, labels, { String.format(Locale.KOREA, "%.1f번", it) }), change(brakeKm) { String.format(Locale.KOREA, "%.1f번", it) }))
+    if (brakeKm.count { it != null } >= 1) charts.add(card("브레이크 밟은 횟수 (1km당)", "브레이크 페달 신호 ÷ 달린 거리 · 막히는 길에서는 늘어나요", TrendChart(this, ui, brakeKm, labels, { String.format(Locale.KOREA, "%.1f번", it) }), change(brakeKm) { String.format(Locale.KOREA, "%.1f번", it) }))
     val park = ds.map { if (it.drive.parkMoves > 0) it.drive.parkMoves.toFloat() else null }
     if (park.count { it != null } >= 1) charts.add(card("후진 뒤 기어 전환", "기어 신호 · 주차할 때 앞뒤로 오간 횟수 (주차 성공 여부는 알 수 없어요)", TrendChart(this, ui, park, labels, { "${it.toInt()}번" }), change(park) { "${it.toInt()}번" }))
     val longest = ds.map { if (it.drive.signals > 0) it.drive.longestSignalSec.toFloat() else null }
@@ -199,7 +199,7 @@ private fun MainActivity.analysis(all: List<Diary>): View {
             val recent = od.takeLast(3); val earlier = od.dropLast(3).takeLast(3)
             fun perKm(l: List<Diary>) = l.sumOf { it.drive.brakes }.toFloat() / l.sumOf { it.drive.distKm.toDouble() }.toFloat().coerceAtLeast(0.1f)
             val rows = mutableListOf(k.item("최근 ${recent.size}번 중 밤에 달린 날", null, "moon", value = "${recent.count { it.drive.night }}번"))
-            if (earlier.isNotEmpty()) rows.add(k.item("1km마다 브레이크", "그 전 ${earlier.size}번 → 최근 ${recent.size}번", "stop", Ink.brake, value = String.format(Locale.KOREA, "%.1f → %.1f", perKm(earlier), perKm(recent))))
+            if (earlier.isNotEmpty()) rows.add(k.item("브레이크 밟은 횟수 (1km당)", "그 전 ${earlier.size}번 → 최근 ${recent.size}번", "stop", Ink.brake, value = String.format(Locale.KOREA, "%.1f → %.1f", perKm(earlier), perKm(recent))))
             list.addView(k.groupOf(rows))
         }
     }

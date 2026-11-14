@@ -442,13 +442,12 @@ internal fun MainActivity.readyScreen(): View {
         })
         addView(k.gap(16))
         val demoRoad = demoRoad0
-        addView(k.buttons(*listOfNotNull(
-            // 시연 길: 에뮬레이터에서는 위치가 움직이지 않으므로 모의 주행으로 끝까지 본다
-            if (BuildConfig.DEMOS) k.button(if (demoRoad) "모의 주행 시작 (시연용)" else "모의 주행 (시연용)", if (demoRoad) Kit.Btn.Primary else Kit.Btn.Plain, if (demoRoad) "play" else null) { trip.startSim() } else null,   // 마켓판에는 없음
-            // 기어 신호를 받는 차에서는 D에 놓으면 시작하므로 단추를 두지 않는다
-            if (!car.gearKnown) k.button("기록 시작", if (demoRoad) Kit.Btn.Secondary else Kit.Btn.Primary, "play") { trip.start() } else null,
-            if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null,
-        ).toTypedArray()))
+        // 단추 순서는 언제나 같다: 가장 먼저 할 일(큰 단추) → 그다음 → 시연용
+        val simButton = if (BuildConfig.DEMOS) k.button(if (demoRoad) "모의 주행 시작 (시연용)" else "모의 주행 (시연용)", if (demoRoad) Kit.Btn.Primary else Kit.Btn.Plain, if (demoRoad) "play" else null) { trip.startSim() } else null   // 마켓판에는 없음
+        // 기어 신호를 받는 차에서는 D에 놓으면 시작하므로 '기록 시작' 단추를 두지 않는다
+        val startButton = if (!car.gearKnown) k.button("기록 시작", if (demoRoad) Kit.Btn.Secondary else Kit.Btn.Primary, "play") { trip.start() } else null
+        val tellButton = if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null
+        addView(k.buttons(*(if (demoRoad) listOfNotNull(simButton, startButton, tellButton) else listOfNotNull(startButton, tellButton, simButton)).toTypedArray()))
     }
 }
 

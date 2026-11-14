@@ -25,23 +25,26 @@ internal fun MainActivity.changeSharing() {
 internal fun MainActivity.settingsScreen(): View {
     // 설정에는 정말 설정만. 안전·알아 두기는 출발 준비와 홈에서, 시연 도구는 차량 데이터 화면에서.
     val k = kit; val me = store.driver
-    return k.col().apply {
-        addView(k.header("설정"))
-        addView(k.section("운전석"))
-        addView(k.groupOf(listOf(
+    // 왼쪽: 나와 안내, 시연 / 오른쪽: 위치와 개인정보, 차와 데이터
+    val left = k.col(); val right = k.col(); var into = left
+    fun put(v: View) = into.addView(v, k.lp(k.MATCH, k.WRAP))
+    run {
+        put(k.section("운전석"))
+        put(k.groupOf(listOf(
             k.item(me, "지금 운전석", trailing = k.avatar(me, 40)) { switchDriver() },
             k.item("이 차를 쓰는 방식", if (store.drivers.size > 1) store.drivers.joinToString(", ") else "다음의 나에게 길을 남겨요", "people", value = if (store.drivers.size > 1) "함께" else "혼자", chevron = true) { changeSharing() },
         )))
-        addView(k.section("안내"))
-        addView(k.groupOf(listOf(
+        put(k.section("안내"))
+        put(k.groupOf(listOf(
             k.toggleItem("소리로 알려 주기", "한마디, 회전 전 깜빡이, 도착을 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
             k.item("말 거는 정도", "달리는 동안 차가 얼마나 자주 말을 걸지", "quote", value = TALK.first { it.first == talkOf(me) }.second, chevron = true) {
                 sheets.choose("말 거는 정도", "운전이 익숙해지면 줄여도 돼요. 경고는 언제나 알려 줘요.", TALK.map { it.second + " · " + it.third }, selected = TALK.indexOfFirst { it.first == talkOf(me) }) { i -> store.setType(me, TALK[i].first); render() }
             },
             k.item("목소리 들어 보기", voice.status, "play", chevron = true) { speak("안녕하세요. 차곡차곡이에요. 오늘도 같이 가요.") },
         )))
-        addView(k.section("위치와 개인정보"))
-        addView(k.groupOf(listOf(
+        into = right
+        put(k.section("위치와 개인정보"))
+        put(k.groupOf(listOf(
             k.toggleItem("한마디를 남긴 곳 근처에서 듣기", "$me 님의 위치로 한마디를 남긴 곳 근처인지 봐요. 이 차 안에만 저장돼요.", store.locationOn, "pin") {
                 store.locationOn = it
                 if (it) { places.start(); if (!places.permitted()) askLocation(); if (store.locationConsent(me) == null) askLocationConsent(me) }
@@ -50,19 +53,18 @@ internal fun MainActivity.settingsScreen(): View {
             k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
             k.item("개인정보·위치정보 안내", "무엇을 어디에 두고, 누구에게 보이는지", "lock", chevron = true) { go(MainActivity.LEARN, "privacy") },
         )))
-        addView(k.section("연결"))
-        addView(k.groupOf(listOf(
-            k.item("차량 연결 상태", "차량·내비·위치·음성이 잘 이어졌는지", "car", chevron = true) { go(MainActivity.CHECK) },
-        )))
+        into = left
         if (BuildConfig.DEMOS) {
-            addView(k.section("시연 (공모전 심사용)"))
-            addView(k.groupOf(listOf(
+            put(k.section("시연 (공모전 심사용)"))
+            put(k.groupOf(listOf(
                 k.item("출근길 시연 보기", "지난 출근 기록(예시)을 넣고, 모의 주행으로 ‘늘었어요’ 화면까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@settingsScreen) },
                 k.item("시연 도구", "시연 기록 지우기, 시험용 신호, 아이디어 시연", "list", chevron = true) { go(MainActivity.DEMO) },
             )))
         }
-        addView(k.section("데이터"))
-        addView(k.groupOf(listOf(
+        into = right
+        put(k.section("차와 데이터"))
+        put(k.groupOf(listOf(
+            k.item("차량 연결 상태", "차량·내비·위치·음성이 잘 이어졌는지, 받은 신호", "car", chevron = true) { go(MainActivity.CHECK) },
             k.item("권한 다시 묻기", "위치·속도·알림 권한을 지워요. 앱을 완전히 껐다 켜면 처음처럼 물어봐요", "lock", chevron = true) {
                 sheets.confirm("권한을 다시 물을까요?", "위치, 속도, 알림 권한을 지워요. 앱을 완전히 껐다가 다시 켜면 처음처럼 물어봐요. 기록은 지워지지 않아요.", "지우기") {
                     try {
@@ -73,7 +75,12 @@ internal fun MainActivity.settingsScreen(): View {
             },
             k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) { confirmClearAll() },
         )))
-        addView(k.gap(24))
+    }
+    return k.col().apply {
+        addView(k.header("설정"))
+        if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
+        else { addView(left); addView(right) }
+        addView(k.gap(20))
         addView(k.text("차곡차곡 0.3 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
     }
 }

@@ -16,32 +16,25 @@ internal fun MainActivity.diaryScreen(id: String?): View {
     val guide = store.guide(d.guideId)
     val prev = previousSame(d)
     val paper = readPage(d, guide, prev)
-    val side = k.col().apply {
-        addView(k.section("오늘의 숫자"))
-        addView(numbers(d))
-        if (prev != null) {
-            addView(k.section((if (sameRoad(prev.drive, d.drive)) "같은 길" else "같은 곳") + " · ${visits(d)}번째"))
-            Growth.judge(store.diariesOf(d.driver), d)?.let { j -> addView(k.card(pad = 20) { addView(judgementView(j, store.answer(d.id, Q_VS_LAST), compact = true)) }); addView(k.gap(12)) }
-            addView(compareCard(prev, d))
-            addView(k.gap(10))
-            addView(k.button("이 길의 나 · 그래프로 보기", Kit.Btn.Tinted, "chart") { go(MainActivity.ROAD, d.id) })
-        }
-        addView(k.section("주행 타임라인"))
-        addView(k.card(pad = 20) {
-            addView(Timeline(context, ui, d.drive), k.lp(k.MATCH, ui.dp(176)))
-            addView(k.gap(8))
-            addView(k.text(timelineSummary(d.drive), Type.Caption, Ink.text2))
+    // 아래쪽은 두 칸 격자: 윗줄은 지나온 길 · 오늘의 숫자, 아랫줄은 주행 타임라인 · 다음으로.
+    // (같은 길의 판정과 비교는 맨 위 한 장과 "이 길의 나"에 있으므로 여기서 되풀이하지 않는다)
+    fun block(title: String, body: View) = k.col().apply { addView(k.section(title)); addView(body, k.lp(k.MATCH, k.WRAP)) }
+    val timeline = k.card(pad = 22) {
+        addView(Timeline(context, ui, d.drive), k.lp(k.MATCH, ui.dp(176)))
+        addView(k.gap(8))
+        addView(k.text(timelineSummary(d.drive), Type.Caption, Ink.text2))
+        addView(k.text("이 기록의 근거 보기", Type.Sub, Ink.accent).apply {
+            gravity = Gravity.CENTER_VERTICAL; minHeight = ui.touch(48)
+            setOnClickListener { sheets.sheet("이 기록의 근거", "어떤 차량 신호로 적었는지") { _ -> addView(evidence(d, guide)) } }
         })
-        addView(k.section("이 기록의 근거"))
-        addView(evidence(d, guide))
-        addView(k.section("다음으로"))
-        addView(actions(d, guide))
     }
     return k.col().apply {
         addView(diaryPage(d, prev))
-        addView(k.section("지나온 길과 기록"))
-        if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(paper, k.lp(0, k.WRAP, 1.15f)); addView(side, k.lp(0, k.WRAP, 1f)) })
-        else { addView(paper); addView(side) }
+        addView(k.gap(8))
+        addView(k.grid(if (ui.wide) 2 else 1, listOf(
+            block("지나온 길", paper), block("오늘의 숫자", numbers(d)),
+            block("주행 타임라인", timeline), block("다음으로", actions(d, guide)),
+        ), 20))
     }
 }
 
@@ -109,7 +102,7 @@ private fun MainActivity.numbers(d: Diary): View {
         k.stat(if (v.distKm > 0.05f) String.format(java.util.Locale.KOREA, "%.1fkm", v.distKm) else "–", "거리"),
         k.stat(if (v.minutes >= 1) "${v.minutes}분" else "${v.seconds}초", "시간"),
         k.stat(if (v.turns > 0) "${v.turnsSignaled}/${v.turns}" else "${v.signals}번", if (v.turns > 0) "돌기 전 깜빡이" else "깜빡이"),
-        k.stat(if (v.distKm > 0.3f) String.format(java.util.Locale.KOREA, "%.1f", v.brakes / v.distKm) else "${v.brakes}번", if (v.distKm > 0.3f) "1km마다 브레이크" else "브레이크"),
+        k.stat(if (v.distKm > 0.3f) String.format(java.util.Locale.KOREA, "%.1f", v.brakes / v.distKm) else "${v.brakes}번", if (v.distKm > 0.3f) "브레이크 (1km당)" else "브레이크"),
         v.economy?.let { k.stat(String.format(java.util.Locale.KOREA, "%.1f", it), "연비 ${v.economyUnit}") },
         lw?.let { k.stat("${it.toInt()}초", "차선 변경 전 기다림") },
     )
@@ -125,7 +118,7 @@ private fun MainActivity.compareCard(a: Diary, b: Diary): View {
     val k = kit
     data class M(val label: String, val prev: Float, val now: Float, val unit: String, val lowerIsEasier: Boolean)
     val ms = mutableListOf(M("걸린 시간", a.drive.minutes.toFloat().coerceAtLeast(a.drive.seconds / 60f), b.drive.minutes.toFloat().coerceAtLeast(b.drive.seconds / 60f), "분", true))
-    if (a.drive.distKm > 0.3f && b.drive.distKm > 0.3f) ms.add(M("1km마다 브레이크", a.drive.brakes / a.drive.distKm, b.drive.brakes / b.drive.distKm, "번", true))
+    if (a.drive.distKm > 0.3f && b.drive.distKm > 0.3f) ms.add(M("브레이크 (1km당)", a.drive.brakes / a.drive.distKm, b.drive.brakes / b.drive.distKm, "번", true))
     if (a.drive.turns > 0 && b.drive.turns > 0) ms.add(M("돌기 전 깜빡이", 100f * a.drive.turnsSignaled / a.drive.turns, 100f * b.drive.turnsSignaled / b.drive.turns, "%", false))
     ms.add(M("어려웠던 곳", a.drive.calm.toFloat(), b.drive.calm.toFloat(), "번", true))
     fun fmt(v: Float, u: String) = (if (v % 1f == 0f || v >= 10) String.format("%.0f", v) else String.format("%.1f", v)) + u

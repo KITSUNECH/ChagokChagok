@@ -90,8 +90,10 @@ class ScreenshotTest {
                 path = SampleRoute.points.mapIndexed { i, q -> Pt(i / (SampleRoute.points.size - 1f), q.first, q.second) })
             val dd = Writer.write(again, store.diariesOf("나"), null, 0); store.addDiary(dd)
             a.go(MainActivity.DIARY, dd.id); snap("06b_diary_compare")
+            scrollDown(620); snap("06b2_diary_lower"); scrollDown(700); snap("06b3_diary_lowest")
             a.noteToSelf(dd); snap("06c_tip_ideas"); a.onBackPressed()
             a.go(MainActivity.ROAD, dd.id); snap("06e_road")
+            scrollDown(600); snap("06e2_road_lower")
             a.go(MainActivity.TODAY); snap("02b_today_review")
         }
         if (!short) {
@@ -104,6 +106,7 @@ class ScreenshotTest {
             a.convoyWith(Demo.friends[0], store.guide("sample")); a.trip.start(); snap("16_convoy_drive"); a.onCarEvent(Evt.GEAR, "P"); store.demoOn = false
             a.roadsTab = 2; a.go(MainActivity.ROADS); snap("11_roads")
             a.go(MainActivity.SETTINGS); snap("12_settings")
+            scrollDown(600); snap("12b_settings_lower"); a.go(MainActivity.DEMO); snap("12c_demo")
             a.go(MainActivity.LEARN, "law"); snap("13_learn"); a.go(MainActivity.LEARN, "tips"); snap("13b_tips")
             listOf(Evt.GEAR to "D", Evt.SIGNAL to "LEFT", Evt.BRAKE to "on", Evt.WIPER to "on", Evt.LIGHT to "on", "location" to "37.4900, 127.0300").forEach { (t, v) -> Telemetry.hit(t, v) }
             a.go(MainActivity.CHECK); snap("14_check")

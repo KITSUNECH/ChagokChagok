@@ -222,13 +222,14 @@ internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
         if (mine) addView(k.button(if (open.isNotEmpty()) "돌아볼 순간 ${open.size}곳 · 다음에 들을 한마디 남기기" else "다음에 들을 한마디 남기기", if (question == null) Kit.Btn.Primary else Kit.Btn.Tinted, "quote") {
             if (open.size == 1) reviewMoment(d, open.first()) else noteToSelf(d)
         }, k.lp(k.MATCH, k.WRAP))
+        if (prev != null) addView(k.button("이 길에서의 변화 보기", Kit.Btn.Secondary, "chart") { go(MainActivity.ROAD, d.id) }, k.lp(k.MATCH, k.WRAP))
         if (mine && pending(d, prev)) addView(k.button("나중에 할게요", Kit.Btn.Plain) { go(MainActivity.TODAY) }, k.lp(k.MATCH, k.WRAP))
     }
     return k.col().apply {
         addView(k.header(d.title, dateText(d.date) + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
             trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 52) { readAloud(d.title, listOfNotNull(feeling, Coach.today(d.drive, all.filter { it.date < d.date }, store.answer(d.id, "focus"))).joinToString(". ")) }))
         addView(k.gap(16))
-        if (ui.wide) addView(k.row(20).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1.2f)); addView(right, k.lp(0, k.WRAP, 1f)) })
+        if (ui.wide) addView(k.row(20).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
         else { addView(left); addView(k.gap(14)); addView(right) }
     }
 }
