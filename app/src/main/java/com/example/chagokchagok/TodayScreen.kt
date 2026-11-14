@@ -191,7 +191,7 @@ private fun MainActivity.heroCard(): View {
                 else readAloud("${Writer.poss(g.owner)} 한마디", g.tips.mapIndexed { i, t -> "${i + 1}. ${t.text}" }.joinToString("\n\n"))
             }
         ))
-        if (placed > 0) { addView(k.gap(12)); addView(k.status("한마디 $placed 개는 남긴 자리에 가까워지면 들려줘요", Ink.go)) }
+        if (placed > 0) { addView(k.gap(12)); addView(k.status("한마디 $placed 개는 남긴 곳 근처에 가면 들려줘요", Ink.go)) }
     }
 }
 
@@ -425,7 +425,7 @@ internal fun MainActivity.readyScreen(): View {
         addView(k.section(if (g.kind == "나") "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"))
         if (tipRows.isEmpty()) addView(k.card { addView(k.text("이 길에는 한마디가 없어요. 조용히 기록만 해요.", Type.Sub, Ink.text2)) })
         else addView(k.groupOf(tipRows))
-        if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 자리에서 들려줘요.", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
+        if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 근처에서 들려줘요.", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
     }
     return k.col().apply {
         Session.convoy?.let { f -> addView(k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) }); addView(k.gap(12)) }

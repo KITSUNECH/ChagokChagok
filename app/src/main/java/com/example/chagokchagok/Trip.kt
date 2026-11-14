@@ -234,7 +234,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         host.say(when {
             g == null -> "출발합니다. 조용히 적고 있을게요."
             g.kind == "나" -> "지난번의 내가 남긴 길로 출발합니다. 그 자리에 가면 알려 드릴게요."
-            placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 한마디를 남긴 자리에 가면 알려 드릴게요."
+            placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 한마디를 남긴 곳 근처에 가면 알려 드릴게요."
             else -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 조용히 적고 있을게요."
         })
         // 받은 응원이 있으면 출발하고 조금 뒤에 대신 전해 준다

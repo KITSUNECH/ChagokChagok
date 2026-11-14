@@ -220,7 +220,7 @@ private fun MainActivity.evidence(d: Diary, guide: Guide?, all: Boolean = false)
     if (v.passenger) row("함께 탄 사람", "있음", "차량 신호 · 좌석 감지", "people")
     if (guide != null) {
         row("끝까지 달림", if (v.completed) "예" else "중간에 멈춤", if (v.completed) "내비 도착 또는 받은 길 거리의 90% 이상" else "졸업 횟수에 넣지 않았어요", "flag")
-        row("들은 한마디", "${guide.tips.size}개 중 남긴 자리에서", "위치 · 한마디를 남긴 자리 150m 안", "pin")
+        row("들은 한마디", "${guide.tips.size}개 중 남긴 곳 근처에서", "위치 · 한마디를 남긴 자리 150m 안", "pin")
     }
     v.place?.let { row("다녀온 곳", it, "내비 목적지", "pin") }
     store.weather(d.id)?.let { row("날씨", it, "Open-Meteo 공개 예보 (도착한 곳)", "cloud") }

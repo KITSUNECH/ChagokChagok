@@ -259,7 +259,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
 
     /** 운전자마다 위치 기록 동의를 따로 받는다 (위치정보법 제15조: 누구든지 동의 없이 개인위치정보를 수집하면 안 된다) */
     internal fun askLocationConsent(n: String) {
-        sheets.sheet("$n 님의 위치를 써도 될까요?", "한마디를 남긴 자리에 가까워졌는지 보고, 지나온 길을 이 차 안에만 저장해요. 다른 사람에게는 $n 님이 고른 일기만 보여요.", dismissible = false) { close ->
+        sheets.sheet("$n 님의 위치를 써도 될까요?", "한마디를 남긴 곳 근처인지 보고, 지나온 길을 이 차 안에만 저장해요. 다른 사람에게는 $n 님이 고른 일기만 보여요.", dismissible = false) { close ->
             addView(kit.buttons(
                 kit.button("쓰지 않기", Kit.Btn.Secondary) { store.setLocationConsent(n, false); close(); toast("위치 없이 기록해요. 설정에서 바꿀 수 있어요.") },
                 kit.button("동의해요", Kit.Btn.Primary, "pin") { store.setLocationConsent(n, true); close() },

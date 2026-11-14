@@ -50,7 +50,7 @@ internal fun MainActivity.settingsScreen(): View {
         )))
         addView(k.section("위치와 개인정보"))
         addView(k.groupOf(listOf(
-            k.toggleItem("한마디를 그 자리에서 듣기", "$me 님의 위치로 한마디를 남긴 자리에 가까워졌는지 봐요. 이 차 안에만 저장돼요.", store.locationOn, "pin") {
+            k.toggleItem("한마디를 남긴 곳 근처에서 듣기", "$me 님의 위치로 한마디를 남긴 곳 근처인지 봐요. 이 차 안에만 저장돼요.", store.locationOn, "pin") {
                 store.locationOn = it
                 if (it) { places.start(); if (!places.permitted()) askLocation(); if (store.locationConsent(me) == null) askLocationConsent(me) }
                 render()

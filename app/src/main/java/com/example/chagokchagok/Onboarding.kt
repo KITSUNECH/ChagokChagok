@@ -113,7 +113,7 @@ internal fun MainActivity.onboardScreen(): View {
                 addView(k.gap(6))
                 val pillars = listOf(
                     Triple("book", "차가 쓰는 일기", "깜빡이, 브레이크, 와이퍼… 차 신호가 그대로 근거가 돼요"),
-                    Triple("quote", "그 자리의 한마디", "지난번의 나, 함께 쓰는 가족이 남긴 말을 그 자리에서"),
+                    Triple("quote", "그 자리의 한마디", "지난번의 나, 함께 쓰는 가족이 남긴 말을 그 근처에서"),
                     Triple("speaker", "달릴 때는 말로만", "화면은 한눈에, 나머지는 주차한 뒤에"),
                 )
                 side(k.col(10).apply { pillars.forEach { (ic, t, s) ->
@@ -224,7 +224,7 @@ internal fun MainActivity.onboardScreen(): View {
                 addView(k.text("이렇게 쓸게요", Type.Large))
                 addView(k.text("모두 나중에 설정에서 바꿀 수 있어요.", Type.Sub, Ink.text2))
                 addView(k.groupOf(listOf(
-                    k.toggleItem("한마디를 그 자리에서 듣기", "${O.name} 님의 위치로 한마디를 남긴 자리에 가까워졌는지 봐요. 위치는 이 차 안에만 저장되고, 함께 쓰는 사람은 각자 따로 동의해요.", store.locationOn, "pin") { store.locationOn = it; if (it && !places.permitted()) askLocation() },
+                    k.toggleItem("한마디를 남긴 곳 근처에서 듣기", "${O.name} 님의 위치로 한마디를 남긴 곳 근처인지 봐요. 위치는 이 차 안에만 저장되고, 함께 쓰는 사람은 각자 따로 동의해요.", store.locationOn, "pin") { store.locationOn = it; if (it && !places.permitted()) askLocation() },
                     k.toggleItem("소리로 알려 주기", "달리는 동안 화면 대신 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
                     k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
                 )))
