@@ -41,7 +41,7 @@ Android Studio의 Build Variants에서 `contestDebug` / `marketDebug` 를 고르
 | 항목 | 값 |
 |---|---|
 | 에뮬레이터 | Pleos Connect Emulator 2.1.0, Android API 34 |
-| 화면 규격 | 에뮬레이터 기본 가로 디스플레이(넓은 창: 사이드바 배치). 분할 화면·좁은 창(아래 탭 배치)도 지원합니다. 화면 확인 테스트는 1280×720dp(가로)와 420×700dp(좁은 창)에서 했습니다. |
+| 화면 규격 | **2560×1440 px** 가로 디스플레이 (`adb shell wm size` 결과). 넓은 창은 사이드바 배치이고, 분할 화면·좁은 창(아래 탭 배치)도 지원합니다. 화면 확인 테스트는 1280×720dp(가로)와 420×700dp(좁은 창)에서 했습니다. |
 | 개발 환경 | Kotlin 1.9.24, AGP 8.5.2, Gradle 8.7, minSdk 28, targetSdk 34 |
 | Pleos SDK | Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech 3.3.1, FusedLocation 1.1.3 |
 | AAOS API | CarUxRestrictions(주행 중 제한), CarPropertyManager `GEAR_SELECTION`(기어) |
