@@ -60,13 +60,14 @@ internal fun MainActivity.settingsScreen(): View {
         addView(k.section("연결"))
         addView(k.groupOf(listOf(
             k.item("차량 연결 상태", "차량·내비·위치·음성이 잘 이어졌는지", "car", chevron = true) { go(MainActivity.CHECK) },
+            *(if (BuildConfig.DEMOS) arrayOf(k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개와 모의 주행 · 공모전판에만 있어요", "play", chevron = true) { DemoCommute.start(this@settingsScreen) }) else emptyArray()),
         )))
         addView(k.section("데이터"))
         addView(k.groupOf(listOf(
             k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) { confirmClearAll() },
         )))
         addView(k.gap(24))
-        addView(k.text("차곡차곡 0.2 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
+        addView(k.text("차곡차곡 0.3 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
     }
 }
 
@@ -252,19 +253,6 @@ internal fun MainActivity.checkScreen(): View {
     return k.col().apply {
         addView(k.header("차량 연결 상태", "이 앱이 실제로 받은 차량 신호예요." + if (Telemetry.simulated > 0) " 시연·시험으로 만든 신호 ${Telemetry.simulated}번은 여기에 세지 않았어요." else " 시연·시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
         addView(k.gap(16))
-        // 공모전 시연 도구 (마켓판에는 없음)
-        if (BuildConfig.DEMOS) {
-            addView(k.section("시연 도구 · 공모전판"))
-            addView(k.groupOf(listOf(
-                k.toggleItem("다른 차의 친구와 함께 · 미리 보기", "Pleos 계정 연동이 생기면 어떻게 쓸 수 있는지 가상의 친구로 보여 줘요. 화면에 시연용으로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() },
-                k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@checkScreen) },
-                k.item("시연 기록 지우기", "예시 출근 기록과 시연으로 달린 모의 주행을 지워요", "trash", chevron = true) {
-                    sheets.confirm("시연 기록을 지울까요?", "예시 출근 기록 3개, 남겨 둔 한마디, 시연으로 달린 모의 주행이 지워져요.", "지우기", danger = true) { DemoCommute.clear(this@checkScreen); toast("시연 기록을 지웠어요."); render() }
-                },
-                k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
-                k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
-            )))
-        }
         val mins = ((System.currentTimeMillis() - Telemetry.since) / 60000).coerceAtLeast(1)
         addView(k.grid(if (ui.wide) 4 else 2, listOf(
             k.stat("${Telemetry.total}", "받은 신호"),
@@ -306,6 +294,20 @@ internal fun MainActivity.checkScreen(): View {
             k.item("주행 제한 (CarUxRestrictions)", limits.status, "lock", ok(!limits.status.startsWith("연결 실패"))),
             k.item("화면", "${ui.w}×${ui.h}dp · ${if (ui.wide) "넓은 창" else "좁은 창"} · ${if (Ink.night) "밤" else "낮"}", "eye"),
         )))
+        // 공모전 시연 도구 (마켓판에는 없음)
+        if (BuildConfig.DEMOS) {
+            addView(k.section("시연 도구 · 공모전판"))
+            addView(k.groupOf(listOf(
+                k.toggleItem("아이디어 시연: 다른 차의 가족·친구와 잇기", "지금 Pleos에는 차와 차를 잇는 기능이 없어요. 그 기능이 열린다면 이렇게 쓰겠다는 생각을 가상의 친구로만 보여 줘요. 실제 기능이 아니에요.", store.demoOn, "people") { store.demoOn = it; render() },
+                *(if (store.demoOn) arrayOf(k.item("아이디어 시연 열기", "함께 차곡 · 화면에 모두 시연용으로 표시돼요", "people", chevron = true) { go(MainActivity.TOGETHER) }) else emptyArray()),
+                k.item("시연: 회사 가는 길, 네 번째 출근", "예시 출근 기록 3개를 넣고 모의 주행으로 네 단계를 끝까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@checkScreen) },
+                k.item("시연 기록 지우기", "예시 출근 기록과 시연으로 달린 모의 주행을 지워요", "trash", chevron = true) {
+                    sheets.confirm("시연 기록을 지울까요?", "예시 출근 기록 3개, 남겨 둔 한마디, 시연으로 달린 모의 주행이 지워져요.", "지우기", danger = true) { DemoCommute.clear(this@checkScreen); toast("시연 기록을 지웠어요."); render() }
+                },
+                k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
+                k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
+            )))
+        }
     }
 }
 

@@ -442,7 +442,7 @@ internal fun MainActivity.readyScreen(): View {
         addView(k.gap(16))
         addView(k.buttons(*listOfNotNull(
             k.button("기록 시작", Kit.Btn.Primary, "play") { trip.start() },
-            k.button("출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) },
+            if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null,
             if (BuildConfig.DEMOS) k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() } else null,   // 마켓판에는 없음
         ).toTypedArray()))
     }
