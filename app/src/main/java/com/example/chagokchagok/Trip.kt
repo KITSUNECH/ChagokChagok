@@ -128,7 +128,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     fun onArrived() {
         if (!active || arrived) return
         arrived = true
-        host.say("목적지에 도착했어요. 기어를 P에 놓으면 일기를 씁니다.")
+        host.say("목적지에 도착했어요. 기어를 P에 놓으면 일기를 쓸게요.")
     }
 
     fun onDistance(km: Float) { if (!sim) recorder.distance(km) }
@@ -252,10 +252,10 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val g = guide
         val placed = g?.tips?.count { it.placed } ?: 0
         host.say(when {
-            g == null -> "출발합니다. 조용히 적고 있을게요."
-            g.kind == "나" -> "지난번의 내가 남긴 길로 출발합니다. 그 자리에 가면 알려 드릴게요."
-            placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 한마디를 남긴 곳 근처에 가면 알려 드릴게요."
-            else -> "${Writer.subj(g.owner)} 남긴 길로 출발합니다. 조용히 적고 있을게요."
+            g == null -> "출발해요. 조용히 적고 있을게요."
+            g.kind == "나" -> "지난번의 내가 남긴 길로 출발해요. 그 자리에 가면 알려 드릴게요."
+            placed > 0 && store.locationOn -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 한마디를 남긴 곳 근처에 가면 알려 드릴게요."
+            else -> "${Writer.subj(g.owner)} 남긴 길로 출발해요. 조용히 적고 있을게요."
         })
         // 받은 응원이 있으면 출발하고 조금 뒤에 대신 전해 준다
         store.news(store.driver).lastOrNull { it.contains("응원") }?.let { cheer ->
@@ -349,7 +349,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         recorder.add(Evt.CALM, "on", freshFix()?.first, freshFix()?.second)
         val asked = car.comfortable()
         if (asked) ownRerouteUntil = System.currentTimeMillis() + 60_000
-        host.say(if (asked) "좋아요. 이곳을 기억해 둘게요. 내비에 편안한 경로를 요청했어요." else "좋아요. 이곳을 기억해 둘게요.")
+        host.say(if (asked) "알겠어요. 이곳을 기억해 둘게요. 내비에 편안한 경로도 부탁했어요." else "알겠어요. 이곳을 기억해 둘게요. 주차하면 같이 돌아봐요.")
     }
 
     // ───────── 모의 주행 (시연용) ─────────
@@ -399,7 +399,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 }
                 val cam = ((0.66f - at) * total * 1000).toInt()
                 car.setAhead(50, if (cam in 1..600) cam else 0, 50)
-                if (at >= 1f) { simDone = true; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0); arrived = true; host.say("도착했어요. 기어를 P에 놓으면 일기를 씁니다."); host.tripChanged() }
+                if (at >= 1f) { simDone = true; car.setTurn(null, 0, ""); car.setAhead(0, 0, 0); arrived = true; host.say("도착했어요. 기어를 P에 놓으면 일기를 쓸게요."); host.tripChanged() }
                 else main.postDelayed(this, 500)
             }
         }, 500)

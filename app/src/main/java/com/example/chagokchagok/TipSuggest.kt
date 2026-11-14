@@ -49,7 +49,7 @@ internal object TipSuggest {
         }
         // 운전자가 직접 "천천히"를 청한 자리
         ev.firstOrNull { it.type == Evt.CALM }?.let { out.add(TipIdea(it.p, if (forSelf) "여기선 서두르지 말자. 천천히 가도 괜찮아." else "여기서는 천천히 가도 괜찮아요.",
-            "천천히 가자고 한 곳이에요 · ${where(it.p)}", 6, moment = true, lat = it.lat, lng = it.lng, icon = "breath")) }
+            "어려웠다고 한 곳이에요 · ${where(it.p)}", 6, moment = true, lat = it.lat, lng = it.lng, icon = "breath")) }
         // 내비가 경로를 다시 찾은 곳. 길을 놓쳤는지는 모른다 (운전자가 확인한다). 위치가 없으면 조금 앞(진행 3%)을 추정한다
         ev.firstOrNull { it.type == Evt.LOST }?.let { e ->
             out.add(TipIdea(if (e.lat != null) e.p else (e.p - .03f).coerceAtLeast(0f), if (forSelf) "여기선 미리 차로를 확인하자." else "여기서는 미리 차로를 확인해요.",

@@ -44,7 +44,7 @@ internal fun MainActivity.todayScreen(): View {
         "새 차" -> "이 차는 처음이죠. 출발 준비에서 손부터 익혀 봐요."
         else -> "평소처럼 달리면 돼요. 그 길이 누군가의 첫 길이 돼요."
     }
-    val head = k.header("$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · $greeting",
+    val head = k.header(if (d == "나") "안녕하세요" else "$d 님, 안녕하세요", "${dateText(System.currentTimeMillis())} · $greeting",
         trailing = if (ui.narrow) k.avatar(d, 44).apply { setOnClickListener { switchDriver() } } else null)
 
     car.refreshNavi()
@@ -158,7 +158,7 @@ private fun MainActivity.heroCard(): View {
         addView(k.empty("road", "아직 건네받은 길이 없어요",
             "가족이나 친구가 이 차로 평소 길을 달린 뒤 ‘이 길 건네주기’를 누르면 여기에 나타나요. 기다리지 않아도 돼요. 기어를 D에 놓으면 오늘 주행도 바로 일기가 돼요.",
             *(if (BuildConfig.DEMOS) arrayOf(k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() }) else emptyArray()),
-            k.button("차곡차곡 시작", Kit.Btn.Primary, "play") { beginTrip() }))
+            k.button("기록 시작", Kit.Btn.Primary, "play") { beginTrip() }))
     }
     val followed = store.timesFollowed(d, g.id)
     val placed = g.tips.count { it.placed }
@@ -441,13 +441,13 @@ internal fun MainActivity.readyScreen(): View {
                 addView(k.icon("steering", Ink.accent, 28))
                 addView(k.col(2).apply {
                     addView(k.text("기어를 D에 놓으면 기록을 시작해요", Type.Headline))
-                    addView(k.text("달리는 동안 화면은 한 줄만 보여 주고, 말로 알려 줄게요.", Type.Sub, Ink.text2))
+                    addView(k.text("달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요.", Type.Sub, Ink.text2))
                 }, k.lp(0, k.WRAP, 1f))
             })
         })
         addView(k.gap(16))
         addView(k.buttons(*listOfNotNull(
-            k.button("차곡차곡 시작", Kit.Btn.Primary, "play") { trip.start() },
+            k.button("기록 시작", Kit.Btn.Primary, "play") { trip.start() },
             k.button("출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) },
             if (BuildConfig.DEMOS) k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() } else null,   // 마켓판에는 없음
         ).toTypedArray()))

@@ -189,6 +189,7 @@ internal class GaugeView(ctx: Context, private val ui: Ui, private val from: Int
                 p.alpha = 255
             }
         }
+        if (labelW <= 0) return   // 이름표 없이 막대만
         // 단계 이름과 경계선 (막대 왼쪽)
         p.textSize = ui.sp(if (labelW > ui.dp(50)) 14f else 12f) * resources.displayMetrics.density; p.typeface = ui.semibold
         p.textAlign = Paint.Align.RIGHT
@@ -229,8 +230,7 @@ internal fun MainActivity.stackRail(): View {
         val side = ui.dp(if (ui.wide) 14 else 6)   // 좁은 창의 바는 폭이 좁아 단계 이름이 한 줄에 들도록 여백을 줄인다
         setPadding(side, ui.dp(24), side, ui.dp(20))
         setBackgroundColor(Ink.surface)
-        addView(k.text("$doneCount", Type.Title).apply { gravity = android.view.Gravity.CENTER })
-        addView(k.text("칸", Type.Micro, Ink.text2).apply { gravity = android.view.Gravity.CENTER })
+        addView(k.text("${doneCount}칸", if (ui.wide) Type.Title else Type.Headline).apply { gravity = android.view.Gravity.CENTER; maxLines = 1 })
         // 막대 폭은 처음 설정의 게이지와 같게 (옆 여백 14) 두어 압축 모션이 같은 자리에서 이어진다
         addView(StackView(context, ui, bs, fresh, squeeze), k.lp(k.MATCH, 0, 1f).apply { val m = ui.dp(14) - side; leftMargin = m; rightMargin = m })
         // 좁은 창의 바는 폭이 좁아 단계 이름 대신 색으로만 (넓은 창은 이름까지)

@@ -31,6 +31,8 @@ internal class Metric(
     val traffic: Boolean,
     val value: (Drive) -> Float?,
 ) {
+    /** 화면에 보이는 값 (fmt 와 같은 자릿수) */
+    fun shown(v: Float): Float = when (unit) { "%", "초", "분" -> v.toInt().toFloat(); else -> Math.round(v * 10) / 10f }
     fun fmt(v: Float): String = when (unit) {
         "%" -> "${v.toInt()}%"
         "초" -> "${v.toInt()}초"
@@ -46,7 +48,7 @@ internal object Metrics {
         Metric("lane", "차선 변경 전 기다림", "초", 3f, false, false) { d -> d.laneWaitMedian() },
         Metric("lost", "경로 재탐색", "번", 2f, false, false) { d -> if (d.sim) null else d.lostWay.toFloat() },
         Metric("park", "주차할 때 기어 바꿈", "번", 2f, false, false) { d -> if (d.completed && !d.sim) d.parkMoves.toFloat() else null },
-        Metric("calm", "천천히를 청함", "번", 0f, false, false) { d -> d.calm.toFloat() },
+        Metric("calm", "어려웠다고 한 곳", "번", 0f, false, false) { d -> d.calm.toFloat() },
         Metric("brake", "1km마다 브레이크", "번", 1f, false, true) { d -> if (d.distKm > 0.3f) d.brakes / d.distKm else null },
         Metric("eco", "연비", "", 1f, true, true) { d -> d.economy },
         Metric("time", "걸린 시간", "분", 0f, false, true) { d -> if (d.sim) null else max(d.minutes.toFloat(), d.seconds / 60f) },
@@ -68,9 +70,11 @@ internal data class Change(val metric: Metric, val base: Float, val now: Float, 
     /** 화면에 보일 변화: "50% → 80% (+30%p)", "15초 → 6초 (−60%)" */
     fun text(): String {
         val head = "${metric.fmt(base)} → ${metric.fmt(now)}"
+        // 괄호 안 변화량은 화면에 보이는 값으로 계산한다 (58% → 100%이면 +42%p. 안쪽 소수점으로 계산하면 +41이 되어 산수가 안 맞아 보인다)
+        val b = metric.shown(base); val n = metric.shown(now)
         val tail = when {
-            metric.unit == "%" -> " (${if (now >= base) "+" else "−"}${abs(now - base).toInt()}%p)"
-            base > 0f -> " (${if (now >= base) "+" else "−"}${(abs(now - base) / base * 100).toInt()}%)"
+            metric.unit == "%" -> " (${if (n >= b) "+" else "−"}${Math.round(abs(n - b))}%p)"
+            b > 0f -> " (${if (n >= b) "+" else "−"}${Math.round(abs(n - b) / b * 100)}%)"
             else -> ""
         }
         return head + tail
@@ -93,6 +97,9 @@ internal data class Judgement(
     fun top(n: Int = 3) = changes.filter { it.weight > 0f && (it.better || it.worse) }.sortedByDescending { abs(it.score) * it.weight }.take(n)
 }
 
+/** 차선 변경 전 기다림의 하한(초). 이보다 짧아진 것은 실력이 아니라 서두른 것일 수 있다. */
+internal const val LANE_FLOOR = 3f
+
 internal object Growth {
     /** 같은 길의 지난 기록 (오래된 것부터). 끝까지 다녀온 실제 주행만 (예시 기록 포함) */
     fun history(all: List<Diary>, d: Diary): List<Diary> = all.filter { o ->
@@ -113,10 +120,12 @@ internal object Growth {
             base.forEach { o -> m.value(o.drive)?.let { v -> val w = if (o.drive.cond() == today) 1f else .5f; sw += w; sv += w * v } }
             if (sw == 0f) return@mapNotNull null
             val b = sv / sw
-            val diff = if (m.higherBetter) now - b else b - now
+            // 차선 변경 전 기다림은 3초(깜빡이를 충분히 미리 켜는 시간) 아래로 줄어든 만큼은 나아진 것으로 치지 않는다
+            val (bs, ns) = if (m.key == "lane") maxOf(b, LANE_FLOOR) to maxOf(now, LANE_FLOOR) else b to now
+            val diff = if (m.higherBetter) ns - bs else bs - ns
             // 횟수 지표는 1번보다 작은 차이를 크게 부풀리지 않게 분모를 1 이상으로 (0.3번 → 0번이 -100%가 되지 않게)
             val floor = if (m.unit == "번") 1f else 0f
-            val score = if (b == 0f && now == 0f) 0f else (diff / maxOf(abs(b), abs(now), floor)).coerceIn(-1f, 1f)
+            val score = if (bs == 0f && ns == 0f) 0f else (diff / maxOf(abs(bs), abs(ns), floor)).coerceIn(-1f, 1f)
             // 길 상황에 흔들리는 지표는 조건이 다를 때 무게를 더 줄인다
             val w = m.weight * if (m.traffic && condDiffers) .5f else 1f
             Change(m, b, now, score, w)
@@ -208,7 +217,7 @@ internal fun MainActivity.judgementView(j: Judgement, answer: String?, compact: 
         setPadding(ui.dp(22), ui.dp(18), ui.dp(22), ui.dp(12)); background = k.rounded(Ink.alpha(col, if (Ink.night) .16f else .08f), 20)
         addView(k.row(10).apply {
             addView(k.text("차가 본 변화", Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
-            addView(k.tag("확신 ${j.confidence}", Ink.text2))
+            addView(k.tag("지난 기록 ${j.history}번과 비교", Ink.text2))
         })
         addView(k.row(12).apply {
             addView(k.icon(when (j.verdict) { Verdict.UP -> "chart"; Verdict.SAME -> "compare"; Verdict.DOWN -> "info" }, col, if (compact) 24 else 30))

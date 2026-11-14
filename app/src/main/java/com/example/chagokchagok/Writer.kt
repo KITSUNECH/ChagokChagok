@@ -150,7 +150,7 @@ object Writer {
         var highlight = ""
         var stamp: String? = null
 
-        if (guide != null) sb.append(if (guide.kind == "나") "지난번의 나와 같은 길을 다시 달렸다. " else "${subj(guide.owner)} 다니던 길을 오늘은 네가 운전했다. ")
+        if (guide != null) sb.append(if (guide.kind == "나") "지난번의 나와 같은 길을 다시 달렸다. " else "${subj(guide.owner)} 다니던 길을 오늘은 내가 운전했다. ")
         else if (n == 1) sb.append("오늘 처음으로 같이 달렸다. ")
 
         val firstRain = drive.rained && before.none { it.drive.rained }
@@ -191,7 +191,7 @@ object Writer {
             if (drive.turnsSignaled == drive.turns) "돌 때마다 미리 깜빡이를 켰다. "
             else "${times(drive.turns)} 도는 동안 ${times(drive.turnsSignaled)}은 미리 깜빡이를 켰다. "
         )
-        if (drive.calm > 0) sb.append("${times(drive.calm)} 천천히 가자고 했다. ")
+        if (drive.calm > 0) sb.append("어렵다고 느낀 곳을 ${times(drive.calm)} 남겨 뒀다. ")
 
         if (drive.parkMoves > 0) {
             val last = before.lastOrNull { it.drive.parkMoves > 0 }?.drive?.parkMoves
@@ -207,7 +207,7 @@ object Writer {
             val followed = before.count { it.guideId == guide.id && it.drive.completed && !it.drive.sim } + if (drive.completed && !drive.sim) 1 else 0
             if (!drive.completed) sb.append("오늘은 끝까지 가지 않고 멈췄다. ")
             if (drive.completed && !drive.sim && followed == GRADUATE) { sb.append("이 길은 이제 졸업이다. "); stamp = "졸업" }
-            else if (guide.kind != "나") sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 네 기록이 생겼다. ")
+            else if (guide.kind != "나") sb.append("${subj(guide.owner)} ${times(guide.times)} 다닌 길에 내 기록도 생겼다. ")
         }
 
         // 다음에 챙길 것 하나

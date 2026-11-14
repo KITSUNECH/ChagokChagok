@@ -107,8 +107,7 @@ internal fun MainActivity.onboardScreen(): View {
     val content = k.col(18).apply {
         when (O.step) {
             0 -> {
-                addView(k.text("차로 쓰는 성장일기", Type.Micro, Ink.accent))
-                addView(k.text("차가 기억했다가,\n다시 갈 때 꺼내 줘요", Type.Display))
+                addView(k.text("차로 쓰는\n성장일기", Type.Display))
                 addView(k.text("차가 내 운전을 기억했다가, 같은 길을 다시 달릴 때 내가 늘었다는 걸 보여 줘요.", Type.Body, Ink.text2))
                 addView(k.gap(6))
                 val pillars = LOOP_STEPS
@@ -119,7 +118,7 @@ internal fun MainActivity.onboardScreen(): View {
                         addView(k.col(2).apply { addView(k.text(t, Type.BodyStrong)); addView(k.text(s, Type.Caption, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
                     }, k.lp(k.MATCH, k.WRAP))
                 } })
-                nextLabel = "시작하기"
+                nextLabel = "다음"
             }
             1 -> {
                 addView(k.text("운전석에 앉는 분을\n뭐라고 부를까요?", Type.Large))
@@ -141,7 +140,6 @@ internal fun MainActivity.onboardScreen(): View {
                 onNext = { O.name = nameField?.text?.toString()?.trim()?.ifEmpty { "나" } ?: "나"; next() }
             }
             2 -> {
-                addView(k.row(10).apply { addView(k.tag("여기서 길이 나뉘어요", Ink.accent)) })
                 addView(k.text("${O.name} 님은 운전을\n얼마나 해 봤나요?", Type.Large))
                 addView(k.col(8).apply { anchor = this; BRANCHES.forEach { b -> addView(option(b.title, b.sub, b.icon, O.type == b.type) { O.type = b.type; if (!O.licenseTouched) O.license = null; render() }, k.lp(k.MATCH, k.WRAP)) } })
                 side(k.text("고르면 이렇게 달라져요", Type.Headline))
@@ -149,7 +147,6 @@ internal fun MainActivity.onboardScreen(): View {
                 side(specTable(listOf(
                     specRow("말로 알려 주기", branch.voice, "speaker"),
                     specRow("홈에서 먼저", branch.first, "today"),
-                    specRow("시작 칸", branch.stage, "layers", stageColor(0)),
                 )))
             }
             3 -> {
@@ -184,7 +181,6 @@ internal fun MainActivity.onboardScreen(): View {
                 if (all.size > list.size) side(k.text("나머지 ${all.size - list.size}가지는 홈의 ‘바뀐 법규’ 카드에서 볼 수 있어요.", Type.Caption, Ink.text3))
             }
             4 -> {
-                addView(k.row(10).apply { addView(k.tag("여기서 한 번 더 나뉘어요", Ink.accent)) })
                 addView(k.text("이 차를 누구와\n쓰나요?", Type.Large))
                 addView(k.col(10).apply {
                     anchor = this
@@ -228,13 +224,12 @@ internal fun MainActivity.onboardScreen(): View {
                 onNext = { if (store.locationOn && !places.permitted()) askLocation(); next() }
             }
             else -> {
-                addView(k.text("준비됐어요,\n${O.name} 님", Type.Large))
+                addView(k.text(if (O.name == "나") "준비됐어요" else "준비됐어요,\n${O.name} 님", Type.Large))
                 val lic = O.license
                 addView(specTable(listOf(
                     specRow("운전 경험", branch.title, branch.icon),
                     specRow("면허", lic?.let { "${it}년 · 그 뒤 바뀐 법규 ${Laws.since(it).size}가지" } ?: "기억 안 남 · 법규 전부", "info"),
                     specRow("함께", if (O.solo == false) (listOf(O.name) + O.others).joinToString(" · ") else "혼자 · 다음의 나에게", "people"),
-                    specRow("시작 칸", branch.stage, "layers", stageColor(0)),
                 )))
                 side(k.text("이렇게 시작해요", Type.Headline))
                 side(k.grid(1, listOf(
@@ -246,7 +241,7 @@ internal fun MainActivity.onboardScreen(): View {
                     addView(k.icon(ic, Ink.accent, 24))
                     addView(k.col(2).apply { addView(k.text(t, Type.BodyStrong)); addView(k.text(s, Type.Caption, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
                 } }, 10))
-                nextLabel = "오늘로"
+                nextLabel = "시작하기"
                 onNext = { finishOnboarding(false) }
             }
         }
@@ -292,17 +287,16 @@ internal fun MainActivity.onboardScreen(): View {
     // 오른쪽: 13칸 성장 게이지. 홈의 성장 바와 같은 자리, 같은 폭에 둬서
     // 처음 설정을 마치면 같은 자리에서 그대로 압축되며 홈의 바로 이어진다.
     val cap = Gauge.cap(levelOf(O.type))
-    val target = if (O.step == Onboard.LAST) cap else Math.round(cap * (O.step + 1).toFloat() / (Onboard.LAST + 1)).coerceIn(1, cap)
+    val target = if (O.step == Onboard.LAST) cap else 0
     val from = O.gaugeShown; O.gaugeShown = target
-    val labelW = ui.dp(if (ui.wide) 70 else 64)
+    val labelW = 0   // 단계 이름표 없이 막대만 (홈의 성장 바와 같은 폭)
     val rail = k.col(10).apply {
         // 홈 바(stackRail)와 같은 안쪽 여백: 위 24 · 옆 14 · 아래 20
         setPadding(ui.dp(14), ui.dp(24), ui.dp(14), ui.dp(20))
         setBackgroundColor(Ink.surface)
-        addView(k.text("$target", Type.Title).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 22 else 8), 0) })
-        addView(k.text("칸", Type.Micro, Ink.text2).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 34 else 14), 0) })
+        // 숫자와 '칸'은 한 낱말로 붙인다. 아직 채우지 않은 동안에는 자리만 지킨다.
+        addView(k.text("${target}칸", if (ui.wide) Type.Title else Type.Headline).apply { gravity = Gravity.CENTER; maxLines = 1; visibility = if (target > 0) View.VISIBLE else View.INVISIBLE })
         addView(GaugeView(context, ui, from, target, labelW), k.lp(k.MATCH, 0, 1f))
-        addView(k.text(STAGES[levelOf(O.type) - 1], Type.Micro, stageColor(levelOf(O.type) - 1)).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 16 else 2), 0) })
     }
     val railW = labelW + ui.dp(if (ui.wide) 84 else 56)
     if (ui.wide) right.addView(k.row(12).apply { addView(brand(30)); addView(k.fill()) }, 0)

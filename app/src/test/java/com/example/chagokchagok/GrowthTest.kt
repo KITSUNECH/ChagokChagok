@@ -43,6 +43,23 @@ class GrowthTest {
         assertNull(Growth.judge(hist + today, today))
     }
 
+    @Test fun rushingTheLaneChangeIsNotGrowth() {
+        // 깜빡이를 켜고 3초도 안 기다린 것은 더 줄어도 나아진 것으로 치지 않는다 (서두른 것일 수 있다)
+        val hist = listOf(drive(1, 4, 3, 20, 3f), drive(2, 4, 3, 20, 3f))
+        val today = drive(3, 4, 3, 20, 1f)
+        val j = Growth.judge(hist + today, today)!!
+        assertEquals(0f, j.changes.first { it.metric.key == "lane" }.score, .001f)
+        assertEquals(Verdict.SAME, j.verdict)
+    }
+
+    @Test fun shownChangeMatchesShownNumbers() {
+        // 화면에 58% → 100%로 보이면 괄호 안도 +42%p여야 한다
+        val m = Metrics.all.first { it.key == "signal" }
+        assertEquals("58% → 100% (+42%p)", Change(m, 58.33f, 100f, .4f, 3f).text())
+        val lane = Metrics.all.first { it.key == "lane" }
+        assertEquals("13초 → 6초 (−54%)", Change(lane, 13.4f, 6f, .5f, 3f).text())
+    }
+
     @Test fun differentConditionHalvesTheWeight() {
         val hist = listOf(drive(1, 4, 3, 20, 8f, hour = 8))
         val today = drive(2, 4, 3, 20, 8f, rain = true, hour = 22)

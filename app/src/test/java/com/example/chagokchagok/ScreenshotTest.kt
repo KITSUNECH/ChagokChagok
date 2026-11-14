@@ -54,9 +54,11 @@ class ScreenshotTest {
             idle(); find(a.window.decorView)?.scrollBy(0, px)
         }
         Onboard.step = 0; Onboard.gaugeShown = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
+        Onboard.step = 1; a.go(MainActivity.ONBOARD); snap("00a2_onboard_name")
         Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00b_onboard_type")
         Onboard.step = 3; a.go(MainActivity.ONBOARD); snap("00c2_onboard_license")
         Onboard.step = 4; Onboard.solo = false; Onboard.others.add("아빠"); a.go(MainActivity.ONBOARD); snap("00c_onboard_who")
+        Onboard.step = 5; a.go(MainActivity.ONBOARD); snap("00c3_onboard_settings")
         Onboard.step = 6; a.go(MainActivity.ONBOARD); snap("00d_onboard_ready"); Onboard.others.clear()
         val store = a.store
         store.setDrivers(listOf("나", "아빠")); store.driver = "나"; store.setLocationConsent("나", true); store.setType("나", "초보"); store.setType("아빠", "익숙"); store.setRelation("아빠", "가족"); store.onboarded = true

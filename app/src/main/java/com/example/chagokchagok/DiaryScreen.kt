@@ -99,12 +99,26 @@ private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
                 addView(k.text(d.highlight, Type.Title).apply { typeface = ui.batang; setLineSpacing(0f, 1.3f) }, k.lp(0, k.WRAP, 1f))
             })
         }
+        // 일기에 '나'가 있어야 내 일기다. 내 한 줄이 먼저, 차가 적어 둔 것은 그 아래에 둔다.
         addView(k.gap(18))
-        addView(k.text(d.text, Type.Body).apply { textSize = ui.sp(21f); setLineSpacing(0f, 1.62f) })
-        store.feeling(d.id)?.let {
-            addView(k.gap(16))
-            addView(k.row(10).apply { addView(k.icon("pencil", Ink.accent, 18)); addView(k.text("내 한 줄 · $it", Type.BodyStrong, Ink.accent)) })
+        val mine = store.feeling(d.id)
+        if (mine != null) {
+            addView(k.row(8).apply { addView(k.icon("pencil", Ink.accent, 18)); addView(k.text("내 한 줄", Type.Sub, Ink.accent), k.lp(0, k.WRAP, 1f)); addView(k.text("고치기", Type.Sub, Ink.accent).apply { gravity = Gravity.CENTER_VERTICAL; minHeight = ui.touch(48); setPadding(ui.dp(12), 0, 0, 0); setOnClickListener { askFeeling(d) } }) })
+            addView(k.voice("“$mine”", if (ui.wide) 28f else 24f))
+        } else if (d.driver == store.driver) {
+            addView(k.text("오늘 운전은 어땠어요?", Type.Headline))
+            addView(k.gap(4))
+            addView(k.text("한 줄만 남기면 내 일기가 돼요.", Type.Sub, Ink.text2))
+            addView(k.gap(10))
+            addView(k.flow(10).apply {
+                FEELS.forEach { f -> addView(k.chip(f, false) { store.setFeeling(d.id, f); render() }) }
+                addView(k.chip("직접 쓰기", false, "pencil") { sheets.input("한 줄", "예: 주차장 들어갈 때 손에 땀이 났다") { store.setFeeling(d.id, it); render() } })
+            })
         }
+        addView(k.gap(20))
+        addView(k.row(8).apply { addView(k.icon("car", Ink.text2, 18)); addView(k.text("차가 적어 둔 것", Type.Sub, Ink.text2)) })
+        addView(k.gap(8))
+        addView(k.text(d.text, Type.Body).apply { setLineSpacing(0f, 1.6f) })
         if (d.ai) { addView(k.gap(10)); addView(aiNote(d)) }
         d.stamp?.let { addView(k.gap(14)); addView(k.row().apply { addView(k.fill()); addView(stamp(it, true, 1, 76)) }) }
     }
@@ -136,7 +150,7 @@ private fun MainActivity.compareCard(a: Diary, b: Diary): View {
     val ms = mutableListOf(M("걸린 시간", a.drive.minutes.toFloat().coerceAtLeast(a.drive.seconds / 60f), b.drive.minutes.toFloat().coerceAtLeast(b.drive.seconds / 60f), "분", true))
     if (a.drive.distKm > 0.3f && b.drive.distKm > 0.3f) ms.add(M("1km마다 브레이크", a.drive.brakes / a.drive.distKm, b.drive.brakes / b.drive.distKm, "번", true))
     if (a.drive.turns > 0 && b.drive.turns > 0) ms.add(M("돌기 전 깜빡이", 100f * a.drive.turnsSignaled / a.drive.turns, 100f * b.drive.turnsSignaled / b.drive.turns, "%", false))
-    ms.add(M("천천히", a.drive.calm.toFloat(), b.drive.calm.toFloat(), "번", true))
+    ms.add(M("어려웠던 곳", a.drive.calm.toFloat(), b.drive.calm.toFloat(), "번", true))
     fun fmt(v: Float, u: String) = (if (v % 1f == 0f || v >= 10) String.format("%.0f", v) else String.format("%.1f", v)) + u
     return k.card(pad = 20) {
         addView(k.row(14).apply {
@@ -246,6 +260,15 @@ private fun timelineSummary(v: Drive): String {
 }
 
 /** 일기 다음에 할 수 있는 일. 지금 가장 할 만한 세 가지만 앞에 두고 나머지는 '더 보기'에. */
+internal val FEELS = listOf("설렜어", "무서웠지만 해냈어", "생각보다 괜찮았어", "피곤했어", "풍경이 좋았어")
+
+/** 오늘 운전이 어땠는지 내 말로 한 줄 */
+internal fun MainActivity.askFeeling(d: Diary) {
+    sheets.choose("오늘 운전은 어땠어요?", null, FEELS + "직접 쓰기") { i ->
+        if (i == FEELS.size) sheets.input("한 줄", "예: 주차장 들어갈 때 손에 땀이 났다") { store.setFeeling(d.id, it); render() } else { store.setFeeling(d.id, FEELS[i]); render() }
+    }
+}
+
 private fun MainActivity.actions(d: Diary, guide: Guide?): View {
     val k = kit
     val all = linkedMapOf<String, () -> View>()
@@ -273,10 +296,7 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
         else postSheet(d)
     } }
     all["feel"] = { k.item(store.feeling(d.id)?.let { "내 한 줄: $it" } ?: "오늘 한 줄 남기기", "오늘 운전이 어땠는지", "pencil", chevron = true) {
-        val feels = listOf("설렜어", "무서웠지만 해냈어", "생각보다 괜찮았어", "피곤했어", "풍경이 좋았어")
-        sheets.choose("오늘 운전은 어땠어요?", null, feels + "직접 쓰기") { i ->
-            if (i == feels.size) sheets.input("한 줄", "예: 주차장 들어갈 때 손에 땀이 났다") { store.setFeeling(d.id, it); render() } else { store.setFeeling(d.id, feels[i]); render() }
-        }
+        askFeeling(d)
     } }
     if (d.drive.passenger) all["passenger"] = { k.item("함께 탄 사람의 한마디 적기", "옆자리에서 해 준 말을 이 길에 남겨요", "people", chevron = true) {
         val lines = listOf("잘하고 있어.", "여기서 미리 차선 바꿔 두면 편해.", "여기는 천천히 가도 돼.", "주차장 입구 조심해.")

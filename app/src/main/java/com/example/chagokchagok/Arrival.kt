@@ -80,7 +80,7 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
             addView(k.text(if (ui.narrow) "돌아봐요" else "이 길을 돌아봐요", Type.Title).apply { maxLines = 1 }, k.lp(0, k.WRAP, 1f))
             // 바쁘면 그냥 떠나도 된다. 답하지 않은 길은 홈의 "돌아볼 길"에 남는다
             addView(k.button("나중에", Kit.Btn.Plain) { go(MainActivity.TODAY) })
-            addView(k.button("넘기기", Kit.Btn.Plain) {
+            addView(k.button("답하지 않기", Kit.Btn.Plain) {
                 moments.forEach { if (it.why !in kept) store.skipMoment(d.id, it.why) }
                 if (heard.isNotEmpty() && helped == null) store.setAnswer(d.id, Q_HELPED, "답하지 않음")
                 if (prev != null && vs == null) store.setAnswer(d.id, Q_VS_LAST, "답하지 않음")

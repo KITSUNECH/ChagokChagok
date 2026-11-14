@@ -126,7 +126,7 @@ internal fun MainActivity.driveScreen(): View {
     // 도로교통법 제49조 제1항 제11호의2: 운전 중 화면 조작은 정지 중에만. 차가 주행 제한을 걸면(움직이는 중) 버튼을 잠근다.
     val moving = limits.restricted
     // 달리는 동안은 말로: "차곡차곡, 천천히 갈래" (Gleo AI → GleoReceiver TAKE_IT_SLOW)
-    val breathe = k.button(if (moving) "말로: 차곡차곡, 천천히 갈래" else "천천히", Kit.Btn.Secondary, "breath", enabled = !moving) { trip.breathe() }
+    val breathe = k.button(if (moving) "말로: 차곡차곡, 여기 어려웠어" else "여기 어려웠어요", Kit.Btn.Secondary, "breath", enabled = !moving) { trip.breathe() }
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
     // 멈춰 있을 때는 언제나 "기록 끝내기"를 둔다 (기어 신호가 없거나 P로 바뀌지 않아도 빠져나올 수 있게)
     val stop = if (!limits.restricted) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
