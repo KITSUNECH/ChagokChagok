@@ -74,7 +74,7 @@ internal fun MainActivity.driveScreen(): View {
 
     // 다음 회전 (내비)
     V.turnIcon = IconView(this, "turnRight", Ink.text)
-    V.turnText = k.text("", Type.Display)
+    V.turnText = k.text("", if (ui.narrow) Type.Large else Type.Display)
     V.turnSub = k.text("", Type.Body, Ink.text2)
     V.turnBar = Bar(this, ui)
     val turnCard = k.card(26) {

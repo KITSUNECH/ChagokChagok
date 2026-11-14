@@ -31,8 +31,13 @@ internal fun MainActivity.pending(d: Diary, prev: Diary?): Boolean {
     val handled = store.skippedMoments(d.id) + store.keptMoments(d.id)
     return (store.heardTips(d.id).isNotEmpty() && store.answer(d.id, Q_HELPED) == null) ||
         (prev != null && store.answer(d.id, Q_VS_LAST) == null) ||
-        moments.any { it.why !in handled }
+        moments.any { it.why !in handled } || unnamed(d)
 }
+
+/** 내비 목적지도, 전에 다녀온 곳도 아닌 곳에 주차했다: 이름을 붙이면 다음부터 같은 곳으로 비교한다 */
+internal fun MainActivity.unnamed(d: Diary) = d.drive.place == null && d.drive.path.size > 1 && !d.drive.sim && !store.flag("noname_${d.id}")
+
+private val PLACE_NAMES = listOf("집", "회사", "학교", "병원", "마트")
 
 /** 주차 후 첫 화면의 맨 위. 답을 다 하면 한 줄 요약만 남는다. */
 internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
@@ -42,7 +47,7 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
     val moments = TipSuggest.moments(d.drive)
     val skipped = store.skippedMoments(d.id); val kept = store.keptMoments(d.id)
     val helped = store.answer(d.id, Q_HELPED); val vs = store.answer(d.id, Q_VS_LAST)
-    if (heard.isEmpty() && prev == null && moments.isEmpty()) return null
+    if (heard.isEmpty() && prev == null && moments.isEmpty() && !unnamed(d)) return null
 
     val judge = if (prev != null) Growth.judge(store.diariesOf(d.driver), d) else null
     // 다 답했으면: 앱의 판단과 내 답을 합친 한 줄
@@ -72,7 +77,7 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
     return k.card(pad = 26) {
         addView(k.row(10).apply {
             addView(k.icon("flag", Ink.accent, 24))
-            addView(k.text("이 길을 돌아봐요", Type.Title), k.lp(0, k.WRAP, 1f))
+            addView(k.text(if (ui.narrow) "돌아봐요" else "이 길을 돌아봐요", Type.Title).apply { maxLines = 1 }, k.lp(0, k.WRAP, 1f))
             // 바쁘면 그냥 떠나도 된다. 답하지 않은 길은 홈의 "돌아볼 길"에 남는다
             addView(k.button("나중에", Kit.Btn.Plain) { go(MainActivity.TODAY) })
             addView(k.button("넘기기", Kit.Btn.Plain) {
@@ -90,6 +95,21 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
         if (judge != null) blocks.add(judgementView(judge, vs))
         if (prev != null && vs == null) blocks.add(question(
             "내 느낌은 어땠어요?", "${dateText(prev.date, "M월 d일")}에도 같은 곳에 다녀왔어요. 차의 판단과 합쳐서 보여 드려요.", VS_LAST, vs) { store.setAnswer(d.id, Q_VS_LAST, it); render() })
+        if (unnamed(d)) blocks.add(k.col(10).apply {
+            addView(k.text("여기를 뭐라고 부를까요?", Type.Headline))
+            addView(k.text("이름을 붙이면 다음에 내비 없이 와도 같은 곳으로 알아보고 지난번과 비교해요.", Type.Sub, Ink.text2, lines = 2))
+            addView(k.flow(10).apply {
+                fun name(n: String) {
+                    val end = d.drive.path.last()
+                    val n0 = store.diariesOf(d.driver).count { it.drive.place == n && !it.drive.sim && it.id != d.id }
+                    store.addDiary(d.copy(title = "$n · ${n0 + 1}번째", drive = d.drive.copy(place = n, placeLat = end.lat, placeLng = end.lng)))
+                    toast("‘$n’로 기억해 둘게요."); render()
+                }
+                PLACE_NAMES.forEach { n -> addView(k.chip(n, false) { name(n) }) }
+                addView(k.chip("직접 쓰기", false, "pencil") { sheets.input("이곳의 이름", "예: 외근지 A사, 어린이집") { t -> if (t.isNotBlank()) name(t.trim().take(20)) } })
+                addView(k.chip("이름 붙이지 않기", false) { store.setFlag("noname_${d.id}"); render() })
+            })
+        })
         val open = moments.filter { it.why !in skipped && it.why !in kept }
         if (open.isNotEmpty()) blocks.add(k.col(10).apply {
             addView(k.text("오늘 돌아볼 만한 순간", Type.Headline))

@@ -290,6 +290,11 @@ class Store(ctx: Context) {
     fun saved(name: String): Set<String> = prefs.getStringSet("saved_$name", emptySet()) ?: emptySet()
     fun toggleSaved(name: String, guideId: String) { val s = saved(name).toMutableSet(); if (!s.remove(guideId)) s.add(guideId); prefs.edit().putStringSet("saved_$name", s).apply() }
     fun removeGuide(id: String) = writeArray("guides", guides().filter { it.id != id }) { json(it) }
+    /** 이 운전자가 전에 다녀온 곳 가운데 (lat,lng) 250m 안에서 가장 가까운 곳: 이름, 위도, 경도 */
+    fun placeNear(driver: String, lat: Double, lng: Double): Triple<String, Double, Double>? =
+        diariesOf(driver).filter { it.drive.place != null && it.drive.placeLat != null && it.drive.placeLng != null && !it.drive.sim }
+            .map { Triple(it.drive.place!!, it.drive.placeLat!!, it.drive.placeLng!!) }.distinctBy { it.first }
+            .map { it to Places.meters(lat, lng, it.second, it.third) }.filter { it.second <= 250 }.minByOrNull { it.second }?.first
     fun removeDiary(id: String) = writeArray("diaries", diaries().filter { it.id != id }) { json(it) }
     /** 시연용 예시 기록 (화면에 "예시"로 표시하고, 시연 정리에서 지운다) */
     fun isSample(diaryId: String) = flag("sample_d_$diaryId")

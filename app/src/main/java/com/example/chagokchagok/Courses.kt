@@ -80,7 +80,7 @@ internal fun MainActivity.myRouteHero(): View {
 internal fun MainActivity.startCard(guide: Guide?): View {
     val k = kit
     val title = if (guide != null) "이 길로 차곡차곡 시작" else "차곡차곡 시작"
-    val sub = if (guide != null) "${Writer.subj(guide.owner)} 건넨 길 · 출발 전 확인으로 가요" else "기어를 D에 놓으면 저절로 시작돼요"
+    val sub = if (guide != null) "${Writer.subj(guide.owner)} 건넨 길 · 출발 전 확인으로 가요" else if (ui.narrow) "D에 놓아도 시작돼요" else "기어를 D에 놓으면 저절로 시작돼요"
     return k.col().apply {
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = ui.dp(112)

@@ -206,10 +206,13 @@ internal fun MainActivity.judgementView(j: Judgement, answer: String?, compact: 
         })
         addView(k.text(Growth.combined(j, answer), Type.Body))
         if (!compact) j.top(3).forEach { c ->
-            addView(k.row(8).apply {
-                addView(k.text(c.metric.label, Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
-                addView(k.text(c.text(), Type.BodyStrong))
-                addView(k.icon(if (c.better) "check" else "info", if (c.better) Ink.go else Ink.text3, 16))
+            // 좁은 창에서는 이름 위, 값 아래 (이름이 글자 단위로 꺾이지 않게)
+            addView((if (ui.narrow) k.col(0) else k.row(8)).apply {
+                addView(k.text(c.metric.label, Type.Sub, Ink.text2), if (ui.narrow) k.lp(k.WRAP, k.WRAP) else k.lp(0, k.WRAP, 1f))
+                addView(k.row(6).apply {
+                    addView(k.text(c.text(), Type.BodyStrong))
+                    addView(k.icon(if (c.better) "check" else "info", if (c.better) Ink.go else Ink.text3, 16))
+                })
             })
         }
         addView(k.text("왜 이렇게 판단했나요", Type.Sub, Ink.accent).apply { setPadding(0, ui.dp(6), 0, ui.dp(6)); setOnClickListener { evidenceSheet(j) } })

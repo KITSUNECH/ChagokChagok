@@ -288,6 +288,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 // 지난번의 내가 남긴 길로 다시 간 날도 같은 곳으로 적어야 지난 기록과 비교된다
                 g != null && g.kind == "나" -> d.copy(place = g.title, placeLat = g.lat ?: route.lastOrNull()?.lat, placeLng = g.lng ?: route.lastOrNull()?.lng)
                 g == null && !car.destName.isNullOrBlank() -> d.copy(place = car.destName, placeLat = car.destLat ?: route.lastOrNull()?.lat, placeLng = car.destLng ?: route.lastOrNull()?.lng)
+                // 내비 없이 다니는 길(출퇴근): 주차한 곳이 전에 다녀온 곳 250m 안이면 같은 곳으로 적는다
+                g == null && route.size > 1 -> store.placeNear(driver, route.last().lat, route.last().lng)?.let { (n, la, ln) -> d.copy(place = n, placeLat = la, placeLng = ln) } ?: d
                 else -> d
             }
             val far = g != null && g.drive.distKm > 0.05f && km >= g.drive.distKm * 0.9f
