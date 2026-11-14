@@ -244,7 +244,7 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
     } }
     val posted = store.posted(d.id) != null
     all["post"] = { k.item(if (posted) "함께 차곡에 올렸어요" else "함께 차곡에 올리기", if (posted) "누르면 내릴 수 있어요" else "미리 보고 누구에게 보일지 골라요", "share", chevron = true) {
-        if (posted) sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", danger = true) { store.unpost(d.id); toast("내렸어요."); render() }
+        if (posted) sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", danger = true) { val cap = store.posted(d.id) ?: ""; store.unpost(d.id); render(); toastUndo("함께 차곡에서 내렸어요.") { store.post(d.id, cap) } }
         else postSheet(d)
     } }
     all["feel"] = { k.item(store.feeling(d.id)?.let { "내 한 줄: $it" } ?: "오늘 한 줄 남기기", "오늘 운전이 어땠는지", "pencil", chevron = true) {
@@ -336,7 +336,9 @@ internal fun MainActivity.giveScreen(id: String?): View {
         if (giveTips.isEmpty()) addView(k.card(pad = 20) { addView(k.text(if (giveKind == "추천") "주차장이나 입구처럼 처음 가는 사람에게 도움이 될 말을 남겨 주세요." else "길 위의 한 자리에 한마디를 남기면, 받은 사람이 그 자리에 가까워질 때 들려줘요.", Type.Sub, Ink.text2)) })
         else addView(k.groupOf(giveTips.mapIndexed { i, t ->
             k.item(t.text, TIP_PLACES.minByOrNull { Math.abs(it.second - t.p) }!!.first + if (hasPath) " · 그 자리 좌표 저장" else " · 좌표 없음", if (hasPath) "pin" else "quote",
-                trailing = k.iconButton("trash", Ink.danger, Ink.alpha(Ink.danger, .1f), 40) { giveTips.removeAt(i); render() })
+                trailing = k.iconButton("trash", Ink.danger, Ink.alpha(Ink.danger, .1f), 48) {
+                    sheets.confirm("이 한마디를 지울까요?", "“${t.text}”", "지우기", true) { val gone = giveTips.removeAt(i); render(); toastUndo("한마디를 지웠어요.") { giveTips.add(i.coerceAtMost(giveTips.size), gone) } }
+                })
         }))
     }
     val preview = k.col().apply {

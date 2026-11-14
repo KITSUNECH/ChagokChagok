@@ -16,69 +16,72 @@ internal fun MainActivity.changeSharing() {
         } else if (!solo) {
             val others = store.drivers.filter { it != store.driver }
             sheets.confirm("혼자 쓰기로 바꿀까요?", "${others.joinToString(", ")} 님을 운전석 목록에서 빼요. 그동안 쓴 일기와 건넨 길은 남아요.", "혼자 쓰기") {
-                others.forEach { store.removeDriver(it) }; toast("혼자 쓰기로 바꿨어요."); render()
+                others.forEach { store.removeDriver(it) }; render(); toastUndo("혼자 쓰기로 바꿨어요.") { others.forEach { store.addDriver(it) } }
             }
         }
     }
 }
 
 internal fun MainActivity.settingsScreen(): View {
+    // 설정에는 정말 설정만. 안전·알아 두기는 출발 준비와 홈에서, 시연 도구는 차량 데이터 화면에서.
     val k = kit; val me = store.driver
     return k.col().apply {
         addView(k.header("설정"))
         addView(k.section("운전석"))
         addView(k.groupOf(listOf(
-            k.item(me, "${store.relation(me)} · ${store.typeOf(me)} · 지금 운전석", trailing = k.avatar(me, 36)) { switchDriver() },
-            k.item("이 차를 쓰는 방식", if (store.drivers.size > 1) "함께 · ${store.drivers.joinToString(", ")}" else "혼자 · 다음의 나에게 길을 남겨요", "people", value = if (store.drivers.size > 1) "함께" else "혼자", chevron = true) { changeSharing() },
+            k.item(me, "${store.relation(me)} · ${store.typeOf(me)} · 지금 운전석", trailing = k.avatar(me, 40)) { switchDriver() },
+            k.item("이 차를 쓰는 방식", if (store.drivers.size > 1) store.drivers.joinToString(", ") else "다음의 나에게 길을 남겨요", "people", value = if (store.drivers.size > 1) "함께" else "혼자", chevron = true) { changeSharing() },
+            k.item("운전 경험", null, "steering", value = store.typeOf(me), chevron = true) {
+                sheets.choose("운전 경험", "말로 알려 주는 양과 홈에서 먼저 보일 것이 바뀌어요.", DRIVER_TYPES.map { it.second }, selected = DRIVER_TYPES.indexOfFirst { it.first == store.typeOf(me) }) { t -> store.setType(me, DRIVER_TYPES[t].first); render() }
+            },
+            k.item("면허 딴 해", "그 뒤로 바뀐 법규만 보여 줘요", "scale", value = store.licenseYear(me)?.let { "${it}년" } ?: "모름", chevron = true) { pickLicenseYear() },
+        )))
+        addView(k.section("이 차"))
+        addView(k.groupOf(listOf(
+            k.item("차종", "기어 쓰는 법과 안전 조작을 맞춰 보여 줘요", "car", value = store.carModel ?: Shifters.byId(store.shifter)?.name ?: "고르지 않음", chevron = true) { prepTab = 1; go(MainActivity.PREP) },
         )))
         addView(k.section("안내"))
         addView(k.groupOf(listOf(
             k.toggleItem("소리로 알려 주기", "한마디, 회전 전 깜빡이, 도착을 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
             k.item("목소리 들어 보기", voice.status, "play", chevron = true) { speak("안녕하세요. 차곡차곡이에요. 오늘도 같이 가요.") },
-            k.item("일기 말투", "다음 일기부터 바뀌어요", "pencil", value = store.tone(me)) {
+            k.item("일기 말투", "다음 일기부터 바뀌어요", "pencil", value = store.tone(me), chevron = true) {
                 sheets.choose("일기 말투", null, listOf("담백하게", "다정하게"), selected = if (store.tone(me) == "다정하게") 1 else 0) { i -> store.setTone(me, listOf("담백하게", "다정하게")[i]); render() }
             },
         )))
         addView(k.section("위치와 개인정보"))
         addView(k.groupOf(listOf(
-            k.toggleItem("한마디를 그 자리에서 듣기", "차의 위치로 한마디를 남긴 자리에 가까워졌는지 봐요. 위치는 이 차 안에만 저장돼요.", store.locationOn, "pin") {
+            k.toggleItem("한마디를 그 자리에서 듣기", "$me 님의 위치로 한마디를 남긴 자리에 가까워졌는지 봐요. 이 차 안에만 저장돼요.", store.locationOn, "pin") {
                 store.locationOn = it
-                if (it) { places.start(); if (!places.permitted()) askLocation() }
+                if (it) { places.start(); if (!places.permitted()) askLocation(); if (store.locationConsent(me) == null) askLocationConsent(me) }
                 render()
             },
-            k.toggleItem("도착지 날씨", "목적지 좌표를 공개 예보(Open-Meteo)에 보내 날씨를 읽어 와요", store.weatherOn, "cloud") { store.weatherOn = it },
-            k.toggleItem("내 기록을 가족에게 보여 주기", "켜면 가족 프로필 일기장에 내 요즘 운전이 보여요", store.shares(me), "eye") { store.setShares(me, it) },
-            k.item("일기 문장 다듬기 (생성형 AI)", if (AiDiary.enabled) "켜짐 · 일기 초안만 Anthropic API로 가요. 사실과 다른 숫자는 걸러요" else "꺼짐 · 키를 넣으면 켜져요. 키는 앱에 들어 있지 않고 이 차에만 암호화해 둬요", "sparkle", value = trip.aiStatus.ifEmpty { if (AiDiary.enabled) "켜짐" else "꺼짐" }, chevron = true) {
-                if (AiDiary.enabled) sheets.confirm("AI 다듬기를 끌까요?", "넣어 둔 키를 이 차에서 지워요.", "끄기", true) { store.aiKey = null; AiDiary.key = null; render() }
+            k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
+            k.toggleItem("내 기록을 가족에게 보여 주기", "켜면 가족 일기장에 내 요즘 운전이 보여요", store.shares(me), "eye") { store.setShares(me, it) },
+            k.item("일기 문장 다듬기 (생성형 AI)", if (AiDiary.enabled) "일기 초안만 Anthropic API로 가요" else "키를 넣으면 켜져요. 키는 이 차에만 암호화해 둬요", "sparkle", value = if (AiDiary.enabled) "켜짐" else "꺼짐", chevron = true) {
+                if (AiDiary.enabled) sheets.confirm("AI 다듬기를 끌까요?", "넣어 둔 키를 이 차에서 지워요.", "끄기", true) { store.aiKey = null; AiDiary.key = null; toast("AI 다듬기를 껐어요. 키를 지웠어요."); render() }
                 else sheets.input("Anthropic API 키", "sk-ant-…", ok = "저장") { v -> store.aiKey = v; AiDiary.key = v; toast("키를 암호화해 저장했어요. 다음 일기부터 다듬어요."); render() }
             },
-            k.item("저장소", SecurePrefs.status, "lock"),
-            k.item("개인정보·위치정보 안내", "무엇을 어디에 두고, 누구에게 보이는지", "eye", chevron = true) { go(MainActivity.LEARN, "privacy") },
+            k.item("개인정보·위치정보 안내", "무엇을 어디에 두고, 누구에게 보이는지", "lock", chevron = true) { go(MainActivity.LEARN, "privacy") },
         )))
-        addView(k.section("알아 두기"))
+        addView(k.section("연결"))
         addView(k.groupOf(listOf(
-            k.item("이렇게 쓸 수 있어요", "앱 사용 팁 ${APP_TIPS.size}가지", "sparkle", chevron = true) { go(MainActivity.LEARN, "tips") },
-            k.item("그동안 바뀐 법규", null, "info", chevron = true) { go(MainActivity.LEARN, "law") },
-            k.item("면허시험 차와 다른 곳", null, "steering", chevron = true) { go(MainActivity.LEARN, "newcar") },
-            k.item("경고등 색 읽는 법", null, "warning", chevron = true) { go(MainActivity.LEARN, "lamp") },
-        )))
-        addView(k.section(if (BuildConfig.DEMOS) "연결과 시연" else "연결"))
-        addView(k.groupOf(listOfNotNull(
-            if (BuildConfig.DEMOS) k.toggleItem("Pleos 발전 제안 보기 (시연용)", "친구·가족 계정 연동이 생기면 어떻게 쓸지 가상의 친구로 보여 줘요. 지금 되는 기능과 따로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() } else null,
-            k.item("Pleos에 제안하는 것", "지금 되는 것과 앞으로 바라는 것", "sparkle", chevron = true) { go(MainActivity.PROPOSE) },
-            k.item("차량 데이터", "지금 받고 있는 차량 신호와 연결 상태", "car", chevron = true) { go(MainActivity.CHECK) },
-            // 시연·시험 도구는 공모전판에만 (마켓판은 실제 신호만)
-            if (BuildConfig.DEMOS) k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() } else null,
-            if (BuildConfig.DEMOS) k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") } else null,
+            k.item("차량 연결 상태", "차량·내비·위치·음성이 잘 이어졌는지", "car", chevron = true) { go(MainActivity.CHECK) },
         )))
         addView(k.section("데이터"))
         addView(k.groupOf(listOf(
-            k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) {
-                sheets.confirm("모두 지울까요?", "되돌릴 수 없어요.", "모두 지우기", true) { store.clearAll(); store.onboarded = false; go(MainActivity.ONBOARD) }
-            },
+            k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) { confirmClearAll() },
         )))
         addView(k.gap(24))
-        addView(k.text("차곡車곡 알파 0.1 · 기록은 이 차 안에만 저장돼요.\n글꼴: Pretendard, 고운바탕 (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
+        addView(k.text("차곡車곡 0.2 · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
+    }
+}
+
+/** 모두 지우기: 두 번 묻고, 지운 뒤 알린다 */
+internal fun MainActivity.confirmClearAll() {
+    sheets.confirm("기록을 모두 지울까요?", "일기 ${store.diaries().size}개, 건넨 길 ${store.guides().size}개, 함께 쓰는 사람과 설정이 이 차에서 사라져요.", "다음", true) {
+        sheets.confirm("정말 지울까요?", "지우면 되돌릴 수 없어요.", "모두 지우기", true) {
+            store.clearAll(); store.onboarded = false; go(MainActivity.ONBOARD); toast("기록을 모두 지웠어요.")
+        }
     }
 }
 
@@ -128,7 +131,7 @@ private fun MainActivity.editPerson(n: String) {
             0 -> { store.driver = n; go(MainActivity.TODAY) }
             1 -> sheets.choose("$n 님은 어떤 운전자인가요?", null, DRIVER_TYPES.map { it.second }, selected = DRIVER_TYPES.indexOfFirst { it.first == store.typeOf(n) }) { t -> store.setType(n, DRIVER_TYPES[t].first); render() }
             2 -> sheets.choose("$n 님은", null, listOf("가족", "친구"), selected = if (store.relation(n) == "가족") 0 else 1) { r -> store.setRelation(n, if (r == 0) "가족" else "친구"); render() }
-            else -> if (store.drivers.size <= 1) toast("한 사람은 남아 있어야 해요.") else sheets.confirm("$n 님을 목록에서 뺄까요?", "쓴 일기와 건넨 길은 남아요.", "빼기", true) { store.removeDriver(n); render() }
+            else -> if (store.drivers.size <= 1) toast("한 사람은 남아 있어야 해요.") else sheets.confirm("$n 님을 목록에서 뺄까요?", "쓴 일기와 건넨 길은 남아요.", "빼기", true) { val rel = store.relation(n); store.removeDriver(n); render(); toastUndo("$n 님을 목록에서 뺐어요.") { store.addDriver(n); store.setRelation(n, rel) } }
         }
     }
 }
@@ -248,8 +251,17 @@ internal fun MainActivity.checkScreen(): View {
     fun ok(b: Boolean) = if (b) Ink.go else Ink.text3
     val vehicleOk = !car.failures.containsKey("vehicle") && !Car.offline
     return k.col().apply {
-        addView(k.header("차량 데이터", "이 앱이 지금 실제로 받고 있는 차량 신호예요. 시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
+        addView(k.header("차량 연결 상태", "이 앱이 지금 실제로 받고 있는 차량 신호예요. 시험용 신호는 세지 않아요.", onBack = { back() }, trailing = k.button("새로고침", Kit.Btn.Plain) { car.refreshNavi(); car.refreshCondition(); render() }))
         addView(k.gap(16))
+        // 공모전 시연 도구 (마켓판에는 없음)
+        if (BuildConfig.DEMOS) {
+            addView(k.section("시연 도구 · 공모전판"))
+            addView(k.groupOf(listOf(
+                k.toggleItem("다른 차의 친구와 함께 · 미리 보기", "Pleos 계정 연동이 생기면 어떻게 쓸 수 있는지 가상의 친구로 보여 줘요. 화면에 시연용으로 표시돼요.", store.demoOn, "people") { store.demoOn = it; render() },
+                k.item("예시 길과 친구 넣기", "아빠가 건넨 길, 친구 민수의 연습과 추천 장소 · 예시", "gift", chevron = true) { store.addSampleGuide(); store.addSampleFriend(); toast("예시를 넣었어요. 오늘과 함께 차곡에서 볼 수 있어요.") },
+                k.item("시험용 신호 보내기", "가상 콘솔에 없는 신호를 시험해요 (실제 차량 신호 아님)", "sparkle", chevron = true) { testSignals() },
+            )))
+        }
         val mins = ((System.currentTimeMillis() - Telemetry.since) / 60000).coerceAtLeast(1)
         addView(k.grid(if (ui.wide) 4 else 2, listOf(
             k.stat("${Telemetry.total}", "받은 신호"),
@@ -294,35 +306,6 @@ internal fun MainActivity.checkScreen(): View {
     }
 }
 
-// ═══════════════ Pleos에 제안하는 것 ═══════════════
+
 // 지금 Pleos에서 실제로 되는 것과, 플랫폼이 이렇게 발전하면 차곡車곡이 할 수 있는 것을 나눠 보여 준다.
 
-internal fun MainActivity.proposeScreen(): View {
-    val k = kit
-    fun row(title: String, now: String, ok: Boolean, icon: String) = k.item(title, now, icon, if (ok) Ink.go else Ink.warn, trailing = k.tag(if (ok) "구현함" else "제안", if (ok) Ink.go else Ink.warn))
-    return k.col().apply {
-        addView(k.header("Pleos에 제안하는 것", "차곡車곡은 지금 Pleos에서 되는 것으로 만들었고, 플랫폼이 아래처럼 발전하면 가족·친구와 이어질 수 있어요.", onBack = { back() }))
-        addView(k.section("지금 Pleos SDK로 구현한 것"))
-        addView(k.groupOf(listOf(
-            row("차량 신호로 주행 기록과 일기", "Vehicle SDK · 깜빡이, 브레이크, 와이퍼, 전조등, 기어, 좌석, 주행거리, 표시등", true, "car"),
-            row("목적지 넣기, 편안한 길, 회전 안내, 제한속도", "NaviHelper SDK", true, "pin"),
-            row("한마디를 남긴 자리에서 들려주기", "FusedLocation SDK · 위치와 진행 방향", true, "pin"),
-            row("음성 안내", "TextToSpeech SDK · 기기 안 합성", true, "speaker"),
-            row("주행 중 화면 제한", "CarUxRestrictions", true, "lock"),
-            row("같은 차를 쓰는 가족·친구끼리 길 건네기, 응원, 일기 올리기", "이 차 안의 운전자 프로필", true, "people"),
-        )))
-        addView(k.section("Pleos에 제안하는 것 (시연용으로 미리 보기)"))
-        addView(k.groupOf(listOf(
-            row("가족·친구 계정 연동", "다른 차를 타는 아빠, 친구와 Pleos 계정으로 이어지기", false, "people"),
-            row("다른 차의 길 받기", "아빠의 그랜저에서 남긴 출근길을 내 아반떼에서 따라 달리기", false, "gift"),
-            row("같이 가기", "앞서 가는 가족·친구의 위치를 동의 아래 함께 보기", false, "car"),
-            row("글레오로 묻고 듣기", "\"오늘 일기 읽어 줘\", \"나 지난주보다 늘었어?\" (앱 스키마 승인 필요)", false, "sparkle"),
-            row("휴대폰 연동", "차 밖에서 일기를 보고 응원 보내기", false, "share"),
-        )))
-        addView(k.gap(16))
-        if (BuildConfig.DEMOS) addView(k.buttons(k.button(if (store.demoOn) "제안 시연 끄기" else "제안 시연 켜기", Kit.Btn.Primary, "people") { store.demoOn = !store.demoOn; render() },
-            k.button("함께 차곡 보기", Kit.Btn.Secondary) { go(MainActivity.TOGETHER) }, stack = false))
-        addView(k.gap(10))
-        addView(k.text("제안 시연에서 보이는 친구, 다른 차의 글, 같이 가기 위치는 모두 가상이며 화면에 '시연용'으로 표시돼요.", Type.Caption, Ink.text3))
-    }
-}

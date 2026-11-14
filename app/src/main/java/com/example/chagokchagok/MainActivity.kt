@@ -56,6 +56,10 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     internal var giveTitle = ""
     internal val giveTips = mutableListOf<Tip>()
     internal var journalTab = 0
+    internal var prepTab = 0
+    /** 같은 화면을 다시 그릴 때 스크롤 위치를 지킨다 (차 신호로 화면이 갱신돼도 읽던 자리가 튀지 않게) */
+    private var shownRoute: Route? = null
+    private var pageScroll: android.widget.ScrollView? = null
     internal var roadsTab = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -146,6 +150,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     internal fun back() { onBackPressed() }
 
     internal fun render() {
+        val keepY = if (shownRoute == route) pageScroll?.scrollY ?: 0 else 0
         stage.removeAllViews()
         // 달리는 동안 화면이 꺼지지 않게
         if (driving) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -157,6 +162,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             else -> shell(page())
         }
         stage.addView(view, FrameLayout.LayoutParams(-1, -1))
+        shownRoute = route
+        if (keepY > 0) pageScroll?.let { sv -> sv.post { sv.scrollTo(0, keepY) } }
     }
 
     private fun page(): View = when (route.name) {
@@ -172,7 +179,6 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         PEOPLE -> peopleScreen()
         ANALYSIS -> analysisScreen()
         CHECK -> checkScreen()
-        PROPOSE -> proposeScreen()
         else -> todayScreen()
     }
 
@@ -187,6 +193,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
             setPadding(padH, padV, padH, padV + ui.dp(20))
             addView(content, FrameLayout.LayoutParams(-1, -2))
         })
+        pageScroll = body as? android.widget.ScrollView
         if (ui.wide) return k.row().apply {
             gravity = Gravity.TOP
             addView(sidebar(), k.lp(ui.dp(268), k.MATCH))
@@ -351,6 +358,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     override fun lampsChanged() { if (route.name == TODAY) render() }
 
     internal fun toast(s: String) = sheets.toast(s)
+    /** 지운 뒤 알림 + 되돌리기 */
+    internal fun toastUndo(s: String, undo: () -> Unit) = sheets.toast(s, "trash") { undo(); render(); sheets.toast("되돌렸어요.") }
 
     /** 소리로 읽고 글로도 보여 준다 */
     internal fun readAloud(title: String, text: String) {

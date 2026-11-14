@@ -131,7 +131,7 @@ private fun MainActivity.diaryCard(d: Diary): View {
         addView(k.gap(12))
         if (d.driver == me) addView(k.buttons(
             k.button("일기 보기", Kit.Btn.Secondary, "book") { go(MainActivity.DIARY, d.id) },
-            k.button("내리기", Kit.Btn.Plain) { sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", true) { store.unpost(d.id); render() } },
+            k.button("내리기", Kit.Btn.Plain) { sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", true) { val cap = store.posted(d.id) ?: ""; store.unpost(d.id); toastUndo("함께 차곡에서 내렸어요.") { store.post(d.id, cap) }; render() } },
             stack = false))
         else if (d.drive.placeLat != null) addView(k.button("나도 가 보기", Kit.Btn.Primary, "play") {
             depart(Guide("visit_${d.id}", d.driver, d.drive.place ?: d.title, d.drive.placeLat, d.drive.placeLng, d.drive.copy(path = Paths.shareable(d.drive.path)), emptyList(), 1, kind = "추천"))
@@ -191,7 +191,7 @@ private fun MainActivity.guideMenu(g: Guide) {
                 }
             }
             1 -> depart(g.copy(id = "again_${g.id}", kind = "다시"))
-            else -> sheets.confirm("건네기를 취소할까요?", "함께 쓰는 사람의 화면에서 이 길이 사라져요. 이미 쓴 일기는 남아요.", "취소하기", true) { store.removeGuide(g.id); render() }
+            else -> sheets.confirm("건네기를 취소할까요?", "함께 쓰는 사람의 화면에서 이 길이 사라져요. 이미 쓴 일기는 남아요.", "취소하기", true) { store.removeGuide(g.id); render(); toastUndo("“${g.title}” 건네기를 취소했어요.") { store.addGuide(g) } }
         }
     }
 }

@@ -103,20 +103,25 @@ class Overlay(private val host: FrameLayout, private val kitOf: () -> Kit) {
     fun closeAll() { stack.toList().forEach { host.removeView(it) }; stack.clear() }
 
     /** 화면 위쪽에 잠깐 떴다 사라지는 띠. 차가 하는 말이면 icon=speaker */
-    fun toast(s: String, icon: String = "info") {
+    /** 짧은 알림. undo 가 있으면 "되돌리기" 단추를 함께 보여 준다 (지운 뒤 알림) */
+    fun toast(s: String, icon: String = "info", undo: (() -> Unit)? = null) {
         val k = kitOf(); val ui = k.ui
         banner?.let { host.removeView(it) }
         val bar = k.row(12).apply {
-            setPadding(ui.dp(20), ui.dp(14), ui.dp(24), ui.dp(14))
+            setPadding(ui.dp(20), ui.dp(14), ui.dp(if (undo != null) 12 else 24), ui.dp(14))
             background = GradientDrawable().apply { setColor(if (Ink.night) Ink.fill else Color.parseColor("#1D1D1F")); cornerRadius = ui.dp(22).toFloat() }
             elevation = ui.dp(8).toFloat()
             addView(k.icon(icon, Color.WHITE, 22))
             addView(k.text(s, Type.Sub, Color.WHITE).apply { maxLines = 3 })
+            if (undo != null) addView(k.text("되돌리기", Type.BodyStrong, Ink.alpha(Color.parseColor("#7FD8F0"), 1f)).apply {
+                setPadding(ui.dp(16), ui.dp(10), ui.dp(12), ui.dp(10))
+                setOnClickListener { banner?.let { b -> host.removeView(b) }; banner = null; undo() }
+            })
         }
         // 아래 가운데: 제목과 겹치지 않게. 좁은 창은 탭 막대 위로.
         host.addView(bar, FrameLayout.LayoutParams(k.WRAP, k.WRAP, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = ui.dp(if (ui.wide) 28 else 96); leftMargin = ui.dp(24); rightMargin = ui.dp(24) })
         banner = bar
         bar.alpha = 0f; bar.translationY = ui.dp(12).toFloat(); bar.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
-        bar.postDelayed({ if (banner === bar) { bar.animate().alpha(0f).setDuration(200).withEndAction { host.removeView(bar) }.start(); banner = null } }, 4200)
+        bar.postDelayed({ if (banner === bar) { bar.animate().alpha(0f).setDuration(200).withEndAction { host.removeView(bar) }.start(); banner = null } }, if (undo != null) 6500 else 4200)
     }
 }

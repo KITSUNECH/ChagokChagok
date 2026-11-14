@@ -81,11 +81,15 @@ internal fun MainActivity.todayScreen(): View {
             // 위 줄: 큰 카드와 옆 카드 묶음의 밑단을 맞춘다. 옆 묶음의 마지막 카드가 남는 높이를 채운다.
             addView(k.row(20).apply {
                 gravity = Gravity.TOP
-                addView(hero, k.lp(0, k.MATCH, 1.55f))
+                // 왼쪽: 큰 카드 + 큰 시작 단추(남는 높이를 채운다). 오른쪽 묶음과 밑단이 맞는다.
+                addView(k.col(16).apply {
+                    addView(hero, k.lp(k.MATCH, k.WRAP))
+                    addView(startCard(todaysGuide()), k.lp(k.MATCH, 0, 1f))
+                }, k.lp(0, k.MATCH, 1.55f))
                 if (side.isNotEmpty()) addView(k.col(16).apply { side.forEachIndexed { i, v -> addView(v, if (i == side.lastIndex) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP)) } }, k.lp(0, k.MATCH, 1f))
             })
             bottom.forEach { addView(k.gap(20)); addView(it, k.lp(k.MATCH, k.WRAP)) }
-        } else addView(k.col(16).apply { addView(hero); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
+        } else addView(k.col(16).apply { addView(hero); addView(startCard(todaysGuide())); (side + bottom).forEach { addView(it, k.lp(k.MATCH, k.WRAP)) } })
     }
 }
 
@@ -145,7 +149,7 @@ private fun MainActivity.heroCard(): View {
         addView(k.empty("road", "아직 건네받은 길이 없어요",
             "가족이나 친구가 이 차로 평소 길을 달린 뒤 ‘이 길 건네주기’를 누르면 여기에 나타나요. 기다리지 않아도 돼요. 기어를 D에 놓으면 오늘 주행도 바로 일기가 돼요.",
             *(if (BuildConfig.DEMOS) arrayOf(k.button("예시로 둘러보기", Kit.Btn.Tinted, "sparkle") { store.addSampleGuide(); store.addSampleFriend(); render() }) else emptyArray()),
-            k.button("지금 기록 시작", Kit.Btn.Primary) { trip.guide = null; trip.start() }))
+            k.button("지금 차곡기록 시작", Kit.Btn.Primary, "play") { beginTrip() }))
     }
     val followed = store.timesFollowed(d, g.id)
     val placed = g.tips.count { it.placed }
@@ -173,10 +177,8 @@ private fun MainActivity.heroCard(): View {
                 addView(k.voice(it.text, 21f), k.lp(0, k.WRAP, 1f))
             })
         }
-        addView(k.fill())   // 옆 카드보다 짧으면 단추를 카드 밑단에 붙인다
-        addView(k.gap(22))
+        addView(k.gap(18))
         addView(k.buttons(
-            k.button("이 길로 출발", Kit.Btn.Primary, "play") { depart(g) },
             k.button("한마디 미리 듣기", Kit.Btn.Secondary, "speaker") {
                 if (g.tips.isEmpty()) toast("이 길에는 아직 한마디가 없어요.")
                 else readAloud("${Writer.poss(g.owner)} 한마디", g.tips.mapIndexed { i, t -> "${i + 1}. ${t.text}" }.joinToString("\n\n"))
@@ -292,7 +294,7 @@ internal val PREP_ITEMS = listOf(
     Triple("signal", "깜빡이", "왼쪽, 오른쪽 한 번씩"),
     Triple("wiper", "와이퍼", "한 번 켜 보기"),
     Triple("light", "전조등", "한 번 켜 보기"),
-    Triple("gear", "기어", "R에 넣었다가 P로 · 아래 그림"),
+    Triple("gear", "기어", "R에 넣었다가 P로"),
     Triple("belt", "안전벨트", "매면 켜져요"),
 )
 /** 안전벨트는 에뮬레이터에서 체결 상태를 바꿀 수 없을 수 있어 마치는 조건에서 뺀다 */
@@ -303,39 +305,38 @@ internal fun MainActivity.prepScreen(): View {
     val done = PREP_REQUIRED.count { it in prepDone }
     val all = done == PREP_REQUIRED.size
     val next = PREP_REQUIRED.firstOrNull { it !in prepDone }
+    val sh = Shifters.of(this)
+    // 차 안에서 한눈에: 세 갈래로 나눠 한 화면씩 (손에 익히기 · 이 차의 기어 · 안전 조작)
     return k.col().apply {
-        addView(k.header("출발 준비", "면허시험 차와 다른 곳을 손으로 익히고, 이 차의 기어와 안전 조작을 미리 읽어 둬요. 주차 중에만 하는 연습이라 기어를 바꿔도 주행으로 치지 않아요.", onBack = { back() }))
-        addView(k.gap(22))
-        addView(k.card {
-            addView(k.row().apply {
-                addView(k.text(if (all) "다 됐어요. 이 차가 손에 익었어요." else "한 번씩 해 보면 불이 들어와요", Type.Headline), k.lp(0, k.WRAP, 1f))
-                addView(k.text("$done / ${PREP_REQUIRED.size}", Type.BodyStrong, if (all) Ink.go else Ink.accent))
-            })
-            addView(k.gap(12)); addView(k.progress(done / PREP_REQUIRED.size.toFloat(), if (all) Ink.go else Ink.accent))
-            if (prepLine.isNotEmpty()) { addView(k.gap(12)); addView(k.text(prepLine, Type.Sub, Ink.text2)) }
-        })
-        addView(k.gap(16))
-        val tiles = PREP_ITEMS.map { (key, name, hint) ->
-            val ok = key in prepDone; val now = key == next
-            k.card(pad = 20, color = if (now) Ink.accentSoft else Ink.surface) {
-                gravity = Gravity.CENTER_HORIZONTAL
-                addView(Telltale(this@prepScreen, key).apply { on = ok; waiting = now }, k.lp(ui.dp(76), ui.dp(76)))
-                addView(k.gap(10))
-                addView(k.text(name, Type.Headline).apply { gravity = Gravity.CENTER })
-                addView(k.gap(4))
-                addView(k.text(if (ok) "확인했어요" else hint, Type.Caption, if (ok) Ink.go else if (now) Ink.accent else Ink.text2).apply { gravity = Gravity.CENTER })
+        addView(k.header("출발 준비", "주차한 채로 해요. 기어를 바꿔도 주행으로 치지 않아요.", onBack = { back() },
+            trailing = k.button(if (all) "홈으로" else "나중에", if (all) Kit.Btn.Primary else Kit.Btn.Secondary) { back() }))
+        addView(k.gap(18))
+        addView(k.segmented(listOf("손에 익히기 $done/${PREP_REQUIRED.size}", "이 차의 기어", "안전 조작"), prepTab) { prepTab = it; render() }, k.lp(k.MATCH, ui.dp(60)))
+        addView(k.gap(18))
+        when (prepTab) {
+            0 -> {
+                addView(k.row(14).apply {
+                    addView(k.text(if (all) "다 됐어요. 이 차가 손에 익었어요." else next?.let { n -> "다음: " + PREP_ITEMS.first { it.first == n }.let { "${it.second} · ${it.third}" } } ?: "", Type.Headline), k.lp(0, k.WRAP, 1f))
+                })
+                addView(k.gap(10)); addView(k.progress(done / PREP_REQUIRED.size.toFloat(), if (all) Ink.go else Ink.accent))
+                addView(k.gap(16))
+                val tiles = PREP_ITEMS.map { (key, name, hint) ->
+                    val ok = key in prepDone; val now = key == next
+                    k.card(pad = 20, color = if (now) Ink.accentSoft else Ink.surface) {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        addView(Telltale(this@prepScreen, key).apply { on = ok; waiting = now }, k.lp(ui.dp(84), ui.dp(84)))
+                        addView(k.gap(10))
+                        addView(k.text(name, Type.Title).apply { gravity = Gravity.CENTER })
+                        addView(k.gap(2))
+                        addView(k.text(if (ok) "확인했어요" else hint, Type.Sub, if (ok) Ink.go else if (now) Ink.accent else Ink.text2).apply { gravity = Gravity.CENTER })
+                    }
+                }
+                addView(k.grid(if (ui.wide) 5 else 2, tiles, 14))
+                if (all) { addView(k.gap(16)); addView(k.button("이 차의 기어 보기", Kit.Btn.Tinted, "gear") { prepTab = 1; render() }) }
             }
+            1 -> addView(shifterCard())
+            else -> addView(safetySection(sh))
         }
-        addView(k.grid(if (ui.wide) 5 else 2, tiles, 14))
-        addView(k.gap(16))
-        addView(shifterCard())
-        addView(k.gap(22))
-        addView(safetySection(Shifters.of(this@prepScreen)))
-        addView(k.gap(22))
-        addView(k.buttons(
-            k.button(if (all) "홈으로" else "나중에 하기", if (all) Kit.Btn.Primary else Kit.Btn.Secondary) { back() },
-            stack = false
-        ))
     }
 }
 
@@ -357,7 +358,8 @@ internal fun MainActivity.onPrep(type: String, value: String) {
         if (finished && newly in PREP_REQUIRED) speak(prepLine)
     }
     if (prepDone.containsAll(PREP_REQUIRED)) store.setPrepDone(store.driver)
-    render()
+    // 바뀐 것이 있을 때만 다시 그린다 (다른 차 신호마다 그리면 화면이 깜박이고 스크롤이 튄다)
+    if (newly != null || type == Evt.GEAR || (type == Evt.NAVI && value == "vin")) render()
 }
 
 // ═══════════════ 출발 전 ═══════════════
@@ -435,7 +437,7 @@ internal fun MainActivity.readyScreen(): View {
         })
         addView(k.gap(16))
         addView(k.buttons(*listOfNotNull(
-            k.button("지금 기록 시작", Kit.Btn.Primary, "play") { trip.start() },
+            k.button("차곡기록 시작", Kit.Btn.Primary, "play") { trip.start() },
             k.button("출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) },
             if (BuildConfig.DEMOS) k.button("모의 주행 (시연용)", Kit.Btn.Plain) { trip.startSim() } else null,   // 마켓판에는 없음
         ).toTypedArray()))

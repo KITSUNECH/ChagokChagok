@@ -119,7 +119,7 @@ internal fun MainActivity.shifterCard(): View {
     return k.card(pad = 22) {
         addView(k.row(10).apply {
             addView(k.icon("gear", Ink.accent, 24))
-            addView(k.text("이 차의 기어와 안전", Type.Headline), k.lp(0, k.WRAP, 1f))
+            addView(k.text("이 차의 기어", Type.Headline), k.lp(0, k.WRAP, 1f))
             addView(k.tag(when {
                 maker != null -> "차대번호 확인 · $maker"
                 car.vin != null -> "차대번호 확인 · 제조사 모름"

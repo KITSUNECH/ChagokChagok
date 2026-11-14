@@ -101,6 +101,8 @@ internal fun MainActivity.onboardScreen(): View {
 
     // 넓은 창: 왼쪽은 질문과 고르기, 오른쪽(aside)은 고른 결과·비교·미리보기. 좁은 창은 위아래로 잇는다.
     val aside = k.col(14)
+    /** 오른쪽 비교 칸의 윗선을 맞출 왼쪽의 주된 고르기 칸 (질문 제목 아래) */
+    var anchor: View? = null
     fun side(v: View) = aside.addView(v, k.lp(k.MATCH, k.WRAP))
     val content = k.col(18).apply {
         when (O.step) {
@@ -145,7 +147,7 @@ internal fun MainActivity.onboardScreen(): View {
             2 -> {
                 addView(k.row(10).apply { addView(k.tag("여기서 길이 나뉘어요", Ink.accent)) })
                 addView(k.text("${O.name} 님은 운전을\n얼마나 해 봤나요?", Type.Large))
-                addView(k.col(8).apply { BRANCHES.forEach { b -> addView(option(b.title, b.sub, b.icon, O.type == b.type) { O.type = b.type; if (!O.licenseTouched) O.license = null; render() }, k.lp(k.MATCH, k.WRAP)) } })
+                addView(k.col(8).apply { anchor = this; BRANCHES.forEach { b -> addView(option(b.title, b.sub, b.icon, O.type == b.type) { O.type = b.type; if (!O.licenseTouched) O.license = null; render() }, k.lp(k.MATCH, k.WRAP)) } })
                 side(k.text("고르면 이렇게 달라져요", Type.Headline))
                 side(k.text("${branch.title} · 나중에 설정에서 바꿀 수 있어요", Type.Sub, Ink.text2))
                 side(specTable(listOf(
@@ -161,6 +163,7 @@ internal fun MainActivity.onboardScreen(): View {
                 addView(k.text("그 뒤로 바뀐 법규만 골라 알려 드려요. 대략이어도 괜찮아요.", Type.Sub, Ink.text2))
                 // 연도 고르기
                 addView(k.row(16).apply {
+                    anchor = this
                     setPadding(ui.dp(10), ui.dp(10), ui.dp(10), ui.dp(10)); background = k.rounded(Ink.surface, 22, 1, Ink.line)
                     addView(k.iconButton("minus", Ink.text, Ink.fill, 56) { O.licenseTouched = true; O.license = ((y ?: year) - 1).coerceAtLeast(1980); render() })
                     addView(k.col(0).apply {
@@ -170,12 +173,12 @@ internal fun MainActivity.onboardScreen(): View {
                     }, k.lp(0, k.WRAP, 1f))
                     addView(k.iconButton("plus", Ink.text, Ink.fill, 56) { O.licenseTouched = true; O.license = ((y ?: year - 1) + 1).coerceAtMost(year); render() })
                 })
-                addView(k.hscroll(k.row(10).apply {
+                addView(k.flow(10).apply {
                     listOf("올해" to 0, "2년 전" to 2, "5년 전" to 5, "10년 전" to 10, "20년 전" to 20).forEach { (l, ago) ->
                         addView(k.chip(l, y == year - ago) { O.licenseTouched = true; O.license = year - ago; render() })
                     }
                     addView(k.chip("기억 안 나요", y == null) { O.licenseTouched = true; O.license = null; render() })
-                }))
+                })
                 val since = Laws.since(y)
                 side(k.text(if (since.isEmpty()) "바뀐 법규는 없어요" else "그 뒤로 바뀐 법규 ${since.size}가지", Type.Headline))
                 side(k.text(if (since.isEmpty()) "대신 초보가 꼭 알아 둘 것을 보여 드릴게요." else "시행일 순이에요. 법제처 생활법령정보와 정책브리핑으로 확인했어요.", Type.Sub, Ink.text2))
@@ -188,13 +191,14 @@ internal fun MainActivity.onboardScreen(): View {
                 addView(k.row(10).apply { addView(k.tag("여기서 한 번 더 나뉘어요", Ink.accent)) })
                 addView(k.text("이 차를 누구와\n쓰나요?", Type.Large))
                 addView(k.col(10).apply {
+                    anchor = this
                     addView(option("혼자 써요", "내가 가는 길이 차곡이 되고, 다음의 나에게 한마디를 남겨요", "steering", O.solo == true) { O.solo = true; O.others.clear(); render() }, k.lp(k.MATCH, k.WRAP))
                     addView(option("함께 써요", "이 차를 같이 타는 가족·친구가 길을 건네고 서로 응원해요", "people", O.solo == false) { O.solo = false; render() }, k.lp(k.MATCH, k.WRAP))
                 })
                 if (O.solo == false) {
                     addView(k.text("이 차를 함께 쓰는 사람", Type.Sub, Ink.text2))
                     val presets = (listOf("아빠", "엄마", "형", "누나", "언니", "오빠", "동생", "친구") + O.others).distinct()
-                    addView(k.hscroll(k.row(10).apply { presets.forEach { p -> addView(k.chip(p, p in O.others) { if (p in O.others) O.others.remove(p) else O.others.add(p); render() }) } }))
+                    addView(k.flow(10).apply { presets.forEach { p -> addView(k.chip(p, p in O.others) { if (p in O.others) O.others.remove(p) else O.others.add(p); render() }) } })
                     addView(k.button("직접 추가", Kit.Btn.Plain, "plus") { sheets.input("이름", "예: 민수") { O.others.add(it); render() } })
                     side(k.row(12).apply {
                         gravity = Gravity.TOP
@@ -272,6 +276,15 @@ internal fun MainActivity.onboardScreen(): View {
         val body = if (ui.wide && aside.childCount > 0) k.row(40).apply {
             gravity = Gravity.TOP
             addView(content, k.lp(0, k.WRAP, 1.05f)); addView(aside, k.lp(0, k.WRAP, 1f))
+            // 오른쪽 칸은 왼쪽 고르기 칸과 같은 높이에서 시작한다 (제목 높이만큼 내려 맞춤)
+            anchor?.let { a -> content.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    content.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    var top = 0; var v: View? = a
+                    while (v != null && v !== content) { top += v.top; v = v.parent as? View }
+                    if (aside.paddingTop != top) aside.setPadding(0, top, 0, 0)
+                }
+            }) }
         } else k.col(18).apply { addView(content); if (aside.childCount > 0) addView(aside) }
         addView(k.scroll(body), k.lp(k.MATCH, 0, 1f))
         addView(k.gap(16))
@@ -282,13 +295,13 @@ internal fun MainActivity.onboardScreen(): View {
     val cap = Gauge.cap(levelOf(O.type))
     val target = if (O.step == Onboard.LAST) cap else Math.round(cap * (O.step + 1).toFloat() / (Onboard.LAST + 1)).coerceIn(1, cap)
     val from = O.gaugeShown; O.gaugeShown = target
-    val labelW = ui.dp(if (ui.wide) 64 else 40)
+    val labelW = ui.dp(if (ui.wide) 70 else 52)
     val rail = k.col(10).apply {
         // 홈 바(stackRail)와 같은 안쪽 여백: 위 24 · 옆 14 · 아래 20
         setPadding(ui.dp(14), ui.dp(24), ui.dp(14), ui.dp(20))
         setBackgroundColor(Ink.surface)
-        addView(k.text("성장", Type.Micro, Ink.text2).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 14 else 2), 0) })
-        addView(k.text("$target", Type.Title).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 20 else 6), 0) })
+        addView(k.text("$target", Type.Title).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 22 else 8), 0) })
+        addView(k.text("칸", Type.Micro, Ink.text2).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 34 else 14), 0) })
         addView(GaugeView(context, ui, from, target, labelW), k.lp(k.MATCH, 0, 1f))
         addView(k.text(STAGES[levelOf(O.type) - 1], Type.Micro, stageColor(levelOf(O.type) - 1)).apply { gravity = Gravity.END; setPadding(0, 0, ui.dp(if (ui.wide) 16 else 2), 0) })
     }

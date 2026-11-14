@@ -80,8 +80,7 @@ internal fun MainActivity.demoFriendsSection(): View {
         addView(k.row(12).apply {
             setPadding(ui.dp(18), ui.dp(14), ui.dp(18), ui.dp(14)); background = k.rounded(Ink.alpha(Ink.warn, .12f), 16)
             addView(k.icon("info", Ink.warn, 22))
-            addView(k.text("Pleos에 제안하는 기능 · 시연용. Pleos가 친구·가족 계정 연동을 지원하면 이렇게 쓸 수 있어요. 지금 Pleos는 단독 계정이라 다른 차의 친구는 가상의 사람이에요.", Type.Caption, Ink.text), k.lp(0, k.WRAP, 1f))
-            addView(k.text("자세히", Type.Sub, Ink.accent).apply { setOnClickListener { go(MainActivity.PROPOSE) } })
+            addView(k.text("미리 보기 · 시연용. 다른 차의 친구·가족과 계정으로 이어지면 이렇게 쓸 수 있어요. 여기 나오는 친구는 가상의 사람이에요.", Type.Caption, Ink.text), k.lp(0, k.WRAP, 1f))
         })
         addView(k.row().apply {
             addView(k.text("Pleos 친구 ${mine.size}명", Type.Headline), k.lp(0, k.WRAP, 1f))
@@ -124,7 +123,7 @@ internal fun MainActivity.friendSheet(f: Friend) {
             k.button("같이 가기", Kit.Btn.Primary, "car") { close(); convoyWith(f) },
             k.button("응원 보내기", Kit.Btn.Secondary, "heart") { close(); toast("${f.name} 님에게 응원을 보냈어요 (시연용)") },
             stack = false))
-        if (f.id !in Demo.friends.map { it.id } || f.relation == "친구") addView(k.button("친구 끊기", Kit.Btn.Plain) { close(); store.demoRemove(f.id); render() })
+        if (f.id !in Demo.friends.map { it.id } || f.relation == "친구") addView(k.button("친구 끊기", Kit.Btn.Plain) { close(); sheets.confirm("${f.name} 님과 친구를 끊을까요?", "시연용 가상 친구예요.", "끊기", true) { store.demoRemove(f.id); render(); toast("친구를 끊었어요.") } })
     }
 }
 

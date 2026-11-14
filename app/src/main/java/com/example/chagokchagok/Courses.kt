@@ -35,7 +35,7 @@ internal fun MainActivity.myRouteHero(): View {
         addView(k.text("가고 싶은 곳을 내비에 넣고 출발하세요. 내가 가는 길이 그대로 차곡이 돼요.", Type.Body, Ink.text2))
         addView(k.gap(20))
         if (dest != null) {
-            addView(k.item(dest, "내비에 넣은 목적지", "pin", trailing = k.button("이 길로 출발", Kit.Btn.Primary, "play") { trip.guide = null; trip.routeSent = true; trip.start() }).apply { background = k.rounded(Ink.accentSoft, 18) })
+            addView(k.item(dest, "내비에 넣은 목적지 · 아래 단추로 출발해요", "pin").apply { background = k.rounded(Ink.accentSoft, 18) })
         } else {
             addView(k.row(14).apply {
                 setPadding(ui.dp(18), ui.dp(14), ui.dp(14), ui.dp(14)); background = k.rounded(Ink.surface, 18, 1, Ink.line)
@@ -52,16 +52,59 @@ internal fun MainActivity.myRouteHero(): View {
             addView(k.gap(18))
             addView(k.text("다녀온 곳", Type.Sub, Ink.text2))
             addView(k.gap(8))
-            addView(k.hscroll(k.row(10).apply {
+            addView(k.flow(10).apply {
                 places.forEach { (place, ds) ->
                     val self = store.selfGuide(me, place)
                     addView(k.chip(place + if (self != null && self.tips.isNotEmpty()) " · 한마디 ${self.tips.size}" else "", false, "pin") { goAgain(place, ds.last()) })
                 }
-            }))
+            })
         }
-        addView(k.fill())   // 옆 카드보다 짧으면 단추를 카드 밑단에 붙인다
-        addView(k.gap(20))
-        addView(k.buttons(k.button("지금 기록 시작", if (dest == null) Kit.Btn.Primary else Kit.Btn.Secondary, "play") { trip.guide = null; trip.start() }, stack = false))
+    }
+}
+
+/**
+ * 홈의 큰 시작 단추: 카드 하나 크기로 따로 둔다. 누구나 한눈에 찾고 누르기 쉽게.
+ * 받은 길이 있으면 그 길로, 없으면 지금 길로. 기어를 D에 놓아도 똑같이 시작된다.
+ */
+internal fun MainActivity.startCard(guide: Guide?): View {
+    val k = kit
+    val title = if (guide != null) "이 길로 차곡기록 시작" else "지금 차곡기록 시작"
+    val sub = if (guide != null) "${Writer.subj(guide.owner)} 건넨 길 · 출발 전 확인으로 가요" else "기어를 D에 놓아도 바로 시작돼요"
+    return k.col().apply {
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = ui.dp(112)
+        setPadding(ui.dp(28), ui.dp(22), ui.dp(28), ui.dp(22))
+        addView(k.row(20).apply {
+            addView(android.widget.FrameLayout(context).apply {
+                background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Ink.onAccent) }
+                addView(IconView(context, "play", Ink.accent), android.widget.FrameLayout.LayoutParams(ui.dp(30), ui.dp(30), Gravity.CENTER))
+            }, k.lp(ui.dp(64), ui.dp(64)))
+            addView(k.col(4).apply {
+                addView(k.text(title, Type.Title, Ink.onAccent))
+                addView(k.text(sub, Type.Sub, Ink.alpha(Ink.onAccent, .8f)))
+            }, k.lp(0, k.WRAP, 1f))
+        })
+        k.pressable(this, k.rounded(Ink.accent, 26)) { if (guide != null) depart(guide) else beginTrip() }
+    }
+}
+
+/** 지금 길로 기록 시작. 초보는 출발 전에 안내 한 장만 (다음부터 바로 시작을 고를 수 있다) */
+internal fun MainActivity.beginTrip() {
+    fun go() { trip.guide = null; if (!car.destName.isNullOrBlank()) trip.routeSent = true; trip.start() }
+    val d = store.driver
+    if (store.typeOf(d) != "초보" || store.flag("start_guide_off_$d")) { go(); return }
+    sheets.sheet("출발 전에 이것만 확인해요", null) { close ->
+        val k = kit
+        addView(k.groupOf(listOf(
+            k.item("안전벨트", "뒷자리까지 모두", "check", Ink.go),
+            k.item("의자와 거울", "발이 브레이크 끝까지 닿고, 사이드미러에 차 옆이 조금 보이게", "seat"),
+            k.item("주변을 보고 기어 D", "브레이크를 밟은 채로", "gear"),
+            k.item("달리는 동안은 말로 알려 줘요", "화면은 멈췄을 때만 봐요", "speaker"),
+        )).apply { background = k.rounded(Ink.fill, 18) })
+        addView(k.buttons(
+            k.button("시작하기", Kit.Btn.Primary, "play") { close(); go() },
+            k.button("다음부터 바로 시작", Kit.Btn.Plain) { store.setFlag("start_guide_off_$d"); close(); go() },
+            stack = false))
     }
 }
 
@@ -93,7 +136,7 @@ internal fun MainActivity.startCourse(c: Course) {
     sheets.sheet(c.title, c.what) { close ->
         val k = kit
         addView(k.item("해냈는지는 이렇게 확인해요", c.how, "check", Ink.go).apply { background = k.rounded(Ink.fill, 16) })
-        addView(k.buttons(k.button("지금 기록 시작", Kit.Btn.Primary, "play") { close(); trip.guide = null; trip.start() }, k.button("나중에", Kit.Btn.Secondary) { close() }, stack = false))
+        addView(k.buttons(k.button("지금 차곡기록 시작", Kit.Btn.Primary, "play") { close(); beginTrip() }, k.button("나중에", Kit.Btn.Secondary) { close() }, stack = false))
     }
 }
 

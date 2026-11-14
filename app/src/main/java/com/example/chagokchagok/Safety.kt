@@ -27,11 +27,11 @@ internal object Safety {
             listOf("브레이크를 강하게, 끝까지 계속 밟아요", "전자식 주차 브레이크(EPB) 스위치를 당긴 채 놓지 않아요", "비상등을 켜고 안전한 곳에 세워요"),
             "EPB는 당기고 있는 동안만 제동되고, 제동 거리가 길어질 수 있어요. 비상시에만 써요.", "epb",
             "한국교통안전공단 · 현대자동차 사용설명서(EPB 비상 제동)", "https://main.kotsa.or.kr/portal/bbs/report_view.do?menuCode=05010200&bbscCode=report&bbscSeqn=18534", emergency = true, icon = "warning"),
-        SafetyItem("engine_off", "달리는 중에 시동 끄기", "브레이크로도 멈추지 않는 마지막 수단",
+        SafetyItem("engine_off", "달리는 중 시동 끄기", "브레이크로도 멈추지 않는 마지막 수단",
             listOf("시동 버튼을 2초 넘게 길게 눌러요", "또는 시동 버튼을 빠르게 세 번 넘게 눌러요"),
             "시동이 꺼지면 운전대와 브레이크가 무거워져요. 더 세게 밟아 세워요.", "button",
             "현대자동차 사용설명서 · 시동 버튼 (쏘나타 DN8 2026, 투싼 NX4 2025)", "$M/DN8/2026/ko_KR/id60802dd3189.html", emergency = true, icon = "stop"),
-        SafetyItem("epb", "주차 브레이크 걸고 풀기", "주차할 때 · 출발할 때",
+        SafetyItem("epb", "주차 브레이크", "걸 때와 풀 때 · 주차하고 출발할 때",
             listOf("걸기: 브레이크를 밟고 EPB 스위치를 당겨요", "풀기: 브레이크를 밟고 스위치를 눌러요", "안전벨트를 매고 문을 닫은 채 D에서 가속 페달을 밟아도 풀려요"),
             "계기판의 주차 브레이크 경고등이 꺼졌는지 보고 출발해요.", "epb",
             "현대자동차 사용설명서 · 전자식 파킹 브레이크 (그랜저 GN7 2026)", "$M/GN7/2026/ko_KR/id76e01aea2d0.html", icon = "stop"),
@@ -43,7 +43,7 @@ internal object Safety {
             listOf("R·D·N에서 시동을 끄면 저절로 P가 돼요", "멈춘 채 운전석 문을 열어도 P가 돼요"),
             "돕는 기능일 뿐이에요. 내리기 전에 계기판의 P 표시를 직접 확인해요.", "sbw",
             "현대자동차 사용설명서 · 전자식 변속 (아이오닉 5 2025)", "$M/NE1/2025/ko_KR/iddf661a37926.html", icon = "gear"),
-        SafetyItem("n_hold", "N에 두고 내리기 (이중 주차)", "다른 사람이 차를 밀 수 있게 둘 때",
+        SafetyItem("n_hold", "N에 두고 내리기", "이중 주차 · 다른 사람이 차를 밀 수 있게 둘 때",
             listOf("EPB와 오토 홀드를 꺼요", "브레이크를 밟고 N에 놓아요", "운전대의 OK 버튼을 길게 누르고 안내가 뜨면 시동을 꺼요"),
             "3분 안에 운전석 문을 열면 P로 바뀌어요. 오래 두면 배터리가 닳아요.", "sbw",
             "현대자동차 사용설명서 · N단 유지 (아이오닉 5 2025)", "$M/NE1/2025/ko_KR/iddf661a37926.html", icon = "gear"),
@@ -75,35 +75,50 @@ internal object Safety {
     }
 }
 
-/** 출발 준비: 안전 조작 카드들 (위급 상황 둘이 맨 앞, 강조) */
+/** 출발 준비 › 안전 조작: 한눈에 보이게 칸마다 제목과 핵심 한 줄만. 누르면 자세히(단계·주의·근거·읽어 주기) */
 internal fun MainActivity.safetySection(sh: Shifter?): View {
     val k = kit
     val list = Safety.forShifter(sh)
-    fun card(it: SafetyItem): View = k.card(pad = 20, color = if (it.emergency) Ink.alpha(Ink.danger, if (Ink.night) .16f else .07f) else Ink.surface) {
+    fun tile(it: SafetyItem): View = k.col(6).apply {
+        setPadding(ui.dp(18), ui.dp(16), ui.dp(18), ui.dp(16))
         addView(k.row(10).apply {
-            addView(k.icon(it.icon, if (it.emergency) Ink.danger else Ink.accent, 22))
-            addView(k.col(0).apply { addView(k.text(it.title, Type.Headline)); addView(k.text(it.whenText, Type.Caption, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
-            addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 40) { speak(it.title + ". " + it.steps.joinToString(". ") + ". " + it.caution) })
+            addView(k.icon(it.icon, if (it.emergency) Ink.danger else Ink.accent, 24))
+            addView(k.text(it.title, Type.Headline).apply { maxLines = 1 }, k.lp(0, k.WRAP, 1f))
         })
-        addView(k.gap(10))
-        it.steps.forEachIndexed { i, s ->
-            addView(k.row(10).apply {
-                gravity = Gravity.TOP
-                addView(k.text("${i + 1}", Type.BodyStrong, if (it.emergency) Ink.danger else Ink.accent), k.lp(ui.dp(18), k.WRAP))
-                addView(k.text(s, Type.Body), k.lp(0, k.WRAP, 1f))
-            }); addView(k.gap(4))
-        }
-        addView(k.gap(6))
-        addView(k.row(8).apply { gravity = Gravity.TOP; addView(k.icon("info", Ink.text2, 16)); addView(k.text(it.caution, Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f)) })
-        addView(k.fill())
-        addView(k.gap(8))
-        addView(k.text("근거 · ${it.source}", Type.Caption, Ink.text3))
+        addView(k.text(it.steps.first(), Type.Sub, if (it.emergency) Ink.text else Ink.text2).apply { maxLines = 2 })
+        k.pressable(this, k.rounded(if (it.emergency) Ink.alpha(Ink.danger, if (Ink.night) .18f else .08f) else Ink.surface, 20, if (it.emergency) 2 else 1, if (it.emergency) Ink.danger else Ink.line)) { safetySheet(it) }
     }
-    return k.col(14).apply {
+    return k.col(12).apply {
         addView(k.row().apply {
-            addView(k.text("안전 조작 ${list.size}가지", Type.Headline), k.lp(0, k.WRAP, 1f))
-            addView(k.text("주차 중에 미리 읽어 두세요 · 정확한 조작은 이 차의 사용설명서", Type.Caption, Ink.text2))
+            addView(k.text("위급할 때 둘, 평소에 여덟", Type.Headline), k.lp(0, k.WRAP, 1f))
+            addView(k.text("눌러서 자세히 · 소리로 듣기", Type.Sub, Ink.text2))
         })
-        addView(k.grid(if (ui.wide) 2 else 1, list.map { card(it) }, 14))
+        addView(k.grid(if (ui.wide) 3 else 1, list.map { tile(it) }, 12))
+        // 알아 두기: 설정이 아니라 여기서 바로 (차 안에서 출발 전에 보는 곳)
+        addView(k.flow(10).apply {
+            addView(k.button("바뀐 법규", Kit.Btn.Tinted, "scale") { go(MainActivity.LEARN, "law") })
+            addView(k.button("경고등 색 읽는 법", Kit.Btn.Tinted, "warning") { go(MainActivity.LEARN, "lamp") })
+            addView(k.button("시험장 차와 다른 곳", Kit.Btn.Tinted, "steering") { go(MainActivity.LEARN, "newcar") })
+        })
+        addView(k.text("근거: 현대자동차 사용설명서 · 한국교통안전공단 · 법제처 생활법령정보. 정확한 조작은 이 차의 사용설명서를 따라요.", Type.Caption, Ink.text3))
+    }
+}
+
+/** 안전 조작 하나 자세히 */
+internal fun MainActivity.safetySheet(it: SafetyItem) {
+    sheets.sheet(it.title, it.whenText) { close ->
+        val k = kit
+        it.steps.forEachIndexed { i, s ->
+            addView(k.row(14).apply {
+                gravity = Gravity.TOP
+                addView(k.text("${i + 1}", Type.Title, if (it.emergency) Ink.danger else Ink.accent), k.lp(ui.dp(28), k.WRAP))
+                addView(k.text(s, Type.Body), k.lp(0, k.WRAP, 1f))
+            })
+        }
+        addView(k.row(10).apply { gravity = Gravity.TOP; addView(k.icon("info", Ink.text2, 18)); addView(k.text(it.caution, Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f)) })
+        addView(k.text("근거 · ${it.source}", Type.Caption, Ink.text3))
+        addView(k.buttons(
+            k.button("소리로 듣기", Kit.Btn.Secondary, "speaker") { speak(it.title + ". " + it.steps.joinToString(". ") + ". " + it.caution) },
+            k.button("닫기", Kit.Btn.Primary) { close() }, stack = false))
     }
 }

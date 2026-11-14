@@ -1,5 +1,5 @@
 // 차곡車곡 – 성장 바
-// 해낸 일이 블록 하나씩 아래부터 쌓인다. 익히기 → 달리기 → 건네기 세 단계, 단계마다 색이 다르다.
+// 해낸 일이 블록 하나씩 아래부터 쌓인다. 익히기 → 넓히기 → 차곡차곡 세 단계, 단계마다 색이 다르다.
 // 무엇을 했는지만 센다 (점수나 남과의 비교 없음). 모의 주행은 세지 않는다.
 //
 // 처음 설정에서는 13칸 게이지를 고른 운전 경험만큼 채운다 (초보는 조금, 주행은 절반쯤, 차곡은 가득).
@@ -20,18 +20,18 @@ import kotlin.math.pow
 
 internal data class Block(val id: String, val stage: Int, val title: String, val hint: String, val done: Boolean)
 
-/** 단계 이름: 그 단계에서 하는 일 (차를 익히고, 내 길을 달리고, 길을 건넨다) */
-internal val STAGES = listOf("익히기", "달리기", "건네기")
-/** 단계 색: 현대자동차 CI 전용색상에서 (익히기 Active Blue · 달리기 Hyundai Blue/밤에는 Sky Blue · 건네기 Active Red). 색약 구분 검사 통과 */
+/** 단계 이름: 그 단계에서 하는 일 (차를 익히고, 다닐 길을 넓히고, 길을 건네며 차곡차곡 쌓는다) */
+internal val STAGES = listOf("익히기", "넓히기", "차곡차곡")
+/** 단계 색: 현대자동차 CI 전용색상에서 (익히기 Active Blue · 넓히기 Hyundai Blue/밤에는 Sky Blue · 차곡차곡 Active Red). 색약 구분 검사 통과 */
 internal fun stageColor(stage: Int) = Color.parseColor(if (Ink.night) listOf("#00AAD2", "#AACAE6", "#E63312")[stage] else listOf("#00AAD2", "#002C5F", "#E63312")[stage])
 
-/** 운전 경험 → 시작 단계 (1 익히기까지 · 2 달리기까지 · 3 건네기까지) */
+/** 운전 경험 → 시작 단계 (1 익히기까지 · 2 넓히기까지 · 3 차곡차곡까지) */
 internal fun levelOf(type: String) = when (type) { "초보" -> 1; "오랜만", "새 차" -> 2; else -> 3 }
 
 /** 처음 설정 게이지: 13칸 중 단계별로 채우는 양 */
 internal object Gauge {
     const val SLOTS = 13
-    /** 단계가 끝나는 칸 (익히기 4 · 달리기 9 · 건네기 13) */
+    /** 단계가 끝나는 칸 (익히기 4 · 넓히기 9 · 차곡차곡 13) */
     val ends = intArrayOf(4, 9, 13)
     fun cap(level: Int) = ends[(level - 1).coerceIn(0, 2)]
     fun stageOfSlot(i: Int) = when { i < ends[0] -> 0; i < ends[1] -> 1; else -> 2 }
@@ -95,7 +95,7 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
         val done = blocks.filter { it.done }.sortedBy { it.stage }
         val w = width.toFloat(); val h = height.toFloat()
         val gap = ui.dp(4).toFloat()
-        val bh = ((h - gap * (n - 1)) / n).coerceAtMost(ui.dp(40).toFloat())
+        val bh = (h - gap * (n - 1)) / n   // 레일 높이를 꽉 채운다 (위 여백 없음)
         val r = ui.dp(7).toFloat()
         fun slotTop(i: Int) = h - (i + 1) * bh - i * gap
         // 빈 자리: 옅게 채운 칸
@@ -119,7 +119,7 @@ internal class StackView(ctx: Context, private val ui: Ui, private val blocks: L
                 p.color = stageColor(s)
                 c.drawRoundRect(RectF(0f, y, w, y + hh + (if (t > .95f) .8f else 0f)), rr, rr, p)
             }
-            // 익히기 색으로 차오르기: 달리기 칸 다음 건네기 칸 순서로, 아래에서 위로
+            // 익히기 색으로 차오르기: 넓히기 칸 다음 차곡차곡 칸 순서로, 아래에서 위로
             for (s in 1..2) {
                 if (counts[s] == 0) continue
                 val f = ease(((sq - (.70f + (s - 1) * .09f)) / .14f).coerceIn(0f, 1f))
@@ -172,7 +172,7 @@ internal class GaugeView(ctx: Context, private val ui: Ui, private val from: Int
         val x0 = labelW.toFloat(); val x1 = width.toFloat()
         // StackView 와 같은 칸 계산
         val gap = ui.dp(4).toFloat()
-        val bh = ((h - gap * (n - 1)) / n).coerceAtMost(ui.dp(40).toFloat())
+        val bh = (h - gap * (n - 1)) / n   // 레일 높이를 꽉 채운다 (위 여백 없음)
         val r = ui.dp(7).toFloat()
         fun top(i: Int) = h - (i + 1) * bh - i * gap
         for (i in 0 until n) {
@@ -227,18 +227,19 @@ internal fun MainActivity.stackRail(): View {
         val side = ui.dp(if (ui.wide) 14 else 6)   // 좁은 창의 바는 폭이 좁아 단계 이름이 한 줄에 들도록 여백을 줄인다
         setPadding(side, ui.dp(24), side, ui.dp(20))
         setBackgroundColor(Ink.surface)
-        addView(k.text("성장", Type.Micro, Ink.text2).apply { gravity = android.view.Gravity.CENTER })
         addView(k.text("$doneCount", Type.Title).apply { gravity = android.view.Gravity.CENTER })
+        addView(k.text("칸", Type.Micro, Ink.text2).apply { gravity = android.view.Gravity.CENTER })
         // 막대 폭은 처음 설정의 게이지와 같게 (옆 여백 14) 두어 압축 모션이 같은 자리에서 이어진다
         addView(StackView(context, ui, bs, fresh, squeeze), k.lp(k.MATCH, 0, 1f).apply { val m = ui.dp(14) - side; leftMargin = m; rightMargin = m })
-        addView(k.text(STAGES[stage], Type.Micro, stageColor(stage)).apply { gravity = android.view.Gravity.CENTER; maxLines = 1; if (ui.narrow) textSize = ui.sp(11.5f) })
+        // 좁은 창의 바는 폭이 좁아 단계 이름 대신 색으로만 (넓은 창은 이름까지)
+        if (ui.wide) addView(k.text(STAGES[stage], Type.Micro, stageColor(stage)).apply { gravity = android.view.Gravity.CENTER; maxLines = 1 })
         k.pressable(this, null) { stackSheet() }
     }
 }
 
 internal fun MainActivity.stackSheet() {
     val bs = blocks()
-    sheets.sheet("성장 ${bs.count { it.done }} / ${bs.size}", "해낼 때마다 한 칸씩 쌓여요. 차를 익히고, 내 길을 달리고, 길을 건네요.") { _ ->
+    sheets.sheet("성장 ${bs.count { it.done }} / ${bs.size}", "해낼 때마다 한 칸씩 쌓여요. 차를 익히고, 다닐 길을 넓히고, 길을 건네며 차곡차곡 쌓아요.") { _ ->
         val k = kit
         STAGES.forEachIndexed { s, name ->
             val mine = bs.filter { it.stage == s }

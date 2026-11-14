@@ -80,11 +80,12 @@ enum class Type(val size: Float, val weight: Int, val tracking: Float = 0f) {
     Display(40f, 700, -0.02f),
     Large(32f, 700, -0.02f),
     Title(26f, 700, -0.01f),
-    Headline(21f, 600),
-    Body(19f, 400),
-    BodyStrong(19f, 600),
-    Sub(17f, 400),
-    Caption(15f, 400),
+    // 차 안, 팔 길이에서 전 연령이 읽도록 한 단계씩 키웠다 (Pleos 가이드: 최소 12sp, 핵심 정보는 더 크게)
+    Headline(22f, 600),
+    Body(20f, 400),
+    BodyStrong(20f, 600),
+    Sub(18f, 400),
+    Caption(16f, 400),
     Micro(13f, 600, 0.02f),
 }
 

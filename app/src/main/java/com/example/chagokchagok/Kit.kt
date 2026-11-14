@@ -67,7 +67,7 @@ class Kit(val ctx: Context, val ui: Ui) {
         val bgColor = when (kind) { Btn.Primary -> Ink.accent; Btn.Secondary -> Ink.fill; Btn.Tinted -> Ink.accentSoft; Btn.Danger -> Ink.alpha(Ink.danger, .10f); Btn.Plain -> Color.TRANSPARENT }
         return row(8).apply {
             gravity = Gravity.CENTER
-            minimumHeight = ui.dp(60)
+            minimumHeight = ui.dp(64)
             setPadding(ui.dp(if (kind == Btn.Plain) 10 else 24), 0, ui.dp(if (kind == Btn.Plain) 10 else 24), 0)
             if (icon != null) addView(icon(icon, fg, 22))
             addView(text(label, Type.BodyStrong, fg).apply { gravity = Gravity.CENTER; maxLines = 1 })
@@ -105,8 +105,8 @@ class Kit(val ctx: Context, val ui: Ui) {
 
     /** 목록 한 줄: [아이콘] 제목/설명 ……… 오른쪽 값 › */
     fun item(title: String, sub: String? = null, icon: String? = null, iconColor: Int = Ink.accent, value: String? = null, valueColor: Int = Ink.text2, chevron: Boolean = false, trailing: View? = null, onClick: (() -> Unit)? = null) = row(14).apply {
-        minimumHeight = ui.dp(64)
-        setPadding(ui.dp(20), ui.dp(12), ui.dp(18), ui.dp(12))
+        minimumHeight = ui.dp(72)
+        setPadding(ui.dp(20), ui.dp(14), ui.dp(18), ui.dp(14))
         if (icon != null) addView(FrameLayout(ctx).apply {
             background = rounded(Ink.alpha(iconColor, .14f), 10)
             addView(IconView(ctx, icon, iconColor), FrameLayout.LayoutParams(ui.dp(20), ui.dp(20), Gravity.CENTER))
@@ -129,19 +129,21 @@ class Kit(val ctx: Context, val ui: Ui) {
 
     // ── 칩과 분할 선택 ──
     fun chip(label: String, selected: Boolean = false, icon: String? = null, onClick: () -> Unit) = row(6).apply {
-        minimumHeight = ui.dp(48); setPadding(ui.dp(18), 0, ui.dp(18), 0); gravity = Gravity.CENTER
+        minimumHeight = ui.dp(56); setPadding(ui.dp(20), 0, ui.dp(20), 0); gravity = Gravity.CENTER   // 차 안에서 손가락으로 누르기 쉬운 크기
         val fg = if (selected) Ink.onAccent else Ink.text
         if (icon != null) addView(icon(icon, fg, 18))
-        addView(text(label, Type.Sub, fg).apply { typeface = ui.semibold })
+        addView(text(label, Type.Body, fg).apply { typeface = ui.semibold })
         pressable(this, rounded(if (selected) Ink.accent else Ink.fill, 24), onClick)
     }
-    fun chips(labels: List<String>, selected: String?, onPick: (String) -> Unit) = hscroll(row(10).apply { labels.forEach { l -> addView(chip(l, l == selected) { onPick(l) }) } })
+    /** 칩 묶음: 옆으로 숨기지 않고 줄을 바꿔 모두 보이게 (나중에 더해도 잘리지 않는다) */
+    fun chips(labels: List<String>, selected: String?, onPick: (String) -> Unit) = flow(10).apply { labels.forEach { l -> addView(chip(l, l == selected) { onPick(l) }) } }
+    fun flow(gap: Int = 10) = Flow(ctx, ui.dp(gap))
 
     fun segmented(options: List<String>, selected: Int, onPick: (Int) -> Unit) = row().apply {
         setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)); background = rounded(Ink.fill, 14)
         options.forEachIndexed { i, o ->
-            addView(text(o, Type.Sub, if (i == selected) Ink.text else Ink.text2).apply {
-                gravity = Gravity.CENTER; typeface = ui.semibold; minHeight = ui.dp(46)
+            addView(text(o, Type.Body, if (i == selected) Ink.text else Ink.text2).apply {
+                gravity = Gravity.CENTER; typeface = ui.semibold; minHeight = ui.dp(52)   // 차 안에서 누르기 쉬운 높이
                 if (i == selected) { background = rounded(Ink.surface, 11); elevation = ui.dp(1).toFloat() }
                 setOnClickListener { onPick(i) }
             }, lp(0, WRAP, 1f))
@@ -234,4 +236,30 @@ class Switch(ctx: Context, private val ui: Ui, initial: Boolean) : View(ctx) {
         p.color = Color.WHITE; c.drawCircle(if (on) w - r else r, r, r - ui.dp(3), p)
     }
     override fun onTouchEvent(e: MotionEvent): Boolean { if (e.action == MotionEvent.ACTION_UP) performClick(); return true }
+}
+
+
+/** 줄바꿈 배치: 자식을 왼쪽부터 늘어놓다가 폭이 모자라면 다음 줄로 */
+class Flow(ctx: Context, private val gap: Int) : ViewGroup(ctx) {
+    override fun onMeasure(wSpec: Int, hSpec: Int) {
+        val maxW = MeasureSpec.getSize(wSpec) - paddingLeft - paddingRight
+        var x = 0; var y = 0; var lineH = 0
+        for (i in 0 until childCount) {
+            val c = getChildAt(i); if (c.visibility == GONE) continue
+            c.measure(MeasureSpec.makeMeasureSpec(maxW, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+            if (x > 0 && x + c.measuredWidth > maxW) { x = 0; y += lineH + gap; lineH = 0 }
+            x += c.measuredWidth + gap; lineH = maxOf(lineH, c.measuredHeight)
+        }
+        setMeasuredDimension(MeasureSpec.getSize(wSpec), y + lineH + paddingTop + paddingBottom)
+    }
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        val maxW = r - l - paddingLeft - paddingRight
+        var x = 0; var y = 0; var lineH = 0
+        for (i in 0 until childCount) {
+            val c = getChildAt(i); if (c.visibility == GONE) continue
+            if (x > 0 && x + c.measuredWidth > maxW) { x = 0; y += lineH + gap; lineH = 0 }
+            c.layout(paddingLeft + x, paddingTop + y, paddingLeft + x + c.measuredWidth, paddingTop + y + c.measuredHeight)
+            x += c.measuredWidth + gap; lineH = maxOf(lineH, c.measuredHeight)
+        }
+    }
 }
