@@ -26,7 +26,7 @@ internal fun MainActivity.keepForNextTime(d: Diary, picked: List<Tip>, quiet: Bo
 }
 
 /** 이 일기를 쓴 운전자가 아직 답하지 않은 것이 있는지 */
-private fun MainActivity.pending(d: Diary, prev: Diary?): Boolean {
+internal fun MainActivity.pending(d: Diary, prev: Diary?): Boolean {
     val moments = TipSuggest.moments(d.drive)
     val handled = store.skippedMoments(d.id) + store.keptMoments(d.id)
     return (store.heardTips(d.id).isNotEmpty() && store.answer(d.id, Q_HELPED) == null) ||
@@ -67,15 +67,17 @@ internal fun MainActivity.arrivalCard(d: Diary, prev: Diary?): View? {
     return k.card(pad = 26) {
         addView(k.row(10).apply {
             addView(k.icon("flag", Ink.accent, 24))
-            addView(k.text("오늘을 돌아봐요", Type.Title), k.lp(0, k.WRAP, 1f))
-            addView(k.button("다음에", Kit.Btn.Plain) {
+            addView(k.text("이 길을 돌아봐요", Type.Title), k.lp(0, k.WRAP, 1f))
+            // 바쁘면 그냥 떠나도 된다. 답하지 않은 길은 홈의 "돌아볼 길"에 남는다
+            addView(k.button("나중에", Kit.Btn.Plain) { go(MainActivity.TODAY) })
+            addView(k.button("넘기기", Kit.Btn.Plain) {
                 moments.forEach { if (it.why !in kept) store.skipMoment(d.id, it.why) }
                 if (heard.isNotEmpty() && helped == null) store.setAnswer(d.id, Q_HELPED, "답하지 않음")
                 if (prev != null && vs == null) store.setAnswer(d.id, Q_VS_LAST, "답하지 않음")
                 render()
             })
         })
-        addView(k.text("차가 본 것만 적었어요. 어땠는지는 직접 골라 주세요.", Type.Sub, Ink.text2))
+        addView(k.text("차가 본 것을 먼저 보여 드려요. 바쁘면 나중에 홈에서 이어서 해요.", Type.Sub, Ink.text2))
         val blocks = mutableListOf<View>()
         if (heard.isNotEmpty() && helped == null) blocks.add(question(
             "길 위에서 들은 한마디, 도움이 됐나요?", heard.joinToString("  ·  ") { "“$it”" }, HELPED, helped) { store.setAnswer(d.id, Q_HELPED, it); render() })
@@ -111,5 +113,27 @@ private fun MainActivity.reviewMoment(d: Diary, m: TipIdea) {
             }
             else -> { store.skipMoment(d.id, m.why); render() }
         }
+    }
+}
+
+/** 아직 돌아보지 않은 길 (최근 7일, 내 기록). 출근길처럼 바로 내려야 했던 날을 저녁에 몰아서 돌아본다 */
+internal fun MainActivity.pendingReviews(): List<Diary> {
+    val weekAgo = System.currentTimeMillis() - 7 * 86400000L
+    return store.diariesOf(store.driver).filter { it.date >= weekAgo && pending(it, previousSame(it)) }.sortedBy { it.date }
+}
+
+/** 홈의 "돌아볼 길 n개" */
+internal fun MainActivity.reviewCard(): View? {
+    val ds = pendingReviews(); if (ds.isEmpty()) return null
+    val k = kit
+    return k.card(pad = 22, onClick = { go(MainActivity.DIARY, ds.first().id) }) {
+        addView(k.row(14).apply {
+            addView(k.icon("flag", Ink.accent, 28))
+            addView(k.col(3).apply {
+                addView(k.text("돌아볼 길 ${ds.size}개", Type.Headline))
+                addView(k.text(ds.take(2).joinToString(" · ") { "${it.title} ${dateText(it.date, "a h:mm")}" }, Type.Sub, Ink.text2, lines = 2))
+            }, k.lp(0, k.WRAP, 1f))
+            addView(k.icon("chevron", Ink.text3, 20))
+        })
     }
 }

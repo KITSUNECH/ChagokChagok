@@ -49,12 +49,15 @@ class Voice(private val ctx: Context) {
     private var busyUntil = 0L
     /** 같은 말을 30초 안에 되풀이하지 않는다 */
     private val recent = HashMap<String, Long>()
+    /** 무거운 말(PLACE 이상)이 끊기거나, 기다리다 버려졌을 때 */
+    var onDropped: ((String) -> Unit)? = null
+    private fun dropped(text: String?, pri: Int) { if (text != null && pri >= PLACE) onDropped?.invoke(text) }
 
     private val attrs = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
 
-    private val focus by lazy { Focus(ctx.applicationContext, attrs, onLoss = { main.post { stop() } }, onGain = { main.post { flush() } }) }
+    private val focus by lazy { Focus(ctx.applicationContext, attrs, onLoss = { main.post { if (android.os.SystemClock.elapsedRealtime() < busyUntil) dropped(last, curPri); stop() } }, onGain = { main.post { flush() } }) }
 
     fun start() {
         if (Car.offline) { status = "꺼짐 (화면 확인용)"; return }
@@ -118,13 +121,14 @@ class Voice(private val ctx: Context) {
     private fun flush() {
         val t = pending ?: return
         pending = null
-        if (android.os.SystemClock.elapsedRealtime() - pendingAt > 8_000 && pendingPri < URGENT) return
+        if (android.os.SystemClock.elapsedRealtime() - pendingAt > 8_000 && pendingPri < URGENT) { dropped(t, pendingPri); return }
         say(t, pendingPri)
     }
 
     private fun hold(text: String, pri: Int) {
         // 기다리는 자리는 하나. 더 무거운 말이 기다리고 있으면 가벼운 말은 버린다
-        if (pending != null && pendingPri > pri) return
+        if (pending != null && pendingPri > pri) { dropped(text, pri); return }
+        if (pending != text) dropped(pending, pendingPri)
         pending = text; pendingPri = pri; pendingAt = android.os.SystemClock.elapsedRealtime()
     }
 
@@ -146,6 +150,7 @@ class Voice(private val ctx: Context) {
         if (now < busyUntil && pri <= curPri) { if (pri > LOW) hold(text, pri); return }
         // 포커스를 받지 못하면(다른 음성·통화가 쓰는 중) 말하지 않고, 포커스가 돌아오면 이어 말한다
         if (!focus.take()) { if (pri > LOW) hold(text, pri); return }
+        if (now < busyUntil) dropped(last, curPri)   // 더 무거운 말이 끼어들어 지금 말이 끊긴다
         last = text; recent[text] = now; curPri = pri
         busyUntil = now + 800 + text.length * 130L
         val p = pleos

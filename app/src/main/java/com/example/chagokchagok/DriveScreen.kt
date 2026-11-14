@@ -161,7 +161,10 @@ internal fun MainActivity.driveScreen(): View {
 internal fun MainActivity.refreshDrive() {
     val V = DriveViews; val g = trip.guide
     val sec = trip.recorder.secondsNow(); val km = trip.recorder.kmNow()
-    V.status?.text = "기록 중 · ${sec / 60}분" + if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else ""   // 초가 계속 움직이지 않게 분 단위
+    // 기록 상태를 분명히: 차 신호가 끊기면 무엇만 적고 있는지 말한다
+    val vehicleOk = Car.offline || !car.failures.containsKey("vehicle")
+    V.status?.text = (if (trip.sim) "모의 주행 기록 중" else "기록 중") + " · ${sec / 60}분" + (if (km > 0.05f) String.format(Locale.KOREA, " · %.1fkm", km) else "") +   // 초가 계속 움직이지 않게 분 단위
+        (if (!vehicleOk) " · 차량 신호가 없어 시간과 위치만 적어요" else if (!car.naviConnected && !trip.sim) " · 내비 연결 안 됨" else "")
 
     // 다음 회전
     val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }

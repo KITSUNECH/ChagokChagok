@@ -55,7 +55,7 @@ internal fun MainActivity.blocks(): List<Block> {
         // 넓히기: 다닐 길을 하나씩 늘린다
         Block("new", 1, "혼자 새 길", "받은 길 없이 처음 가 보는 곳", store.places(me).isNotEmpty()),
         Block("signal", 1, "돌기 전에 깜빡이", "내비가 알려 준 회전 전에 미리 켜요", ds.any { it.drive.turnsSignaled > 0 }),
-        Block("self", 1, "다음의 나에게 한마디", "주차 후 ‘오늘을 돌아봐요’에서 기억해 둘 일 남기기", store.guides().any { it.owner == me && it.kind == "나" }),
+        Block("self", 1, "다음의 나에게 한마디", "‘이 길을 돌아봐요’에서 기억해 둘 일 남기기", store.guides().any { it.owner == me && it.kind == "나" }),
         Block("follow", 1, "받은 길을 끝까지", "가족·친구가 건넨 길로 목적지까지", ds.any { it.guideId != null && it.drive.completed }),
         Block("places", 1, "다녀온 곳 세 곳", "목적지를 넣고 다녀온 곳이 세 곳", ds.filter { it.drive.completed }.mapNotNull { it.drive.place }.distinct().size >= 3),
         // 차곡차곡: 같은 길을 다시 달리며 쌓는다. "늘었다"는 차가 정하지 않고 운전자가 답한다

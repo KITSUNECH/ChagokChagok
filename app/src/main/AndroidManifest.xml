@@ -14,6 +14,10 @@
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
     <!-- 일기 문장을 생성형 AI로 다듬을 때만 쓴다. 주행 요약 글만 나간다. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 기록 중 알림(앞쪽 서비스): 내비 전체 화면·앱 전환 중에도 기록이 끊기지 않게 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 음성 안내 (Pleos TextToSpeech) -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <!-- 위치: 한마디를 남긴 자리에 가까워졌는지 본다 (Pleos FusedLocation, 실행 중 허락을 받는다) -->
@@ -59,5 +63,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
+        <service android:name=".TripService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Keeps an in-progress driving record alive while the driver uses navigation full screen. Stops when the car is put in P." />
+        </service>
     </application>
 </manifest>

@@ -139,6 +139,13 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     private fun freshFix() = lastFix?.takeIf { System.currentTimeMillis() - lastFixAt < 20_000 }
 
     /** SDK가 "한마디 자리 반경 안에 들어왔다"고 알렸다 */
+    /** 그 근처의 한마디가 끊겼거나 때를 놓쳤다: 들은 것으로 치지 않는다 */
+    fun tipDropped(spoken: String) {
+        val g = guide ?: return
+        val i = g.tips.indexOfFirst { spoken.endsWith(it.text) }
+        if (i >= 0 && heard.remove(i)) { if (currentTip == g.tips[i].text) currentTip = null; host.tripChanged() }
+    }
+
     fun onTipZone(i: Int) { inZone.add(i); lastFix?.let { (la, ln, hd) -> tipsNear(la, ln, hd) } }
 
     private fun tipsNear(lat: Double, lng: Double, heading: Float?) {
@@ -298,7 +305,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         store.setHeardTips(d.id, heard.sorted().mapNotNull { g?.tips?.getOrNull(it)?.text })
         guide = null; routeSent = false
         host.tripEnded(d)
-        host.say("주차했어요. 오늘 일기를 썼어요.")
+        host.say("기록해 뒀어요. 시간 날 때 돌아봐요.")
         // 일기 머리의 날씨는 도착한 곳의 실제 날씨로 (설정에서 끌 수 있다)
         val end = route.lastOrNull()
         val la = car.lat ?: end?.lat; val ln = car.lng ?: end?.lng

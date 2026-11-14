@@ -78,8 +78,8 @@ internal fun MainActivity.myRouteHero(): View {
  */
 internal fun MainActivity.startCard(guide: Guide?): View {
     val k = kit
-    val title = if (guide != null) "이 길로 차곡기록 시작" else "지금 차곡기록 시작"
-    val sub = if (guide != null) "${Writer.subj(guide.owner)} 건넨 길 · 출발 전 확인으로 가요" else "기어를 D에 놓아도 바로 시작돼요"
+    val title = if (guide != null) "이 길로 차곡차곡 시작" else "차곡차곡 시작"
+    val sub = if (guide != null) "${Writer.subj(guide.owner)} 건넨 길 · 출발 전 확인으로 가요" else "기어를 D에 놓으면 저절로 시작돼요"
     return k.col().apply {
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = ui.dp(112)
@@ -146,7 +146,7 @@ internal fun MainActivity.startCourse(c: Course) {
     sheets.sheet(c.title, c.what) { close ->
         val k = kit
         addView(k.item("해냈는지는 이렇게 확인해요", c.how, "check", Ink.go).apply { background = k.rounded(Ink.fill, 16) })
-        addView(k.buttons(k.button("지금 차곡기록 시작", Kit.Btn.Primary, "play") { close(); beginTrip() }, k.button("나중에", Kit.Btn.Secondary) { close() }, stack = false))
+        addView(k.buttons(k.button("차곡차곡 시작", Kit.Btn.Primary, "play") { close(); beginTrip() }, k.button("나중에", Kit.Btn.Secondary) { close() }, stack = false))
     }
 }
 

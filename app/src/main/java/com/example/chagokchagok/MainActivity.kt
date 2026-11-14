@@ -76,6 +76,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         car = Car(this, this)
         trip = Trip(store, car, this)
         voice = Voice(this)
+        // 그 근처의 한마디가 끊기거나 때를 놓쳐 버려지면, 들은 것으로 치지 않는다 (다시 들어서면 들려준다)
+        voice.onDropped = { text -> trip.tipDropped(text) }
         places = Places(this) { lat, lng, hd -> Telemetry.hit("location", String.format("%.4f, %.4f", lat, lng)); trip.onLocation(lat, lng, hd); if (route.name == DRIVE) refreshDrive() }
         limits = Restrictions(this) { onRestricted() }
         sheets.keyboardBlocked = { limits.noKeyboard || trip.active }
@@ -363,10 +365,11 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         val pts = trip.guide?.tips.orEmpty().mapIndexedNotNull { i, t -> if (t.placed) Triple(i, t.lat!!, t.lng!!) else null }
         trip.sdkZones = !trip.sim && store.locationOn && store.locationConsent(store.driver) == true && places.watch(pts) { i -> trip.onTipZone(i) }
         sheets.closeAll(); route = Route(DRIVE); stack.clear(); stack.add(route); render()
+        TripService.start(this, trip.guide?.let { "${it.title} · P에 놓으면 기록을 마쳐요" })
     }
     override fun tripChanged() { if (route.name == DRIVE) refreshDrive() }
-    override fun tripEnded(d: Diary) { places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
-    override fun tripDiscarded() { places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); go(TODAY) }
+    override fun tripEnded(d: Diary) { TripService.stop(this); places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); stack.add(Route(TODAY)); route = Route(DIARY, d.id); stack.add(route); render() }
+    override fun tripDiscarded() { TripService.stop(this); places.clearWatch(); trip.sdkZones = false; Session.convoy = null; stack.clear(); go(TODAY) }
     override fun diaryUpdated(d: Diary) { if (route.name == DIARY && route.arg == d.id) render() }
     override fun lampsChanged() { if (route.name == TODAY) render() }
 
