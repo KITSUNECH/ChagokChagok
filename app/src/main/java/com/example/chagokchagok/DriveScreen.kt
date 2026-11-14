@@ -131,7 +131,14 @@ internal fun MainActivity.driveScreen(): View {
     // 멈춰 있을 때는 언제나 "기록 끝내기"를 둔다 (기어 신호가 없거나 P로 바뀌지 않아도 빠져나올 수 있게)
     val stop = if (!limits.restricted) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
 
-    val view = if (ui.wide) k.row(20).apply {
+    // 달리는 동안(주행 제한): 지금 필요한 것 하나만. 경로 그림·제한속도·통계는 내비·계기판과 겹치니 멈췄을 때만 보여 준다.
+    val view = if (moving) {
+        if (ui.wide) k.row(20).apply {
+            gravity = Gravity.TOP
+            addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }, k.lp(0, k.MATCH, 1.7f))
+            addView(k.col(18).apply { addView(k.fill()); addView(breathe, k.lp(k.MATCH, ui.dp(84))) }, k.lp(0, k.MATCH, 1f))
+        } else k.col(14).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(k.fill()); addView(breathe, k.lp(k.MATCH, ui.dp(84))) }
+    } else if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
         addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard) }, k.lp(0, k.MATCH, 1.7f))
         addView(k.col(18).apply {
@@ -164,7 +171,10 @@ internal fun MainActivity.refreshDrive() {
         // 길 안내는 내비의 몫이다 (Pleos Single Route Policy). 여기서는 거리·방향을 다시 말하지 않고 깜빡이 코칭만 한다.
         side != null && car.turnMeters in 1..300 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "곧 돌아요"; V.turnSub?.text = "깜빡이를 미리 켜 두면 편해요" }
         trip.arrived -> { V.turnIcon?.set("flag", Ink.go); V.turnText?.text = "도착했어요"; V.turnSub?.text = "기어를 P에 놓으면 일기를 써요" }
-        else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "편하게 가요"; V.turnSub?.text = if (trip.routeSent) "길 안내는 내비를 따라가요" else "조용히 적고 있어요" }
+        else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "편하게 가요"; V.turnSub?.text = when {
+            g != null && g.tips.any { it.placed } && store.locationOn && g.tips.indices.any { it !in trip.heard } -> "남긴 한마디는 그 근처에서 들려줘요"
+            trip.routeSent -> "길 안내는 내비를 따라가요"
+            else -> "조용히 적고 있어요" } }
     }
 
     // 회전까지 남은 거리 막대 (300m부터 줄어든다), 깜빡이 안내 중이면 신호 색
@@ -181,7 +191,7 @@ internal fun MainActivity.refreshDrive() {
     }
     V.tip?.text = limits.fit(trip.currentTip ?: when {
         g == null -> "오늘 주행을 조용히 적고 있어요."
-        g.tips.any { it.placed } && store.locationOn -> "남긴 자리에 가까워지면 들려줄게요."
+        g.tips.any { it.placed } && store.locationOn -> "남긴 곳 근처에 가면 들려줄게요."
         g.tips.isNotEmpty() -> "출발 전에 들은 한마디를 기억해 둬요."
         else -> "같은 길을 달리고 있어요."
     })
@@ -190,6 +200,8 @@ internal fun MainActivity.refreshDrive() {
     val speaking = trip.currentTip != null
     (V.tipCard?.background as? GradientDrawable)?.setColor(if (speaking) Ink.accentSoft else Ink.surface)
     V.tipNow?.visibility = if (speaking) View.VISIBLE else View.GONE
+    // 달리는 동안은 한마디가 나오는 때만 한마디 카드를 보여 준다 (평소에는 위 카드 하나)
+    V.tipCard?.visibility = if (!limits.restricted || speaking) View.VISIBLE else View.GONE
 
     // 길 위의 위치
     if (g != null) {
