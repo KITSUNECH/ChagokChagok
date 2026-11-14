@@ -30,6 +30,8 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
 
     companion object {
         const val DURATION = 4400L
+        /** 완성된 로고를 보여 주며 머무는 시간 */
+        const val HOLD = 1100L
         // 로고 G3: 검정 바탕, 현대 샌드 글자, 車은 Active Blue. 화면은 검정, 로고 정사각형은 살짝 떠 보이게
         val STROKE = Color.parseColor("#00AAD2")
         val INK = Color.parseColor("#0C0C0C")   // 아이콘처럼 검정에 가깝게, 흰 선이 타일을 드러낸다
@@ -41,8 +43,11 @@ class SplashView(ctx: Context, private val face: Typeface, private val onDone: (
     fun play() {
         anim = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = DURATION; interpolator = LinearInterpolator()
-            addUpdateListener { t = it.animatedValue as Float; alpha = 1f - ((t - .95f) / .05f).coerceIn(0f, 1f) }
-            addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(a: android.animation.Animator) { finish() } })
+            addUpdateListener { t = it.animatedValue as Float }
+            // 다 그려진 로고를 잠깐 보여 준 뒤(1.1초) 부드럽게 사라진다
+            addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(a: android.animation.Animator) {
+                postDelayed({ animate().alpha(0f).setDuration(350).withEndAction { finish() }.start() }, HOLD)
+            } })
             start()
         }
     }

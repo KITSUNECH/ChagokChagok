@@ -39,6 +39,9 @@ internal fun Drive.laneWaitMedian(): Float? {
 }
 
 /** 주행 중에 깜빡이와 조향각을 보고 차선 변경을 찾는다 */
+/** 차선 변경으로 보는 운전대 각도의 위쪽 끝 (도). 이보다 크게 돌리면 회전으로 본다 */
+internal const val LANE_MAX_STEER = 60f
+
 internal class LaneWatch(private val now: () -> Long = { android.os.SystemClock.elapsedRealtime() }) {
     private var side: String? = null
     private var onAt = 0L
@@ -46,6 +49,7 @@ internal class LaneWatch(private val now: () -> Long = { android.os.SystemClock.
     private var base = 0f
     private var peak = 0f
     private var steerSeenAtStart = false
+    private var routeAtStart = false
     private var rain = false; private var dark = false
     private var at: Pair<Double, Double>? = null
     /** 이번 주행에서 조향각을 한 번이라도 받았는지 */
@@ -62,7 +66,8 @@ internal class LaneWatch(private val now: () -> Long = { android.os.SystemClock.
     fun signal(value: String, turnNear: Boolean, routeActive: Boolean, rain: Boolean, dark: Boolean, fix: Pair<Double, Double>?) {
         if (value == "LEFT" || value == "RIGHT") {
             if (side != null || turnNear) return
-            if (!steerSeen && !routeActive) return   // 조향각도 내비도 없으면 회전과 구분할 수 없다
+            // 조향각을 아직 못 받았어도 일단 지켜본다. 깜빡이를 켠 동안에도 조향각이 안 오고 내비 안내도 없으면 끝에서 버린다.
+            routeAtStart = routeActive
             side = value; onAt = now(); movedAt = 0L; base = lastAngle; peak = 0f
             steerSeenAtStart = steerSeen; this.rain = rain; this.dark = dark; at = fix
         } else if (side != null) finish()
@@ -74,7 +79,8 @@ internal class LaneWatch(private val now: () -> Long = { android.os.SystemClock.
         val d = abs(angle - base)
         peak = maxOf(peak, d)
         if (movedAt == 0L && d >= 4f) movedAt = now()
-        if (s.isNotEmpty() && peak > 30f) side = null   // 교차로 회전: 차선 변경이 아니다
+        // 운전대를 크게 돌렸으면 교차로 회전이다. 차선 변경은 느린 속도에서도 운전대 각도가 60°를 넘기 어렵다
+        if (s.isNotEmpty() && peak > LANE_MAX_STEER) side = null
     }
 
     private fun finish() {
@@ -82,6 +88,7 @@ internal class LaneWatch(private val now: () -> Long = { android.os.SystemClock.
         val dur = (now() - onAt) / 1000f
         if (dur < 1f) return   // 스치듯 켠 깜빡이
         val known = steerSeenAtStart || steerSeen
+        if (!known && !routeAtStart) return   // 조향각도 내비도 없으면 회전과 구분할 수 없다
         val lane = if (known) LaneMove(s, if (movedAt > 0) (movedAt - onAt) / 1000f else dur, movedAt > 0, true, rain, dark)
                    else LaneMove(s, dur, true, false, rain, dark)
         onLane?.invoke(lane, at)

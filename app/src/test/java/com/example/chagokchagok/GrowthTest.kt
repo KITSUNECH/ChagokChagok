@@ -25,7 +25,7 @@ class GrowthTest {
         val j = Growth.judge(hist + today, today)!!
         assertEquals(Verdict.UP, j.verdict)
         assertEquals("보통", j.confidence)
-        assertTrue(j.top(1).first().metric.key in setOf("signal", "lane"))   // 습관 지표가 판정을 이끈다
+        assertTrue(j.top(1).first().metric.key in setOf("signal", "lanelead"))   // 습관 지표가 판정을 이끈다
         assertTrue(Growth.bothUp(j, "더 편했어요"))
         assertTrue(Growth.combined(j, "더 긴장됐어요").startsWith("차는 늘었다고 봐요"))
     }
@@ -43,13 +43,21 @@ class GrowthTest {
         assertNull(Growth.judge(hist + today, today))
     }
 
-    @Test fun rushingTheLaneChangeIsNotGrowth() {
-        // 깜빡이를 켜고 3초도 안 기다린 것은 더 줄어도 나아진 것으로 치지 않는다 (서두른 것일 수 있다)
-        val hist = listOf(drive(1, 4, 3, 20, 3f), drive(2, 4, 3, 20, 3f))
+    @Test fun rushingTheLaneChangeIsWorse() {
+        // 기다린 시간이 줄어도 늘었다고 하지 않는다. 깜빡이를 켜고 3초가 안 돼 넘어가면 오히려 나빠진 것이다.
+        val hist = listOf(drive(1, 4, 3, 20, 5f), drive(2, 4, 3, 20, 5f))
         val today = drive(3, 4, 3, 20, 1f)
         val j = Growth.judge(hist + today, today)!!
-        assertEquals(0f, j.changes.first { it.metric.key == "lane" }.score, .001f)
-        assertEquals(Verdict.SAME, j.verdict)
+        assertEquals(0f, j.changes.first { it.metric.key == "lane" }.weight, .001f)   // 기다린 시간은 참고만
+        assertTrue(j.changes.first { it.metric.key == "lanelead" }.score < 0f)
+        assertEquals(Verdict.DOWN, j.verdict)
+    }
+
+    @Test fun waitingLongerInTrafficIsNotWorse() {
+        // 옆 차로에 차가 많아 오래 기다린 날: 깜빡이는 충분히 먼저 켰으니 나빠졌다고 하지 않는다
+        val hist = listOf(drive(1, 4, 3, 20, 5f), drive(2, 4, 3, 20, 5f))
+        val today = drive(3, 4, 3, 20, 25f)
+        assertEquals(Verdict.SAME, Growth.judge(hist + today, today)!!.verdict)
     }
 
     @Test fun shownChangeMatchesShownNumbers() {
@@ -65,6 +73,6 @@ class GrowthTest {
         val today = drive(2, 4, 3, 20, 8f, rain = true, hour = 22)
         val j = Growth.judge(hist + today, today)!!
         assertTrue(j.condDiffers)
-        assertEquals(.5f, j.changes.first { it.metric.key == "brake" }.weight, .001f)
+        assertEquals(0f, j.changes.first { it.metric.key == "brake" }.weight, .001f)   // 브레이크 횟수는 참고만
     }
 }

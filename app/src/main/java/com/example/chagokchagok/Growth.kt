@@ -45,16 +45,20 @@ internal class Metric(
 internal object Metrics {
     val all = listOf(
         Metric("signal", "돌기 전 깜빡이", "%", 3f, true, false) { d -> if (d.turns > 0) 100f * d.turnsSignaled / d.turns else null },
-        Metric("lane", "차선 변경 전 기다림", "초", 3f, false, false) { d -> d.laneWaitMedian() },
+        // 기다린 시간 자체는 옆 차로에 차가 많으면 길어진다. 내가 정할 수 있는 것은 "깜빡이를 충분히 먼저 켰는가"다.
+        Metric("lanelead", "차선 변경 3초 전 깜빡이", "%", 3f, true, false) { d -> d.lanes().map { it.second }.filter { it.moved }.takeIf { it.isNotEmpty() }?.let { ls -> 100f * ls.count { it.wait >= LANE_FLOOR } / ls.size } },
+        Metric("lane", "차선 변경 전 기다림", "초", 0f, false, true) { d -> d.laneWaitMedian() },
         Metric("lost", "경로 재탐색", "번", 2f, false, false) { d -> if (d.sim) null else d.lostWay.toFloat() },
         Metric("park", "주차할 때 기어 바꿈", "번", 2f, false, false) { d -> if (d.completed && !d.sim) d.parkMoves.toFloat() else null },
         Metric("calm", "어려웠다고 한 곳", "번", 0f, false, false) { d -> d.calm.toFloat() },
-        Metric("brake", "1km마다 브레이크", "번", 1f, false, true) { d -> if (d.distKm > 0.3f) d.brakes / d.distKm else null },
+        // 브레이크를 밟은 횟수는 신호등과 막힘에 달려 있어 참고만. 급하게 선 것은 앞을 미리 보는 습관이라 판정에 쓴다 (속도 신호가 있을 때만)
+        Metric("hard", "급하게 선 횟수", "번", 2f, false, false) { d -> if (d.speedSeen()) d.hardBrakes().toFloat() else null },
+        Metric("brake", "브레이크 밟은 횟수 (1km당)", "번", 0f, false, true) { d -> if (d.distKm > 0.3f) d.brakes / d.distKm else null },
         Metric("eco", "연비", "", 1f, true, true) { d -> d.economy },
         Metric("time", "걸린 시간", "분", 0f, false, true) { d -> if (d.sim) null else max(d.minutes.toFloat(), d.seconds / 60f) },
     )
     /** "이 길의 나" 그래프에 그릴 지표 */
-    val charted = listOf("signal", "lane", "brake", "eco", "time")
+    val charted = listOf("signal", "lanelead", "hard", "lane", "eco", "time")
 }
 
 /** 시간대(출근 6–10 · 낮 10–16 · 퇴근 16–20 · 밤) + 비 + 밤 */
@@ -101,6 +105,8 @@ internal data class Judgement(
 internal const val LANE_FLOOR = 3f
 /** 급정거로 보는 감속도 (m/s²). 1초에 시속 약 11km 넘게 줄어든 것 */
 internal const val HARD_BRAKE = 3f
+/** 일기로 남기는 가장 짧은 주행 (km). 이보다 짧으면 자리를 옮긴 것으로 본다 */
+internal const val MIN_TRIP_KM = 0.2f
 
 internal object Growth {
     /** 같은 길의 지난 기록 (오래된 것부터). 끝까지 다녀온 실제 주행만 (예시 기록 포함) */
@@ -263,7 +269,7 @@ internal fun MainActivity.evidenceSheet(j: Judgement) {
             k.item(c.metric.label, c.text() + if (c.weight == 0f) " · 참고만" else " · 무게 ${"%.1f".format(c.weight)}",
                 if (c.better) "check" else if (c.worse) "info" else "minus", if (c.better) Ink.go else Ink.text3)
         }).apply { background = k.rounded(Ink.fill, 18) })
-        addView(k.text("· 습관 지표(돌기 전 깜빡이, 차선 변경 전 기다림, 재탐색, 주차)를 무겁게, 길 상황에 흔들리는 지표(브레이크, 연비)를 가볍게 봐요. 걸린 시간은 판단에서 빼요.\n· 오늘과 조건(시간대·비·밤)이 다른 기록은 절반만 반영해요." + if (j.condDiffers) " 오늘은 ${j.today.label()}이라 조건이 달랐어요." else "" +
+        addView(k.text("· 내가 정할 수 있는 습관(돌기 전 깜빡이, 차선 변경 3초 전 깜빡이, 급하게 선 횟수, 재탐색, 주차)으로 판단해요. 연비는 가볍게, 차선 변경 전 기다린 시간·브레이크 횟수·걸린 시간은 길 상황에 달려 있어 참고로만 보여 줘요.\n· 오늘과 조건(시간대·비·밤)이 다른 기록은 절반만 반영해요." + if (j.condDiffers) " 오늘은 ${j.today.label()}이라 조건이 달랐어요." else "" +
             "\n· 합쳐서 +10% 넘게 나아지면 ‘늘었어요’, 10% 넘게 나빠지면 ‘쉽지 않았어요’예요. 지금 점수 ${(j.score * 100).toInt()}%.", Type.Sub, Ink.text2))
         addView(k.buttons(k.button("닫기", Kit.Btn.Primary) { close() }))
     }

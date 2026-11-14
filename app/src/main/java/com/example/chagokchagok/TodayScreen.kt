@@ -426,7 +426,7 @@ internal fun MainActivity.readyScreen(): View {
     }
     return k.col().apply {
         Session.convoy?.let { f -> addView(k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) }); addView(k.gap(12)) }
-        addView(k.header(g.title, (when (g.kind) { "나" -> "지난번의 내가 다녀온 길"; "다시" -> "다시 가는 길"; "연습" -> "${Writer.subj(g.owner)} 건네준 연습"; else -> "${Writer.subj(g.owner)} 건네준 길" }) + " · ${facts(g.drive)}", onBack = { trip.guide = null; Session.convoy = null; back() }))
+        addView(k.header(g.title, (when (g.kind) { "나" -> "지난번의 내가 다녀온 길"; "다시" -> "다시 가는 길"; "연습" -> "${Writer.subj(g.owner)} 건네준 연습"; else -> "${Writer.subj(g.owner)} 건네준 길" }) + " · ${facts(g.drive)}", onBack = { trip.guide = null; trip.routeSent = false; Session.convoy = null; back() }))
         addView(k.gap(8))
         if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
         else { addView(left); addView(right) }

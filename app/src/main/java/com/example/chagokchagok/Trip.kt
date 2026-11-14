@@ -62,10 +62,11 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
      */
     private fun lanePraise(l: LaneMove) {
         if (!l.moved || l.wait < LANE_FLOOR) return
-        val max = if (focus == "lane") 4 else if (support <= 2) 1 else 0
+        val max = if (focus == "lane") 5 else if (support <= 2) 3 else 0
         if (lanePraised >= max) return
         lanePraised++
-        host.speak("깜빡이 켜고 ${l.wait.toInt()}초, 잘 넘어갔어요.", Voice.LOW)
+        host.chime()
+        host.speak("깜빡이 켜고 ${l.wait.toInt()}초, 잘 넘어갔어요.", Voice.NORMAL)
     }
     private var praised = 0
     private val spoken = mutableSetOf<String>()
@@ -135,8 +136,13 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (active) roadside(type, value)
         if (type == Evt.GEAR) {
             // 기록은 D에서만 시작한다 (주차하려고 R만 넣었다 빼는 것은 주행이 아니다). 처음 설정을 마치기 전에는 시작하지 않는다.
+            if (value != "P") parkPending = false
             if (value == "D" && !active && store.onboarded) start()
-            else if (value == "P" && active) end()
+            else if (value == "P" && active) {
+                // 차가 아직 움직이는데 P 신호가 왔다: 주차로 치지 않는다. 완전히 멈추면 그때 기록을 마친다.
+                if (movingNow()) { parkPending = true; host.say("차가 아직 움직이고 있어요. 완전히 멈춘 뒤에 P에 놓아 주세요.", Voice.URGENT) }
+                else end()
+            }
         }
         if (active) { host.tripChanged(); save() }
     }
@@ -153,6 +159,10 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     private var lastHard = 0L
     private var speedMarked = false
     private var maxSpeed = 0f
+    private var speedKm = 0f
+    private var parkPending = false
+    /** 방금(3초 안) 받은 속도가 시속 5km를 넘는지 */
+    private fun movingNow() = lastSpeed?.let { System.currentTimeMillis() - it.first < 3000 && it.second >= 5f } == true
     /**
      * 속도가 바뀌었다 (km/h). 급하게 선 순간을 알아본다: 시속 20km 넘게 달리다가 1초에 약 시속 11km(3m/s²) 넘게 줄었을 때.
      * 그 순간에는 말하지 않는다(지적은 멈췄을 때). 일기와 "차에게 물어보기"에만 나온다.
@@ -162,6 +172,9 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val prev = lastSpeed; lastSpeed = now to kmh
         if (!active || sim) return
         if (kmh > maxSpeed) maxSpeed = kmh
+        // 속도로 잰 거리 (주행거리계가 움직이지 않는 차·에뮬레이터에서 거리로 쓴다)
+        if (prev != null) { val gap = (now - prev.first) / 1000f; if (gap in 0f..3f) speedKm += (prev.second + kmh) / 2f * gap / 3600f }
+        if (parkPending && kmh < 1f) { parkPending = false; if (car.gear == "P") { end(); return } }
         if (!speedMarked) { speedMarked = true; recorder.add(Evt.SPEED, "on") }
         if (prev == null) return
         val dt = (now - prev.first) / 1000f
@@ -282,7 +295,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.cruise) recorder.add(Evt.CRUISE, "on")
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         heard.clear(); inZone.clear(); lastFix = null; voiceNotes.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
-        lastSpeed = null; lastHard = 0L; speedMarked = false; maxSpeed = 0f
+        lastSpeed = null; lastHard = 0L; speedMarked = false; maxSpeed = 0f; speedKm = 0f; parkPending = false
         praised = 0; lanePraised = 0; focus = host.tripFocus(); spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
         // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
         support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
@@ -324,7 +337,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val g = guide?.takeIf { it.kind != "다시" }
         val route = Paths.of(path.toList())
         val drive = recorder.finish(driver).let { d ->
-            val km = if (d.distKm < 0.05f && route.size > 1) Paths.lengthKm(route) else d.distKm
+            // 거리: 주행거리계 → 지나온 길 → 속도로 잰 거리 순으로, 있는 것을 쓴다
+            val km = if (d.distKm >= 0.05f) d.distKm else if (route.size > 1) Paths.lengthKm(route) else speedKm
             val placed = when {
                 again != null -> d.copy(place = again.title, placeLat = again.lat, placeLng = again.lng)
                 // 지난번의 내가 남긴 길로 다시 간 날도 같은 곳으로 적어야 지난 기록과 비교된다
@@ -349,14 +363,16 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
             val tips = (old?.tips.orEmpty() + voiceNotes.map { Tip((it.at.toFloat() / last).coerceIn(0f, 1f), it.text, it.lat, it.lng) }).distinctBy { it.text }.sortedBy { it.p }
             store.addGuide(Guide(old?.id ?: "self_${driver}_${dest.hashCode()}", driver, dest, drive.placeLat ?: old?.lat, drive.placeLng ?: old?.lng, drive, tips, (old?.times ?: 0) + 1, kind = "나"))
         }
-        // D에 놓았다가 움직이지 않고 P로 돌아온 것은 주행이 아니다. 속도 신호가 있으면 그것으로(시속 1km도 안 넘음),
-        // 없으면 주행거리가 그대로이고 깜빡이도 없이 1분 안에 끝났을 때로 본다.
-        val still = !wasSim && !arrived && voiceNotes.isEmpty() && drive.distKm < 0.05f && route.size < 2 &&
-            (if (speedMarked) maxSpeed < 1f else (car.odometerKm != null && drive.signals == 0 && drive.seconds < 60))
-        if (still) {
-            guide = null; routeSent = false; focus = null
-            host.tripDiscarded(); host.say("움직이지 않아서 일기로 남기지 않았어요.")
-            return
+        // 일기로 남길 만한 주행인지. 속도 신호가 있으면 실제로 간 거리로 본다: 200m도 안 갔으면 자리를 옮긴 것이지 주행이 아니다.
+        // 속도 신호가 없으면 주행거리가 그대로이고 깜빡이도 없이 1분 안에 끝났을 때 움직이지 않은 것으로 본다.
+        if (!wasSim && !arrived && voiceNotes.isEmpty()) {
+            val line = when {
+                speedMarked && maxSpeed < 1f && drive.distKm < 0.05f -> "움직이지 않아서 일기로 남기지 않았어요."
+                speedMarked && drive.distKm < MIN_TRIP_KM -> "잠깐만 움직여서 일기로 남기지 않았어요."
+                !speedMarked && drive.distKm < 0.05f && route.size < 2 && car.odometerKm != null && drive.signals == 0 && drive.seconds < 60 -> "움직이지 않아서 일기로 남기지 않았어요."
+                else -> null
+            }
+            if (line != null) { guide = null; routeSent = false; focus = null; host.tripDiscarded(); host.say(line); return }
         }
         // 주차하려고 잠깐 움직인 정도(15초 미만, 50m 미만, 깜빡이·브레이크 같은 조작도 없음)는 일기로 남기지 않는다
         val acted = drive.events.any { it.type != Evt.GEAR }

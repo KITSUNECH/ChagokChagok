@@ -313,7 +313,7 @@ private fun MainActivity.finishOnboarding(prepFirst: Boolean) {
     val type = O.type
     // 홈 오른쪽 바에서 게이지를 압축해 보여 준다 (좁은 창도 같은 모션)
     O.step = 0; O.gaugeShown = 0; O.licenseTouched = false
-    speak(if (type == "초보") "안녕하세요. 면허 따고 처음은 낯설 수 있어요. 함께 확인해 봐요." else "안녕하세요. 오늘도 같이 가요.")
+    speak(if (type == "초보") "안녕하세요. 차곡차곡이에요. 첫 운전도 같이 해 봐요." else "안녕하세요. 오늘도 같이 가요.")
     if (prepFirst) { prepDone.clear(); prepSeen.clear(); go(MainActivity.TODAY) }
     go(if (prepFirst) MainActivity.PREP else MainActivity.TODAY)
 }

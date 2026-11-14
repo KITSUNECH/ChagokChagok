@@ -126,7 +126,7 @@ internal fun MainActivity.driveScreen(): View {
     // 도로교통법 제49조 제1항 제11호의2: 운전 중 화면 조작은 정지 중에만. 차가 주행 제한을 걸면(움직이는 중) 버튼을 잠근다.
     val moving = limits.restricted
     // 달리는 동안은 말로: "차곡차곡, 천천히 갈래" (Gleo AI → GleoReceiver TAKE_IT_SLOW)
-    val breathe = k.button(if (moving) "말로: 차곡차곡, 여기 어려웠어" else "여기 어려웠어요", Kit.Btn.Secondary, "breath", enabled = !moving) { trip.breathe() }
+
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
     // 멈춰 있을 때는 언제나 "기록 끝내기"를 둔다 (기어 신호가 없거나 P로 바뀌지 않아도 빠져나올 수 있게)
     val stop = if (!limits.restricted) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
@@ -136,8 +136,7 @@ internal fun MainActivity.driveScreen(): View {
         if (ui.wide) k.row(20).apply {
             gravity = Gravity.TOP
             addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }, k.lp(0, k.MATCH, 1.7f))
-            addView(k.col(18).apply { addView(k.fill()); addView(breathe, k.lp(k.MATCH, ui.dp(84))) }, k.lp(0, k.MATCH, 1f))
-        } else k.col(14).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(k.fill()); addView(breathe, k.lp(k.MATCH, ui.dp(84))) }
+        } else k.col(14).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }
     } else if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
         addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }, k.lp(0, k.MATCH, 1.5f))
@@ -147,14 +146,12 @@ internal fun MainActivity.driveScreen(): View {
             addView(k.fill())
             // 글레오에게 말로 묻는 것과 같은 답 (멈춰 있을 때만 누를 수 있다)
             addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, k.WRAP))
-            addView(breathe, k.lp(k.MATCH, ui.dp(84)))
             stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
         addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard)
         addView(k.fill())
         addView(k.row(10).apply {
-            addView(breathe, k.lp(0, ui.touch(72), 1f))
             stop?.let { addView(it, k.lp(0, ui.touch(72), 1f)) }
         }, k.lp(k.MATCH, k.WRAP))
     }
@@ -185,10 +182,10 @@ internal fun MainActivity.refreshDrive() {
         // 길 안내는 내비의 몫이다 (Pleos Single Route Policy). 여기서는 거리·방향을 다시 말하지 않고 깜빡이 코칭만 한다.
         side != null && car.turnMeters in 1..300 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "곧 돌아요"; V.turnSub?.text = "깜빡이를 미리 켜 두면 편해요" }
         trip.arrived -> { V.turnIcon?.set("flag", Ink.go); V.turnText?.text = "도착했어요"; V.turnSub?.text = "기어를 P에 놓으면 일기를 써요" }
-        else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "편하게 가요"; V.turnSub?.text = when {
-            g != null && g.tips.any { it.placed } && store.locationOn && g.tips.indices.any { it !in trip.heard } -> "남긴 한마디는 그 근처에서 들려줘요"
-            trip.routeSent -> "길 안내는 내비를 따라가요"
-            else -> "조용히 적고 있어요" } }
+        else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "기록하고 있어요"; V.turnSub?.text = when {
+            g != null && g.tips.any { it.placed } && store.locationOn && g.tips.indices.any { it !in trip.heard } -> "남긴 한마디는 그 근처에서 들려줄게요"
+            car.routeStarted -> "길은 내비가 안내하고, 저는 운전을 적어요"
+            else -> "앞을 봐 주세요. 필요할 때만 말할게요" } }
     }
 
     // 회전까지 남은 거리 막대 (300m부터 줄어든다), 깜빡이 안내 중이면 신호 색
