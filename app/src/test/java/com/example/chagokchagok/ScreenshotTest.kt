@@ -49,6 +49,10 @@ class ScreenshotTest {
             v.draw(Canvas(bmp))
             File(dir, "${tag}_$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
+        fun scrollDown(px: Int) {
+            fun find(v: View): android.widget.ScrollView? = if (v is android.widget.ScrollView) v else (v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { find(g.getChildAt(it)) } }
+            idle(); find(a.window.decorView)?.scrollBy(0, px)
+        }
         Onboard.step = 0; Onboard.gaugeShown = 0; a.go(MainActivity.ONBOARD); snap("00a_onboard_welcome")
         Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("00b_onboard_type")
         Onboard.step = 3; a.go(MainActivity.ONBOARD); snap("00c2_onboard_license")
@@ -74,7 +78,7 @@ class ScreenshotTest {
         a.go(MainActivity.TODAY); snap("01b_today_solo")
         keep.forEach { store.addGuide(it) }
         a.go(MainActivity.TODAY); snap("02_today")
-        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.carModel = "더 뉴 그랜저 (2026)"; a.onPrep(Evt.GEAR, "R"); snap("03b_prep_gear"); store.carModel = null }
+        if (!short) { a.prepDone.clear(); a.go(MainActivity.PREP); a.onPrep(Evt.SIGNAL, "LEFT"); a.onPrep(Evt.SIGNAL, "RIGHT"); a.onPrep(Evt.WIPER, "on"); snap("03_prep"); store.carModel = "더 뉴 그랜저 (2026)"; a.onPrep(Evt.GEAR, "R"); snap("03b_prep_gear"); scrollDown(1000); snap("03c_prep_safety"); scrollDown(900); snap("03d_prep_safety2"); store.carModel = null }
         a.depart(store.guide("sample")!!); snap("04_ready")
         a.trip.start(); a.onCarEvent(Evt.SIGNAL, "RIGHT"); a.car.setTurn("TURN_RIGHT", 80, ""); a.onCarEvent(Evt.NAVI, "turn")
         a.trip.onLocation(SampleRoute.points[16].first, SampleRoute.points[16].second, null)

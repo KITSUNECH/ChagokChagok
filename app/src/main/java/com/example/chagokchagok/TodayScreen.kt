@@ -304,7 +304,7 @@ internal fun MainActivity.prepScreen(): View {
     val all = done == PREP_REQUIRED.size
     val next = PREP_REQUIRED.firstOrNull { it !in prepDone }
     return k.col().apply {
-        addView(k.header("출발 준비", "면허시험 차와 다른 곳을 손으로 익혀요. 주차 중에만 하는 연습이라 기어를 바꿔도 주행으로 치지 않아요.", onBack = { back() }))
+        addView(k.header("출발 준비", "면허시험 차와 다른 곳을 손으로 익히고, 이 차의 기어와 안전 조작을 미리 읽어 둬요. 주차 중에만 하는 연습이라 기어를 바꿔도 주행으로 치지 않아요.", onBack = { back() }))
         addView(k.gap(22))
         addView(k.card {
             addView(k.row().apply {
@@ -329,6 +329,8 @@ internal fun MainActivity.prepScreen(): View {
         addView(k.grid(if (ui.wide) 5 else 2, tiles, 14))
         addView(k.gap(16))
         addView(shifterCard())
+        addView(k.gap(22))
+        addView(safetySection(Shifters.of(this@prepScreen)))
         addView(k.gap(22))
         addView(k.buttons(
             k.button(if (all) "홈으로" else "나중에 하기", if (all) Kit.Btn.Primary else Kit.Btn.Secondary) { back() },

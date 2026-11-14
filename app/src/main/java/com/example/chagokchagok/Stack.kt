@@ -224,12 +224,14 @@ internal fun MainActivity.stackRail(): View {
     }
     val stage = bs.firstOrNull { !it.done }?.stage ?: 2
     return k.col(10).apply {
-        setPadding(ui.dp(14), ui.dp(24), ui.dp(14), ui.dp(20))
+        val side = ui.dp(if (ui.wide) 14 else 6)   // 좁은 창의 바는 폭이 좁아 단계 이름이 한 줄에 들도록 여백을 줄인다
+        setPadding(side, ui.dp(24), side, ui.dp(20))
         setBackgroundColor(Ink.surface)
         addView(k.text("성장", Type.Micro, Ink.text2).apply { gravity = android.view.Gravity.CENTER })
         addView(k.text("$doneCount", Type.Title).apply { gravity = android.view.Gravity.CENTER })
-        addView(StackView(context, ui, bs, fresh, squeeze), k.lp(k.MATCH, 0, 1f))
-        addView(k.text(STAGES[stage], Type.Micro, stageColor(stage)).apply { gravity = android.view.Gravity.CENTER })
+        // 막대 폭은 처음 설정의 게이지와 같게 (옆 여백 14) 두어 압축 모션이 같은 자리에서 이어진다
+        addView(StackView(context, ui, bs, fresh, squeeze), k.lp(k.MATCH, 0, 1f).apply { val m = ui.dp(14) - side; leftMargin = m; rightMargin = m })
+        addView(k.text(STAGES[stage], Type.Micro, stageColor(stage)).apply { gravity = android.view.Gravity.CENTER; maxLines = 1; if (ui.narrow) textSize = ui.sp(11.5f) })
         k.pressable(this, null) { stackSheet() }
     }
 }
