@@ -168,7 +168,15 @@ internal fun MainActivity.usualCard(): View {
             if (ds.size >= 2) addView(k.icon("chevron", Ink.text3, 20))
         })
         addView(k.gap(12))
-        if (u.signalPct == null && u.laneWait == null) addView(k.col(12).apply {
+        // 습관 숫자가 아직 없을 때: 지난 주행 글이 아래에 있으면 한 줄로 줄여 둘 다 온전히 보이게 한다
+        if (u.signalPct == null && u.laneWait == null && last != null) addView(k.row(12).apply {
+            addView(android.widget.FrameLayout(context).apply {
+                background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Ink.accentSoft) }
+                addView(IconView(context, "chart", Ink.accent), android.widget.FrameLayout.LayoutParams(ui.dp(22), ui.dp(22), Gravity.CENTER))
+            }, k.lp(ui.dp(44), ui.dp(44)))
+            addView(k.text("달릴수록 차가 본 내 습관이 여기에 쌓여요.", Type.Sub, Ink.text2), k.lp(0, k.WRAP, 1f))
+        })
+        else if (u.signalPct == null && u.laneWait == null) addView(k.col(12).apply {
             gravity = Gravity.CENTER
             addView(android.widget.FrameLayout(context).apply {
                 background = android.graphics.drawable.GradientDrawable().apply { shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(Ink.accentSoft) }
