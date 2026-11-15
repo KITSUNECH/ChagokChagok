@@ -171,4 +171,4 @@
 
 ## 글꼴과 소리
 
-Pretendard, 고운바탕, Noto Sans KR(아이콘) — SIL Open Font License 1.1
+Pretendard, 고운바탕, Noto Sans KR(아이콘): SIL Open Font License 1.1

@@ -14,13 +14,13 @@ import java.io.File
 /** 시작 모션을 프레임별 PNG로 찍는다 (build/shots/splash_000.png …). 움직임 확인용. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w960dp-h540dp-land-mdpi")
+@Config(sdk = [34], qualifiers = "w1920dp-h1080dp-land-mdpi")
 class SplashTest {
     @Test fun frames() {
         val ctx = RuntimeEnvironment.getApplication()
         val face = ctx.resources.getFont(R.font.pretendard_bold)
         val v = SplashView(ctx, face) {}
-        val w = 960; val h = 540
+        val w = 1920; val h = 1080
         v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)); v.layout(0, 0, w, h)
         val dir = File(System.getProperty("shots.dir") ?: "build/shots").apply { mkdirs() }
         val n = 100  // 4초를 25fps로
