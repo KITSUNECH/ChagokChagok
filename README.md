@@ -69,7 +69,7 @@
 | 항목 | 값 |
 |---|---|
 | 에뮬레이터 | **Pleos Connect Emulator 2.1.0**, Android API 34 |
-| 화면 규격 | **2560×1440 px** 가로 디스플레이 (`adb shell wm size` 결과). 넓은 창은 왼쪽 좁은 레일 배치, 내비 옆 분할 화면·좁은 창은 아래 탭 배치. 에뮬레이터에서 앱이 쓰는 영역은 1682×1210dp였고, 홈·출발 전·일기 한 장은 이 크기에서 상자들이 화면을 꽉 채우도록 배치했습니다. 화면 확인 테스트는 1682×1210dp, 1280×720dp(가로), 420×700dp(내비 옆 좁은 창)에서 했습니다. |
+| 화면 규격 | **2560×1440 px** 가로 디스플레이 (`adb shell wm size` 결과). 넓은 창은 왼쪽 좁은 레일 배치, 내비 옆 분할 화면·좁은 창은 아래 탭 배치. 에뮬레이터에서 앱이 쓰는 영역은 1682×1210dp였고, 홈·출발 전·일기 한 장은 이 크기에서 상자들이 화면을 꽉 채우도록 배치했습니다. 화면 확인 테스트는 1682×1210dp, 841×1210dp(내비와 반씩), 1280×720dp(가로), 420×700dp(좁은 창)에서 했습니다. |
 | 개발 환경 | Kotlin 1.9.24, AGP 8.5.2, Gradle 8.7, minSdk 28, targetSdk 34 |
 | Pleos SDK | Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech 3.3.1, FusedLocation 1.1.3 |
 | AAOS API | CarUxRestrictions(주행 중 제한), CarPropertyManager `GEAR_SELECTION`(기어) · `PERF_VEHICLE_SPEED`(속도) |
@@ -111,7 +111,7 @@
 | 달리는 동안 말로: 내 운전 물어보기·여기 어려웠어·여기 한마디 남기기 (화면의 "여기 어려웠어요" 단추는 뺌: 달리는 중에는 누를 수 없음) | 실제 (에뮬레이터에서 글레오 호출은 확인 필요) | Gleo AI App Integration (`ASK_MY_DRIVING` · `TAKE_IT_SLOW` · `SAVE_NOTE_HERE`) |
 | 급하게 선 순간 (속도가 짧은 시간에 크게 줄어든 때) | 실제 (에뮬레이터 확인 필요) | AAOS `CarPropertyManager` `PERF_VEHICLE_SPEED` |
 | 출발할 때 안전벨트 확인 (안 맸으면 화면과 말로) | 실제 | Vehicle SDK Seat `SeatBeltBuckledState` |
-| 차에게 물어보기 ("지금까지 어땠어?" 버튼 · 넓은 창에서 멈춰 있을 때, 글레오와 같은 답) · 요즘 신경 쓰이는 것부터 말하기 · 차선 변경 뒤 한마디 | 실제 | Vehicle SDK 기록 + 앱 안 분석(`Coach.kt`), TextToSpeech SDK |
+| 차에게 물어보기 ("지금까지 어땠어?" 버튼 · 멈춰 있을 때, 글레오와 같은 답) · 요즘 신경 쓰이는 것부터 말하기 · 차선 변경 뒤 한마디 | 실제 | Vehicle SDK 기록 + 앱 안 분석(`Coach.kt`), TextToSpeech SDK |
 | 첫 주행·처음 가는 길의 "오늘 차가 본 것" (기준에 비춘 사실, 평소의 나) | 실제 | Vehicle SDK 기록 + 앱 안 분석 |
 | 주행 중 화면 제한·입력 막기 (신호를 못 받으면 기어로, 기어도 모르면 주행 중으로) | 실제 | CarUxRestrictions (`activeRestrictions`) |
 | 기록 중 알림 | 실제 | Android 앞쪽 서비스 (specialUse) |

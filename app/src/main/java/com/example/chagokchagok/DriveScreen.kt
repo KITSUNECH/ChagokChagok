@@ -83,8 +83,11 @@ internal fun MainActivity.driveScreen(): View {
             addView(V.turnIcon, k.lp(ui.dp(84), ui.dp(84)))
             addView(k.col(4).apply { addView(V.turnText); addView(V.turnSub) }, k.lp(0, k.WRAP, 1f))
             // 가상 콘솔에는 안전벨트 조작이 없다: 시연판에서는 눌러서 넘어간다 (실제 신호가 아니므로 받은 신호에 세지 않는다)
-            V.beltBtn = if (BuildConfig.DEMOS) k.button("안전벨트 맸어요 (시연)", Kit.Btn.Primary, "check") { trip.beltSkip = true; refreshDrive() }.also { addView(it) } else null
+            V.beltBtn = if (BuildConfig.DEMOS) k.button("안전벨트 맸어요 (시연)", Kit.Btn.Primary, "check") { trip.beltSkip = true; refreshDrive() } else null
+            if (!ui.narrow) V.beltBtn?.let { addView(it) }
         })
+        // 좁은 창에서는 글자 옆에 단추를 둘 자리가 없어 아래 줄에 둔다
+        if (ui.narrow) V.beltBtn?.let { addView(it, k.lp(k.MATCH, k.WRAP).apply { topMargin = ui.dp(12) }) }
         addView(k.gap(16))
         addView(V.turnBar, k.lp(k.MATCH, ui.dp(8)))
     }
@@ -104,7 +107,13 @@ internal fun MainActivity.driveScreen(): View {
     V.trace = if (g != null) TraceView(this, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips, faded = true)) } else null
     V.nextTip = k.text("", Type.Sub, Ink.text2)
     val routeCard = k.card(22) {
-        V.trace?.let { addView(it, k.lp(k.MATCH, ui.dp(96))) }
+        addView(k.text(if (g != null) "지난번에 지나온 길" else "오늘 가는 길", Type.Sub, Ink.text2))
+        if (V.trace != null) addView(V.trace, if (ui.wide) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, ui.dp(96)))
+        else addView(k.col(8).apply {
+            gravity = Gravity.CENTER
+            addView(k.icon("road", Ink.text3, 44))
+            addView(k.text("주차하면 오늘 지나온 길이 일기에 그려져요", Type.Sub, Ink.text2).apply { gravity = Gravity.CENTER })
+        }, if (ui.wide) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, k.WRAP))
         addView(V.nextTip)
     }
 
@@ -138,24 +147,35 @@ internal fun MainActivity.driveScreen(): View {
     val view = if (moving) {
         if (ui.wide) k.row(20).apply {
             gravity = Gravity.TOP
-            addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }, k.lp(0, k.MATCH, 1.7f))
+            // 달리는 동안: 카드가 화면 높이를 나눠 채운다 (한마디가 없으면 위 카드 하나가 다 쓴다)
+            addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1.2f)); addView(tipCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1f)) }, k.lp(0, k.MATCH, 1.7f))
         } else k.col(14).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }
     } else if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
-        addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }, k.lp(0, k.MATCH, 1.5f))
+        // 멈춰 있을 때: 두 칸이 화면 높이를 채운다. 맨 아랫줄에는 양쪽 단추가 같은 높이로 나란히 놓인다
+        val tall = ui.touch(80)
         addView(k.col(18).apply {
-            // 제한속도·주행 통계는 차의 드라이빙 뷰와 내비가 이미 보여 준다. 겹쳐 그리지 않는다
-            addView(routeCard)
-            addView(k.fill())
+            addView(top); convoyCard()?.let { addView(it) }
+            addView(turnCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1.2f))
+            addView(tipCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1f))
             // 글레오에게 말로 묻는 것과 같은 답 (멈춰 있을 때만 누를 수 있다)
-            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, k.WRAP))
-            stop?.let { addView(it, k.lp(k.MATCH, k.WRAP)) }
+            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, tall))
+        }, k.lp(0, k.MATCH, 1.5f))
+        addView(k.col(18).apply {
+            // 제한속도는 차의 드라이빙 뷰와 내비가 이미 보여 준다. 겹쳐 그리지 않는다
+            addView(routeCard, k.lp(k.MATCH, 0, 1f))
+            addView(statsCard.apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = ui.dp(180) })
+            if (stop != null) addView(stop, k.lp(k.MATCH, tall)) else addView(View(context), k.lp(1, tall))
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
-        addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard); addView(routeCard)
-        addView(k.fill())
+        // 내비 옆 좁은 창: 위에서부터 지금 할 일 · 한마디 · 길 그림이 높이를 나눠 채우고, 맨 아래에 단추 두 개
+        addView(top); convoyCard()?.let { addView(it) }
+        addView(turnCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1.2f))
+        addView(tipCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1f))
+        addView(routeCard)
         addView(k.row(10).apply {
-            stop?.let { addView(it, k.lp(0, ui.touch(72), 1f)) }
+            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(0, ui.touch(76), 1f))
+            stop?.let { addView(it, k.lp(0, ui.touch(76), 1f)) }
         }, k.lp(k.MATCH, k.WRAP))
     }
     return FrameLayout(this).apply {
@@ -178,7 +198,8 @@ internal fun MainActivity.refreshDrive() {
     // 다음 회전
     val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }
     val prompt = trip.prompt
-    val beltNag = car.beltKnown && !car.belt && !trip.beltSkip && (sec < 20 || (BuildConfig.DEMOS && !rolling))
+    // 깜빡이 안내와 도착 알림을 가리지 않는다. 모의 주행에서는 처음 20초만 보인다
+    val beltNag = car.beltKnown && !car.belt && !trip.beltSkip && prompt == null && !trip.arrived && (sec < 20 || (BuildConfig.DEMOS && !rolling && !trip.sim))
     V.beltBtn?.visibility = if (beltNag) View.VISIBLE else View.GONE
     when {
         beltNag -> { V.turnIcon?.set("seat", Ink.warn); V.turnText?.text = "안전벨트를 매 주세요"; V.turnSub?.text = if (BuildConfig.DEMOS) "매면 사라져요. 가상 콘솔에서는 오른쪽 단추로 넘어가요" else "매면 이 안내는 사라져요" }
@@ -243,6 +264,6 @@ internal fun MainActivity.refreshDrive() {
     val known = car.speedLimit > 0 || ahead.isNotEmpty()
     V.limitCard?.visibility = if (known) View.VISIBLE else View.GONE
     V.statsCard?.visibility = if (known && ui.narrow) View.GONE else View.VISIBLE
-    V.stats?.text = if (km > 0.05f) String.format(Locale.KOREA, "%.1fkm", km) else "${sec / 60}분"
-    V.statsSub?.text = listOfNotNull(if (km > 0.05f) "${sec / 60}분" else null, trip.recorder.signalsNow().takeIf { it > 0 }?.let { "깜빡이 ${it}번" }).joinToString(" · ").ifEmpty { "조용히 적고 있어요" }
+    V.stats?.text = if (km > 0.05f) String.format(Locale.KOREA, "%.1fkm", km) else if (sec < 60) "방금 출발" else "${sec / 60}분"
+    V.statsSub?.text = listOfNotNull(if (km > 0.05f && sec >= 60) "${sec / 60}분" else null, trip.recorder.signalsNow().takeIf { it > 0 }?.let { "깜빡이 ${it}번" }).joinToString(" · ").ifEmpty { "조용히 적고 있어요" }
 }

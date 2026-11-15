@@ -425,7 +425,7 @@ internal fun MainActivity.readyScreen(): View {
     }
 
     val demoRoad = demoRoad0
-    val hintTitle = if (demoRoad) "‘모의 주행 시작’을 누르면 출근길을 끝까지 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요"
+    val hintTitle = if (demoRoad) "‘모의 주행 시작’을 누르면 출근길을 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요"
     val hintSub = if (demoRoad) "실제로 달릴 때는 기어를 D에 놓으면 기록을 시작해요." else "달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요."
     val tipTitle = if (g.owner == d) "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"
     val noPlace = if (placed > 0 && !canPlace) k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 근처에서 들려줘요.", Type.Caption, Ink.warn) else null
@@ -504,7 +504,7 @@ internal fun MainActivity.readyScreen(): View {
         addView(k.card(pad = 22, color = Ink.accentSoft) {
             addView(k.row(14).apply {
                 addView(k.icon("steering", Ink.accent, 28))
-                addView(k.col(2).apply { addView(k.text(hintTitle, Type.Headline)); addView(k.text(hintSub, Type.Sub, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
+                addView(k.col(2).apply { addView(k.text(hintTitle, Type.BodyStrong).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }); addView(k.text(hintSub, Type.Caption, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
             })
         })
         addView(k.gap(16))

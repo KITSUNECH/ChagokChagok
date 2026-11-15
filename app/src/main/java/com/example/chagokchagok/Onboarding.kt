@@ -312,7 +312,7 @@ internal fun MainActivity.onboardScreen(): View {
             (box.layoutParams as LinearLayout.LayoutParams).apply { height = 0; weight = 1f }
             content.gravity = Gravity.CENTER_VERTICAL
             addView(k.row(48).apply {
-                addView(content, k.lp(0, k.MATCH, 1f)); addView(aside, k.lp(0, k.MATCH, 1.1f))
+                addView(k.scroll(content), k.lp(0, k.MATCH, 1f)); addView(aside, k.lp(0, k.MATCH, 1.1f))   // 글자판이 올라와도 이름 칸이 가려지지 않게
             }, k.lp(k.MATCH, 0, 1f))
         } else addView(k.scroll(k.col(18).apply { addView(content); if (aside.childCount > 0) addView(aside) }), k.lp(k.MATCH, 0, 1f))
         addView(k.gap(20))

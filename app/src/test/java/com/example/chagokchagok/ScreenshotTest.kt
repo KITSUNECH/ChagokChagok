@@ -30,6 +30,8 @@ class ScreenshotTest {
     @Test @Config(qualifiers = "w1280dp-h720dp-land-night-mdpi") fun night() = shoot("night", short = true)
     /** 에뮬레이터에서 실제로 본 큰 창 (1682×1210dp) */
     @Test @Config(qualifiers = "w1682dp-h1210dp-land-mdpi") fun big() = shoot("big")
+    /** 에뮬레이터에서 내비와 반씩 나눠 쓸 때의 창 (1682×1210dp 의 절반) */
+    @Test @Config(qualifiers = "w841dp-h1210dp-port-mdpi") fun split() = shoot("split")
     /** 내비 옆 앱 영역처럼 좁고 긴 창 */
     @Test @Config(qualifiers = "w420dp-h700dp-port-mdpi") fun panel() = shoot("panel")
 

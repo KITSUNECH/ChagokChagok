@@ -126,6 +126,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     @Deprecated("Activity 기본 뒤로 가기")
     override fun onBackPressed() {
         if (sheets.back()) return
+        // 일기의 자세한 기록을 보고 있었으면 일기 한 장으로 돌아간다
+        if (route.name == DIARY && DiaryPrefs.detail != null && !driving) { DiaryPrefs.detail = null; render(); return }
         if (stack.size > 1 && !driving) { stack.removeAt(stack.lastIndex); route = stack.last(); render(); return }
         if (route.name != TODAY && route.name != ONBOARD && !driving) { go(TODAY); return }
         @Suppress("DEPRECATION") super.onBackPressed()
