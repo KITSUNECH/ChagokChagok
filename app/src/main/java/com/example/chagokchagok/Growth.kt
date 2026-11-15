@@ -287,11 +287,9 @@ internal fun MainActivity.roadScreen(anchorId: String?): View {
         val m = Metrics.all.first { it.key == key }
         val vals = visits.map { m.value(it.drive) }
         if (vals.count { it != null } < 2) null else k.card(pad = 18) {
-            addView(k.row().apply {
-                addView(k.text(m.label, Type.Headline), k.lp(0, k.WRAP, 1f))
-                addView(k.text(if (m.weight == 0f) "참고" else if (m.higherBetter) "높을수록 좋아요" else "낮을수록 편해요", Type.Caption, Ink.text3))
-            })
-            addView(MetricTrend(context, ui, vals, m, marks), k.lp(k.MATCH, ui.dp(120)))
+            addView(k.text(m.label, Type.BodyStrong).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            addView(k.text(if (m.weight == 0f) "참고로만 봐요" else if (m.higherBetter) "높을수록 좋아요" else "낮을수록 편해요", Type.Caption, Ink.text3))
+            addView(MetricTrend(context, ui, vals, m, marks), if (ui.wide) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, ui.dp(120)))
         }
     }
     val rows = visits.reversed().map { v ->
@@ -301,14 +299,65 @@ internal fun MainActivity.roadScreen(anchorId: String?): View {
             if (Growth.bothUp(j, ans)) "checkCircle" else "circle", if (Growth.bothUp(j, ans)) Ink.go else Ink.text3, chevron = true) { go(MainActivity.DIARY, v.id) }
     }
     val last = visits.last(); val lj = Growth.judge(all, last)
-    return k.col().apply {
-        addView(k.header("이 길의 나 · $name", "${visits.size}번 다녀왔어요. 같은 길을 다시 달릴 때마다 차가 본 변화가 쌓여요.", onBack = { back() }))
+    // 예시 기록(출근길 시연이 넣은 것)만으로 만들어진 화면이면 분명히 알린다
+    val samples = visits.count { store.isSample(it.id) }
+    val sub = when {
+        samples == visits.size -> "시연용 예시 기록 ${visits.size}개로 그린 화면이에요. 내가 달린 기록이 아니에요."
+        samples > 0 -> "${visits.size}번 다녀왔어요 (예시 기록 ${samples}개 포함). 같은 길을 다시 달릴 때마다 차가 본 변화가 쌓여요."
+        else -> "${visits.size}번 다녀왔어요. 같은 길을 다시 달릴 때마다 차가 본 변화가 쌓여요."
+    }
+    val head = k.header("이 길의 나 · $name", sub, onBack = { back() }, trailing = if (samples > 0) k.tag("예시 기록 포함", Ink.warn) else null)
+    val judged = lj?.let { judgementView(it, store.answer(last.id, Q_VS_LAST)).apply { (background as? android.graphics.drawable.GradientDrawable)?.setColor(Ink.surface) } }
+    val note = "그래프의 점선은 처음 세 번의 평균이에요. 아래 ‘비·밤’은 그날의 조건이에요."
+    // 넓은 화면: 왼쪽에 차의 판단과 다녀온 기록, 오른쪽에 지표 그래프를 두 줄씩. 한 화면에 다 든다.
+    if (ui.wide) return k.col().apply {
+        minimumHeight = pageHeight()
+        addView(head)
         addView(k.gap(16))
-        lj?.let { addView(judgementView(it, store.answer(last.id, Q_VS_LAST)).apply { (background as? android.graphics.drawable.GradientDrawable)?.setColor(Ink.surface) }); addView(k.gap(16)) }
+        addView(k.row(20).apply {
+            addView(k.col(16).apply {
+                judged?.let { addView(it) }
+                addView(k.card(pad = 20) {
+                    addView(k.text("다녀온 기록", Type.Headline))
+                    addView(k.gap(4))
+                    val shown = visits.reversed().take(if (judged == null) 6 else 3)
+                    shown.forEach { v ->
+                        val j = Growth.judge(all, v); val ans = store.answer(v.id, Q_VS_LAST)
+                        addView(k.row(12).apply {
+                            minimumHeight = ui.touch(52)
+                            addView(k.icon(if (Growth.bothUp(j, ans)) "checkCircle" else "circle", if (Growth.bothUp(j, ans)) Ink.go else Ink.text3, 20))
+                            addView(k.col(1).apply {
+                                addView(k.text("${dateText(v.date, "M월 d일 a h:mm")} · ${v.drive.cond().label()}" + (if (store.isSample(v.id)) " · 예시" else "") + if (v.drive.sim) " · 시연" else "", Type.Body).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                                addView(k.text(listOfNotNull(j?.let { if (it.early) "차: 판단은 다음부터" else "차: ${it.verdict.word}" }, ans?.takeIf { it != "답하지 않음" }?.let { "나: $it" }).joinToString(" · ").ifEmpty { "첫 기록" }, Type.Caption, Ink.text2))
+                            }, k.lp(0, k.WRAP, 1f))
+                            addView(k.icon("chevron", Ink.text3, 18))
+                            k.pressable(this, null) { go(MainActivity.DIARY, v.id) }
+                        })
+                    }
+                    if (visits.size > shown.size) addView(k.text("앞선 기록 ${visits.size - shown.size}번은 일기장에서 볼 수 있어요.", Type.Caption, Ink.text3))
+                    addView(View(context), k.lp(1, 0, 1f))
+                }, k.lp(k.MATCH, 0, 1f))
+            }, k.lp(0, k.MATCH, 1f))
+            addView(k.col(14).apply {
+                if (charts.isEmpty()) addView(k.card { gravity = Gravity.CENTER; addView(k.empty("chart", "두 번째 방문부터 그래프가 그려져요", "같은 곳에 다시 다녀오면 지표마다 변화가 보여요.")) }, k.lp(k.MATCH, 0, 1f))
+                else charts.chunked(2).forEach { pair ->
+                    addView(k.row(14).apply {
+                        pair.forEach { addView(it, k.lp(0, k.MATCH, 1f)) }
+                        if (pair.size == 1) addView(View(context), k.lp(0, k.MATCH, 1f))
+                    }, k.lp(k.MATCH, 0, 1f))
+                }
+                addView(k.text(note, Type.Caption, Ink.text3))
+            }, k.lp(0, k.MATCH, 1.25f))
+        }, k.lp(k.MATCH, 0, 1f))
+    }
+    return k.col().apply {
+        addView(head)
+        addView(k.gap(16))
+        judged?.let { addView(it); addView(k.gap(16)) }
         if (charts.isEmpty()) addView(k.card { addView(k.text("두 번째 방문부터 지표마다 그래프가 그려져요.", Type.Sub, Ink.text2)) })
-        else addView(k.grid(if (ui.wide) 2 else 1, charts, 14))
+        else addView(k.grid(1, charts, 14))
         addView(k.section("다녀온 기록"))
         addView(k.groupOf(rows))
-        addView(k.text("그래프의 점선은 처음 세 번의 평균이에요. 아래 ‘비·밤’은 그날의 조건이에요. 예시 기록이 섞여 있으면 일기에 ‘예시’로 표시돼요.", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0); gravity = Gravity.START })
+        addView(k.text(note, Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0); gravity = Gravity.START })
     }
 }

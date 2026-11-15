@@ -29,7 +29,7 @@ class ScreenshotTest {
     /** 밤 */
     @Test @Config(qualifiers = "w1280dp-h720dp-land-night-mdpi") fun night() = shoot("night", short = true)
     /** 에뮬레이터에서 실제로 본 큰 창 (1682×1210dp) */
-    @Test @Config(qualifiers = "w1682dp-h1210dp-land-mdpi") fun big() = shoot("big", short = true)
+    @Test @Config(qualifiers = "w1682dp-h1210dp-land-mdpi") fun big() = shoot("big")
     /** 내비 옆 앱 영역처럼 좁고 긴 창 */
     @Test @Config(qualifiers = "w420dp-h700dp-port-mdpi") fun panel() = shoot("panel")
 
@@ -123,6 +123,10 @@ class ScreenshotTest {
             org.junit.Assert.assertEquals(Verdict.UP, dj?.verdict); org.junit.Assert.assertEquals(1, demoDiary.drive.lanes().size); org.junit.Assert.assertTrue(store.heardTips(demoDiary.id).isNotEmpty()); org.junit.Assert.assertTrue(demoDiary.drive.sim)
             DemoCommute.clear(a)
         } else { a.go(MainActivity.JOURNAL); snap("08_journal") }
+        // 일기가 딱 한 장일 때의 일기장 (목적지 없이 달린 첫 주행)
+        store.clearAll(); store.setDrivers(listOf("김현대")); store.driver = "김현대"; store.onboarded = true
+        store.addDiary(Writer.write(Drive("김현대", System.currentTimeMillis(), 1.2f, 3, 200, emptyList(), 0, 2, false, false, 0, 0, 0), emptyList(), null, 0))
+        a.go(MainActivity.JOURNAL); snap("99_journal_one")
         ctrl.pause().stop().destroy()
     }
 }

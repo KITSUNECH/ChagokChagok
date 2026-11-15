@@ -50,6 +50,26 @@ private fun MainActivity.option(title: String, sub: String, icon: String, select
     }
 }
 
+/** 오른쪽 큰 상자: 제목 아래 세 줄이 상자 높이를 고르게 나눠 채운다 */
+private fun MainActivity.panel(title: String, rows: List<Triple<String, String, String>>): View {
+    val k = kit
+    return k.col().apply {
+        setPadding(ui.dp(32), ui.dp(28), ui.dp(32), ui.dp(20)); background = k.rounded(Ink.surface, 28, 1, Ink.line)
+        addView(k.text(title, Type.Title))
+        rows.forEachIndexed { i, (ic, t, s) ->
+            if (i > 0) addView(View(context).apply { setBackgroundColor(Ink.line) }, k.lp(k.MATCH, ui.dp(1)))
+            addView(k.row(20).apply {
+                addView(FrameLayout(context).apply {
+                    background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Ink.accentSoft) }
+                    addView(IconView(context, ic, Ink.accent), FrameLayout.LayoutParams(ui.dp(30), ui.dp(30), Gravity.CENTER))
+                }, k.lp(ui.dp(64), ui.dp(64)))
+                addView(k.col(4).apply { addView(k.text(t, Type.Headline)); addView(k.text(s, Type.Body, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
+            }, k.lp(k.MATCH, 0, 1f).apply { })
+        }
+        minimumHeight = ui.dp(300)
+    }
+}
+
 /** 표 한 줄: 왼쪽 이름, 오른쪽 값 */
 private fun MainActivity.specRow(label: String, value: String, icon: String, color: Int = Ink.text): View {
     val k = kit
@@ -109,8 +129,8 @@ internal fun MainActivity.onboardScreen(): View {
     val content = k.col(18).apply {
         when (Onboard.PAGES[O.step.coerceIn(0, Onboard.LAST)]) {
             0 -> {
-                addView(k.text("차로 쓰는\n성장일기", Type.Display))
-                addView(k.text("내 운전을 아는 차가 달리는 동안 말을 걸어 주고,\n같은 길에서 내가 늘었는지 보여 줘요.\n첫 운전도 같이 해 봐요.", Type.Body, Ink.text2))
+                addView(k.text("차로 쓰는\n성장일기", Type.Display).apply { if (ui.wide) textSize = ui.sp(76f) })
+                addView(k.text("내 운전을 아는 차가 달리는 동안 말을 걸어 주고,\n같은 길에서 내가 늘었는지 보여 줘요.\n첫 운전도 같이 해 봐요.", if (ui.wide) Type.Headline else Type.Body, Ink.text2).apply { typeface = ui.regular })
                 addView(k.gap(6))
                 // 운전석에서 가운데 화면까지는 멀다: 작은 줄 네 개 대신 큰 상자 하나에 한 가지씩, 몇 초마다 넘긴다
                 side(IntroSlides(this@onboardScreen, ui, k, INTRO_WORDS))
@@ -133,6 +153,11 @@ internal fun MainActivity.onboardScreen(): View {
                     addView(nameField, k.lp(0, k.WRAP, 1f))
                 })
                 addView(k.row(8).apply { addView(k.icon("lock", Ink.text3, 16)); addView(k.text("앱 안에서만 쓰는 이름이에요. 바꿔도 되고 그대로 두어도 돼요.", Type.Sub, Ink.text2)) })
+                side(panel("이 이름으로", listOf(
+                    Triple("quote", "말을 걸어요", "“${O.name} 님, 오늘도 같이 가요.”"),
+                    Triple("book", "일기를 써요", "이 이름의 일기장에 한 장씩 쌓여요"),
+                    Triple("people", "운전석을 나눠요", "함께 쓰는 사람은 설정에서 더할 수 있어요"),
+                )))
                 onNext = { O.name = nameField?.text?.toString()?.trim()?.ifEmpty { "나" } ?: "나"; next() }
             }
             2 -> {
@@ -152,11 +177,10 @@ internal fun MainActivity.onboardScreen(): View {
                         }.apply { alpha = if (ready) 1f else .55f }, k.lp(k.MATCH, k.WRAP))
                     }
                 })
-                side(k.text("운전 초보로 시작하면", Type.Headline))
-                side(specTable(listOf(
-                    specRow("달리는 동안", "돌기 전 깜빡이, 잘한 것까지 자주 말해 줘요", "speaker"),
-                    specRow("주차하면", "오늘 차가 본 것을 일기 한 장으로", "book"),
-                    specRow("다시 갈 때", "같은 길에서 내가 늘었는지 견줘 줘요", "chart"),
+                side(panel("운전 초보로 시작하면", listOf(
+                    Triple("speaker", "달리는 동안", "돌기 전 깜빡이, 잘한 것까지 자주 말해 줘요"),
+                    Triple("book", "주차하면", "오늘 차가 본 것을 일기 한 장으로 적어요"),
+                    Triple("chart", "다시 갈 때", "같은 길에서 내가 늘었는지 견줘 줘요"),
                 )))
                 O.type = "초보"
             }
@@ -231,7 +255,11 @@ internal fun MainActivity.onboardScreen(): View {
                     k.toggleItem("소리로 알려 주기", "달리는 동안 화면 대신 말로 알려 줘요", store.voiceOn, "speaker") { store.voiceOn = it },
                     k.toggleItem("도착지 날씨", "목적지 좌표만 공개 예보(Open-Meteo)로 보내요", store.weatherOn, "cloud") { store.weatherOn = it },
                 )))
-                side(k.row(10).apply { gravity = Gravity.TOP; addView(k.icon("lock", Ink.text2, 18)); addView(k.text("일기와 지나온 길은 이 차 안에만 저장돼요. 앱 서버는 없어요.", Type.Caption, Ink.text2), k.lp(0, k.WRAP, 1f)) })
+                side(panel("내 기록은 이 차 안에", listOf(
+                    Triple("lock", "저장", "일기와 지나온 길은 이 차 안에만 암호화해 둬요. 앱 서버는 없어요"),
+                    Triple("car", "차량 신호", "기어·깜빡이·브레이크·속도·핸들을 읽어 일기를 써요"),
+                    Triple("trash", "지우기", "설정에서 언제든 모두 지울 수 있어요"),
+                )))
                 nextLabel = "시작하기"
                 onNext = { if (!Car.offline) askLocation(); finishOnboarding(false) }
             }
@@ -259,16 +287,15 @@ internal fun MainActivity.onboardScreen(): View {
         }
     }
 
-    // 아래 단추 줄
-    val prepFirst = if (false) k.button("출발 준비부터", Kit.Btn.Secondary, "steering") { finishOnboarding(true) } else null
-    val barRow = k.row(12).apply {
+    // 아래 단추 줄: 다음 단추는 팔을 뻗어 누르기 쉽게 크게
+    val bar = k.row(12).apply {
         if (O.step > 0) addView(k.button("뒤로", Kit.Btn.Plain, "back") { prev() })
         addView(k.fill())
-        if (prepFirst != null && ui.wide) addView(prepFirst)
-        addView(k.button(nextLabel, Kit.Btn.Primary, enabled = canNext) { onNext() })
+        addView(k.button(nextLabel, Kit.Btn.Primary, enabled = canNext) { onNext() }.apply {
+            minimumHeight = ui.touch(if (ui.wide) 84 else 72); minimumWidth = ui.dp(if (ui.wide) 260 else 160)
+            ((this as? android.view.ViewGroup)?.getChildAt(0) as? android.widget.TextView)?.textSize = ui.sp(Type.Headline.size)
+        })
     }
-    // 좁은 창(내비 옆)에서는 단추 셋이 한 줄에 들어가지 않는다: '출발 준비부터'를 윗줄로 올린다
-    val bar = if (prepFirst != null && ui.narrow) k.col(10).apply { addView(prepFirst, k.lp(k.MATCH, k.WRAP)); addView(barRow, k.lp(k.MATCH, k.WRAP)) } else barRow
     val progress = k.row(6).apply {
         repeat(Onboard.LAST + 1) { i -> addView(View(context).apply { background = k.rounded(if (i <= O.step) Ink.accent else Ink.line, 4) }, k.lp(ui.dp(if (i == O.step) 28 else 10), ui.dp(6))) }
         addView(k.gap(6))
@@ -276,28 +303,21 @@ internal fun MainActivity.onboardScreen(): View {
     }
     val right = k.col().apply {
         val pad = ui.dp(if (ui.wide) 64 else 24)
-        setPadding(pad, ui.dp(if (ui.wide) 52 else 24), pad, ui.dp(28))
-        addView(progress)
-        addView(k.gap(28))
-        val body = if (ui.wide && aside.childCount > 0) k.row(40).apply {
-            gravity = Gravity.TOP
-            addView(content, k.lp(0, k.WRAP, 1.05f)); addView(aside, k.lp(0, k.WRAP, 1f))
-            // 오른쪽 칸은 왼쪽 고르기 칸과 같은 높이에서 시작한다 (제목 높이만큼 내려 맞춤)
-            anchor?.let { a -> content.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    content.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                    var top = 0; var v: View? = a
-                    while (v != null && v !== content) { top += v.top; v = v.parent as? View }
-                    if (aside.paddingTop != top) aside.setPadding(0, top, 0, 0)
-                }
-            }) }
-        } else k.col(18).apply { addView(content); if (aside.childCount > 0) addView(aside) }
-        addView(k.scroll(body), k.lp(k.MATCH, 0, 1f))
-        addView(k.gap(16))
+        setPadding(pad, ui.dp(if (ui.wide) 44 else 24), pad, ui.dp(28))
+        if (ui.wide) { addView(k.row(12).apply { addView(brand(30)); addView(k.fill()); addView(progress) }); addView(k.gap(20)) }
+        else { addView(progress); addView(k.gap(28)) }
+        if (ui.wide && aside.childCount > 0) {
+            // 화면 높이를 다 쓴다: 왼쪽 질문은 세로 가운데에, 오른쪽 칸은 위아래를 채운다
+            val box = aside.getChildAt(aside.childCount - 1)
+            (box.layoutParams as LinearLayout.LayoutParams).apply { height = 0; weight = 1f }
+            content.gravity = Gravity.CENTER_VERTICAL
+            addView(k.row(48).apply {
+                addView(content, k.lp(0, k.MATCH, 1f)); addView(aside, k.lp(0, k.MATCH, 1.1f))
+            }, k.lp(k.MATCH, 0, 1f))
+        } else addView(k.scroll(k.col(18).apply { addView(content); if (aside.childCount > 0) addView(aside) }), k.lp(k.MATCH, 0, 1f))
+        addView(k.gap(20))
         addView(bar, k.lp(k.MATCH, k.WRAP))
     }
-    if (ui.wide) right.addView(k.row(12).apply { addView(brand(30)); addView(k.fill()) }, 0)
-    if (ui.wide) right.addView(k.gap(26), 1)
     return right.apply { setBackgroundColor(Ink.bg) }
 }
 
@@ -327,22 +347,39 @@ internal class IntroSlides(ctx: android.content.Context, private val ui: Ui, pri
     private var index = 0
     private val icon = IconView(ctx, items[0].first, Ink.accent)
     private val step = k.text("", Type.Sub, Ink.accent)
-    private val title = k.text("", Type.Display).apply { textSize = ui.sp(60f) }
+    private val title = k.text("", Type.Display).apply { textSize = ui.sp(64f) }
     private val body = k.text("", Type.Headline, Ink.text2).apply { typeface = ui.regular }
-    private val dots = k.row(8)
-    private val next = Runnable { show((index + 1) % items.size, true) }
+    /** 아래 게이지: 칸마다 한 가지. 지금 칸이 차오르면 다음으로 넘어간다 */
+    private val gauge = Gauge(ctx)
+
+    private inner class Gauge(c: android.content.Context) : View(c) {
+        var fill = 0f
+            set(v) { field = v; invalidate() }
+        private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(c: android.graphics.Canvas) {
+            val gap = ui.dp(8).toFloat(); val n = items.size
+            val w = (width - gap * (n - 1)) / n; val h = height.toFloat(); val r = h / 2
+            for (i in 0 until n) {
+                val x = i * (w + gap)
+                p.color = Ink.line; c.drawRoundRect(x, 0f, x + w, h, r, r, p)
+                val part = if (i < index) 1f else if (i == index) fill else 0f
+                if (part > 0f) { p.color = Ink.accent; c.drawRoundRect(x, 0f, x + maxOf(h, w * part), h, r, r, p) }
+            }
+        }
+    }
 
     init {
-        orientation = VERTICAL
-        setPadding(ui.dp(36), ui.dp(32), ui.dp(36), ui.dp(28)); background = k.rounded(Ink.surface, 28, 1, Ink.line)
+        orientation = VERTICAL; gravity = Gravity.CENTER_VERTICAL
+        setPadding(ui.dp(40), ui.dp(32), ui.dp(40), ui.dp(28)); background = k.rounded(Ink.surface, 28, 1, Ink.line)
         minimumHeight = ui.dp(if (ui.wide) 330 else 280)
+        addView(View(ctx), LayoutParams(1, 0, 1f))
         addView(FrameLayout(ctx).apply {
             background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Ink.accentSoft) }
-            addView(icon, FrameLayout.LayoutParams(ui.dp(72), ui.dp(72), Gravity.CENTER))
-        }, LayoutParams(ui.dp(140), ui.dp(140)))
-        addView(k.gap(22)); addView(step); addView(k.gap(4)); addView(title); addView(k.gap(8)); addView(body)
-        addView(k.gap(22))
-        addView(dots)
+            addView(icon, FrameLayout.LayoutParams(ui.dp(84), ui.dp(84), Gravity.CENTER))
+        }, LayoutParams(ui.dp(160), ui.dp(160)))
+        addView(k.gap(24)); addView(step); addView(k.gap(4)); addView(title); addView(k.gap(8)); addView(body)
+        addView(View(ctx), LayoutParams(1, 0, 1f))
+        addView(gauge, LayoutParams(LayoutParams.MATCH_PARENT, ui.dp(8)).apply { topMargin = ui.dp(20) })
         setOnClickListener { show((index + 1) % items.size, true) }
         show(0, false)
     }
@@ -350,14 +387,24 @@ internal class IntroSlides(ctx: android.content.Context, private val ui: Ui, pri
     private fun show(i: Int, animate: Boolean) {
         index = i
         val (ic, t, s) = items[i]
-        fun fill() {
-            icon.set(ic, Ink.accent); step.text = "${i + 1} / ${items.size}"; title.text = t; body.text = s; body.visibility = if (s.isEmpty()) View.GONE else View.VISIBLE
-            dots.removeAllViews()
-            items.indices.forEach { j -> dots.addView(View(context).apply { background = k.rounded(if (j == i) Ink.accent else Ink.line, 4) }, LayoutParams(ui.dp(if (j == i) 28 else 10), ui.dp(6))) }
-        }
+        fun fill() { icon.set(ic, Ink.accent); step.text = "${i + 1} / ${items.size}"; title.text = t; body.text = s; body.visibility = if (s.isEmpty()) View.GONE else View.VISIBLE }
         if (animate) { listOf<View>(icon, step, title, body).forEach { v -> v.animate().alpha(0f).setDuration(160).withEndAction { fill(); v.animate().alpha(1f).setDuration(220).start() }.start() } } else fill()
-        removeCallbacks(next); if (isAttachedToWindow || !animate) postDelayed(next, 3600)
+        run(isAttachedToWindow)
     }
-    override fun onAttachedToWindow() { super.onAttachedToWindow(); removeCallbacks(next); postDelayed(next, 3600) }
-    override fun onDetachedFromWindow() { removeCallbacks(next); super.onDetachedFromWindow() }
+    private var startedAt = 0L
+    private val tick = object : Runnable {
+        override fun run() {
+            val f = (android.os.SystemClock.uptimeMillis() - startedAt) / SLIDE_MS.toFloat()
+            if (f >= 1f) { show((index + 1) % items.size, true); return }
+            gauge.fill = f; postDelayed(this, 33)
+        }
+    }
+    private fun run(start: Boolean) {
+        removeCallbacks(tick); gauge.fill = 0f
+        if (!start) return
+        startedAt = android.os.SystemClock.uptimeMillis(); postDelayed(tick, 33)
+    }
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); run(true) }
+    override fun onDetachedFromWindow() { run(false); super.onDetachedFromWindow() }
+    private companion object { const val SLIDE_MS = 3600L }
 }

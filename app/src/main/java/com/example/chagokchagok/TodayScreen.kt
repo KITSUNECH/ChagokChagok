@@ -385,7 +385,16 @@ internal fun MainActivity.readyScreen(): View {
     fun check(ok: Boolean?, good: String, bad: String, unknown: String, icon: String): View? {
         if (ok == null && unknown.isEmpty()) return null
         if (ok == false && bad.isEmpty()) return null
-        return k.item(when (ok) { true -> good; false -> bad; null -> unknown }, icon = icon,
+        val label = when (ok) { true -> good; false -> bad; null -> unknown }
+        val tint = when (ok) { true -> Ink.go; false -> Ink.warn; null -> Ink.text3 }
+        // 넓은 화면: 한 줄을 낮게 해서 여섯 줄이 넘어도 한 화면에 든다
+        if (ui.wide) return k.row(12).apply {
+            minimumHeight = ui.dp(46)
+            addView(k.icon(icon, tint, 22))
+            addView(k.text(label, Type.Body).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, k.lp(0, k.WRAP, 1f))
+            addView(k.icon(when (ok) { true -> "checkCircle"; false -> "warning"; null -> "circle" }, tint, 22))
+        }
+        return k.item(label, icon = icon,
             iconColor = when (ok) { true -> Ink.go; false -> Ink.warn; null -> Ink.text3 },
             trailing = k.icon(when (ok) { true -> "checkCircle"; false -> "warning"; null -> "circle" }, when (ok) { true -> Ink.go; false -> Ink.warn; null -> Ink.text3 }, 22))
     }
@@ -415,47 +424,91 @@ internal fun MainActivity.readyScreen(): View {
             trailing = k.iconButton("speaker", Ink.accent, Ink.accentSoft, 44) { speak(t.text) })
     }
 
-    val left = k.col().apply {
-        addView(k.section("떠나기 전에"))
-        addView(k.groupOf(checks))
-    }
-    val right = k.col().apply {
-        addView(k.section(if (g.owner == d) "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"))
-        if (tipRows.isEmpty()) addView(k.card { addView(k.text("이 길에는 한마디가 없어요. 조용히 기록만 해요.", Type.Sub, Ink.text2)) })
-        else addView(k.groupOf(tipRows))
-        if (placed > 0 && !canPlace) addView(k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 근처에서 들려줘요." + "", Type.Caption, Ink.warn).apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) })
+    val demoRoad = demoRoad0
+    val hintTitle = if (demoRoad) "‘모의 주행 시작’을 누르면 출근길을 끝까지 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요"
+    val hintSub = if (demoRoad) "실제로 달릴 때는 기어를 D에 놓으면 기록을 시작해요." else "달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요."
+    val tipTitle = if (g.owner == d) "이번에 참고할 지난번 한마디 ${g.tips.size}개" else "${Writer.poss(g.owner)} 한마디 ${g.tips.size}개"
+    val noPlace = if (placed > 0 && !canPlace) k.text("위치를 받지 못하고 있어요. 설정에서 위치를 켜면 그 근처에서 들려줘요.", Type.Caption, Ink.warn) else null
+    fun trace() = TraceView(this, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips)) }
+    // 단추 순서는 언제나 같다: 가장 먼저 할 일(큰 단추) → 그다음 → 시연용
+    val simButton = if (BuildConfig.DEMOS) k.button(if (demoRoad) "모의 주행 시작 (시연용)" else "모의 주행 (시연용)", if (demoRoad) Kit.Btn.Primary else Kit.Btn.Plain, if (demoRoad) "play" else null) { trip.startSim() } else null   // 마켓판에는 없음
+    // 기어 신호를 받는 차에서는 D에 놓으면 시작하므로 '기록 시작' 단추를 두지 않는다
+    val startButton = if (!car.gearKnown) k.button("기록 시작", if (demoRoad) Kit.Btn.Secondary else Kit.Btn.Primary, "play") { trip.start() } else null
+    val tellButton = if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null
+    val buttons = k.buttons(*(if (demoRoad) listOfNotNull(simButton, startButton, tellButton) else listOfNotNull(startButton, tellButton, simButton)).toTypedArray())
+    val head = k.header(g.title, (when (g.kind) { "나" -> "지난번의 내가 다녀온 길"; "다시" -> "다시 가는 길"; "연습" -> "${Writer.subj(g.owner)} 건네준 연습"; else -> "${Writer.subj(g.owner)} 건네준 길" }) + " · ${facts(g.drive)}", onBack = { trip.guide = null; trip.routeSent = false; Session.convoy = null; back() })
+    val convoy = Session.convoy?.let { f -> k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) } }
+
+    // 넓은 화면: 왼쪽은 떠나기 전 확인(아래에 시작하는 법), 오른쪽은 한마디와 지난번에 지나온 길. 두 칸의 위아래를 맞추고 맨 아래에 단추.
+    if (ui.wide) return k.col().apply {
+        minimumHeight = pageHeight()
+        convoy?.let { addView(it); addView(k.gap(12)) }
+        addView(head)
+        addView(k.gap(18))
+        addView(k.row(20).apply {
+            addView(k.card(pad = 22) {
+                addView(k.text("떠나기 전에", Type.Headline))
+                addView(k.gap(8))
+                checks.forEach { addView(it, k.lp(k.MATCH, k.WRAP)) }
+                addView(View(context), k.lp(1, 0, 1f))
+                addView(k.row(14).apply {
+                    setPadding(ui.dp(16), ui.dp(14), ui.dp(16), ui.dp(14)); background = k.rounded(Ink.accentSoft, 16)
+                    addView(k.icon("steering", Ink.accent, 26))
+                    addView(k.col(2).apply { addView(k.text(hintTitle, Type.BodyStrong)); addView(k.text(hintSub, Type.Caption, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
+                })
+            }, k.lp(0, k.MATCH, 1f))
+            addView(k.col(16).apply {
+                addView(k.card(pad = 22) {
+                    addView(k.text(tipTitle, Type.Headline))
+                    addView(k.gap(6))
+                    if (g.tips.isEmpty()) addView(k.text("이 길에는 한마디가 없어요. 조용히 기록만 해요.", Type.Sub, Ink.text2))
+                    g.tips.forEach { t ->
+                        addView(k.row(12).apply {
+                            minimumHeight = ui.touch(56)
+                            addView(k.icon(if (t.placed) "pin" else "quote", if (t.placed) Ink.accent else Ink.text3, 22))
+                            addView(k.col(1).apply {
+                                addView(k.text(t.text, Type.Body))
+                                addView(k.text(if (t.placed && store.locationOn) "남긴 곳 근처에 가면 들려줘요" else "자리 정보가 없어요 · 지금 미리 들어 두세요", Type.Caption, Ink.text2))
+                            }, k.lp(0, k.WRAP, 1f))
+                            addView(k.iconButton("speaker", Ink.accent, Ink.accentSoft, 44) { speak(t.text) })
+                        })
+                    }
+                    noPlace?.let { addView(it) }
+                })
+                addView(k.card(pad = 22) {
+                    addView(k.text("지난번에 지나온 길", Type.Headline))
+                    addView(k.text("숫자는 한마디를 남긴 자리예요. 달리는 동안에는 지금 위치가 이 길 위에 표시돼요.", Type.Caption, Ink.text2))
+                    addView(trace(), k.lp(k.MATCH, 0, 1f).apply { topMargin = ui.dp(6) })
+                    minimumHeight = ui.dp(150)
+                }, k.lp(k.MATCH, 0, 1f))
+            }, k.lp(0, k.MATCH, 1f))
+        }, k.lp(k.MATCH, 0, 1f))
+        addView(k.gap(16))
+        addView(buttons)
     }
     return k.col().apply {
-        Session.convoy?.let { f -> addView(k.row(10).apply { setPadding(ui.dp(16), ui.dp(12), ui.dp(16), ui.dp(12)); background = k.rounded(Ink.accentSoft, 14); addView(k.avatar(f.name, 30)); addView(k.text("${f.name} 님과 같이 가요. ${f.name} 님이 앞서 가요.", Type.Sub), k.lp(0, k.WRAP, 1f)); addView(k.tag("시연용", Ink.warn)); addView(k.text("그만", Type.Sub, Ink.accent).apply { setOnClickListener { Session.convoy = null; render() } }) }); addView(k.gap(12)) }
-        addView(k.header(g.title, (when (g.kind) { "나" -> "지난번의 내가 다녀온 길"; "다시" -> "다시 가는 길"; "연습" -> "${Writer.subj(g.owner)} 건네준 연습"; else -> "${Writer.subj(g.owner)} 건네준 길" }) + " · ${facts(g.drive)}", onBack = { trip.guide = null; trip.routeSent = false; Session.convoy = null; back() }))
+        convoy?.let { addView(it); addView(k.gap(12)) }
+        addView(head)
         addView(k.gap(8))
-        if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
-        else { addView(left); addView(right) }
+        addView(k.section("떠나기 전에")); addView(k.groupOf(checks))
+        addView(k.section(tipTitle))
+        if (tipRows.isEmpty()) addView(k.card { addView(k.text("이 길에는 한마디가 없어요. 조용히 기록만 해요.", Type.Sub, Ink.text2)) })
+        else addView(k.groupOf(tipRows))
+        noPlace?.let { addView(it.apply { setPadding(ui.dp(4), ui.dp(10), 0, 0) }) }
         addView(k.gap(20))
-        // 이 길의 그림: 지난번에 지나온 길과 한마디를 남긴 자리. 화면의 남는 높이를 채운다
         addView(k.card(pad = 20) {
             addView(k.text("지난번에 지나온 길", Type.Sub, Ink.text2))
-            addView(TraceView(context, ui).apply { lanes = listOf(Lane(g.owner, g.drive, g.tips)) }, k.lp(k.MATCH, 0, 1f).apply { topMargin = ui.dp(6) })
-            minimumHeight = ui.dp(130)
-        }, if (ui.wide) k.lp(k.MATCH, 0, 1f) else k.lp(k.MATCH, ui.dp(150)))
+            addView(trace(), k.lp(k.MATCH, 0, 1f).apply { topMargin = ui.dp(6) })
+        }, k.lp(k.MATCH, ui.dp(150)))
         addView(k.gap(20))
         addView(k.card(pad = 22, color = Ink.accentSoft) {
             addView(k.row(14).apply {
                 addView(k.icon("steering", Ink.accent, 28))
-                addView(k.col(2).apply {
-                    addView(k.text(if (demoRoad0) "아래 ‘모의 주행 시작’을 누르면 출근길을 끝까지 보여 줘요" else "기어를 D에 놓으면 기록을 시작해요", Type.Headline))
-                    addView(k.text(if (demoRoad0) "실제로 달릴 때는 기어를 D에 놓으면 기록을 시작해요." else "달리는 동안 화면에는 꼭 필요한 것만 보여 주고, 나머지는 말로 알려 줄게요.", Type.Sub, Ink.text2))
-                }, k.lp(0, k.WRAP, 1f))
+                addView(k.col(2).apply { addView(k.text(hintTitle, Type.Headline)); addView(k.text(hintSub, Type.Sub, Ink.text2)) }, k.lp(0, k.WRAP, 1f))
             })
         })
         addView(k.gap(16))
-        val demoRoad = demoRoad0
-        // 단추 순서는 언제나 같다: 가장 먼저 할 일(큰 단추) → 그다음 → 시연용
-        val simButton = if (BuildConfig.DEMOS) k.button(if (demoRoad) "모의 주행 시작 (시연용)" else "모의 주행 (시연용)", if (demoRoad) Kit.Btn.Primary else Kit.Btn.Plain, if (demoRoad) "play" else null) { trip.startSim() } else null   // 마켓판에는 없음
-        // 기어 신호를 받는 차에서는 D에 놓으면 시작하므로 '기록 시작' 단추를 두지 않는다
-        val startButton = if (!car.gearKnown) k.button("기록 시작", if (demoRoad) Kit.Btn.Secondary else Kit.Btn.Primary, "play") { trip.start() } else null
-        val tellButton = if (g.owner != d) k.button("${g.owner} 님에게 출발 알리기", Kit.Btn.Secondary, "share") { tellDeparture(g) } else null
-        addView(k.buttons(*(if (demoRoad) listOfNotNull(simButton, startButton, tellButton) else listOfNotNull(startButton, tellButton, simButton)).toTypedArray()))
+        addView(buttons)
     }
 }
 

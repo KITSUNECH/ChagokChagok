@@ -21,6 +21,7 @@ internal object DriveViews {
     var turnText: TextView? = null
     var turnSub: TextView? = null
     var turnCard: View? = null
+    var beltBtn: View? = null
     var tip: TextView? = null
     var tipWho: TextView? = null
     var trace: TraceView? = null
@@ -81,6 +82,8 @@ internal fun MainActivity.driveScreen(): View {
         addView(k.row(22).apply {
             addView(V.turnIcon, k.lp(ui.dp(84), ui.dp(84)))
             addView(k.col(4).apply { addView(V.turnText); addView(V.turnSub) }, k.lp(0, k.WRAP, 1f))
+            // 가상 콘솔에는 안전벨트 조작이 없다: 시연판에서는 눌러서 넘어간다 (실제 신호가 아니므로 받은 신호에 세지 않는다)
+            V.beltBtn = if (BuildConfig.DEMOS) k.button("안전벨트 맸어요 (시연)", Kit.Btn.Primary, "check") { trip.beltSkip = true; refreshDrive() }.also { addView(it) } else null
         })
         addView(k.gap(16))
         addView(V.turnBar, k.lp(k.MATCH, ui.dp(8)))
@@ -175,9 +178,10 @@ internal fun MainActivity.refreshDrive() {
     // 다음 회전
     val side = when (car.turn) { "LEFT" -> "좌회전"; "RIGHT" -> "우회전"; "UTURN" -> "유턴"; else -> null }
     val prompt = trip.prompt
-    val beltNag = car.beltKnown && !car.belt && sec < 20
+    val beltNag = car.beltKnown && !car.belt && !trip.beltSkip && (sec < 20 || (BuildConfig.DEMOS && !rolling))
+    V.beltBtn?.visibility = if (beltNag) View.VISIBLE else View.GONE
     when {
-        beltNag -> { V.turnIcon?.set("seat", Ink.warn); V.turnText?.text = "안전벨트를 매 주세요"; V.turnSub?.text = "매면 이 안내는 사라져요" }
+        beltNag -> { V.turnIcon?.set("seat", Ink.warn); V.turnText?.text = "안전벨트를 매 주세요"; V.turnSub?.text = if (BuildConfig.DEMOS) "매면 사라져요. 가상 콘솔에서는 오른쪽 단추로 넘어가요" else "매면 이 안내는 사라져요" }
         prompt != null -> { V.turnIcon?.set(if (prompt.startsWith("왼")) "turnLeft" else "turnRight", Ink.signal); V.turnText?.text = "지금 $prompt"; V.turnSub?.text = "돌기 전에 미리" }
         // 길 안내는 내비의 몫이다 (Pleos Single Route Policy). 여기서는 거리·방향을 다시 말하지 않고 깜빡이 코칭만 한다.
         side != null && car.turnMeters in 1..300 -> { V.turnIcon?.set(when (car.turn) { "LEFT" -> "turnLeft"; "UTURN" -> "uturn"; else -> "turnRight" }, Ink.text); V.turnText?.text = "곧 돌아요"; V.turnSub?.text = "깜빡이를 미리 켜 두면 편해요" }

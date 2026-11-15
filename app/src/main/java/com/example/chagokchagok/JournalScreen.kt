@@ -22,8 +22,10 @@ internal var journalRoad: String? = null
 internal fun MainActivity.journalScreen(): View {
     val k = kit; val me = store.driver
     val all = store.diariesOf(me)
-    val roads = all.mapNotNull { it.drive.place }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }.take(5)
+    val roads = all.mapNotNull { it.drive.place }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }
     if (journalRoad != null && journalRoad !in roads) journalRoad = null
+    // 자주 간 곳 네 곳만 바로 보이고, 나머지는 ‘다른 곳’에서 고른다 (고른 곳은 앞으로 나온다)
+    val quick = (listOfNotNull(journalRoad?.takeIf { it !in roads.take(4) }) + roads).take(4)
     val shown = (if (journalRoad == null) all else all.filter { it.drive.place == journalRoad }).reversed()
     return k.col().apply {
         addView(k.header("일기장", if (all.isEmpty()) "아직 일기가 없어요" else "일기 ${all.size}장 · 첫 일기 ${dateText(all.first().date, "M월 d일")}"))
@@ -31,7 +33,11 @@ internal fun MainActivity.journalScreen(): View {
         if (roads.isNotEmpty()) {
             addView(k.flow(10).apply {
                 addView(k.chip("전체", journalRoad == null) { journalRoad = null; render() })
-                roads.forEach { r -> addView(k.chip(r, journalRoad == r, "pin") { journalRoad = r; render() }) }
+                quick.forEach { r -> addView(k.chip(r, journalRoad == r, "pin") { journalRoad = r; render() }) }
+                val more = roads - quick.toSet()
+                if (more.isNotEmpty()) addView(k.chip("다른 곳 ${more.size}", false, "list") {
+                    sheets.choose("다녀온 곳", "많이 간 순서예요.", more.map { r -> "$r · ${all.count { it.drive.place == r }}번" }) { i -> journalRoad = more[i]; render() }
+                })
             })
             addView(k.gap(14))
             // 길을 고르면 그 길에서의 변화로 바로 갈 수 있다

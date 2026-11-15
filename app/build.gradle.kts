@@ -19,8 +19,8 @@ android {
         applicationId = "com.example.chagokchagok"
         minSdk = 28
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.3.6"
+        versionCode = 10
+        versionName = "0.3.7"
     }
     // 제출용 release: 공모전 안내대로 실행 가능한 release 버전. 서명은 공개 디버그 키로 해 별도 키 파일 없이 설치된다.
     // (Pleos App Market 탑재 때는 마켓 안내에 따른 정식 키로 바꾼다.) 코드 축소(R8)는 SDK 동작 확인 전이라 끈다.

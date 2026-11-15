@@ -43,6 +43,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     var nextTipMeters: Int? = null; private set       // 다음 한마디까지 거리
     val heard = mutableSetOf<Int>()
     var arrived = false; private set
+    /** 시연: "안전벨트 맸어요"를 눌렀다 (가상 콘솔에는 안전벨트 조작이 없다) */
+    var beltSkip = false
     /** 차선 변경 판정 (깜빡이 + 조향각) */
     private val lanes = LaneWatch().also { w ->
         car.onSteer = { a -> if (active) w.steer(a) }
@@ -298,7 +300,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         if (car.passenger) recorder.add(Evt.SEAT, "on")
         heard.clear(); inZone.clear(); lastFix = null; voiceNotes.clear(); currentTip = null; coach.reset(); prompt = null; nextTipMeters = null
         lastSpeed = null; lastHard = 0L; speedMarked = false; maxSpeed = 0f; speedKm = 0f; parkPending = false
-        praised = 0; lanePraised = 0; focus = host.tripFocus(); spoken.clear(); withPassenger = car.passenger; arrived = false; path.clear()
+        praised = 0; lanePraised = 0; focus = host.tripFocus(); spoken.clear(); withPassenger = car.passenger; arrived = false; beltSkip = false; path.clear()
         // 말하는 양: 받은 길의 종류가 기본, 처음 설정에서 고른 운전 경험으로 더하거나 줄인다 (초보는 회전 전 깜빡이까지, 익숙은 경고만)
         support = when (guide?.kind) { "연습" -> 1; "길", "나" -> 2; else -> 3 }.let { base ->
             when (store.typeOf(store.driver)) { "초보" -> minOf(base, 2); "익숙" -> 3; else -> base }
@@ -352,7 +354,7 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 else -> d
             }
             val far = g != null && g.drive.distKm > 0.05f && km >= g.drive.distKm * 0.9f
-            placed.copy(distKm = km, path = route, completed = g == null || arrived || far || wasSim, sim = wasSim, economy = car.economy, economyUnit = car.economyUnit)
+            placed.copy(distKm = km, path = route, completed = g == null || arrived || far, sim = wasSim, economy = car.economy, economyUnit = car.economyUnit)
         }
         if (demoAuto) { demoAuto = false; car.simEconomy(null) }
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()

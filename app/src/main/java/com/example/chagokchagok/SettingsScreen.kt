@@ -55,7 +55,7 @@ internal fun MainActivity.settingsScreen(): View {
         )))
         into = left
         if (BuildConfig.DEMOS) {
-            put(k.section("시연 (공모전 심사용)"))
+            put(k.section("시연"))
             put(k.groupOf(listOf(
                 k.item("출근길 시연 보기", "지난 출근 기록(예시)을 넣고, 모의 주행으로 ‘늘었어요’ 화면까지 보여 줘요 · 2분", "play", chevron = true) { DemoCommute.start(this@settingsScreen) },
                 k.item("시연 도구", "시연 기록 지우기, 시험용 신호, 아이디어 시연", "list", chevron = true) { go(MainActivity.DEMO) },
@@ -75,13 +75,26 @@ internal fun MainActivity.settingsScreen(): View {
             },
             k.item("기록 모두 지우기", "일기, 건넨 길, 사람, 설정이 모두 사라져요", "trash", Ink.danger) { confirmClearAll() },
         )))
+        put(k.section("앱 정보"))
+        put(k.groupOf(listOf(
+            k.item("차곡차곡 ${BuildConfig.VERSION_NAME}", "기록은 이 차 안에만 암호화해 저장돼요 · 글꼴 Pretendard, 고운바탕, Noto Sans KR (SIL OFL)", "info"),
+        )))
     }
+    // 넓은 화면: 두 칸의 아래가 맞도록, 짧은 칸의 줄들이 남는 높이를 고르게 나눠 갖는다
+    fun stretch(c: android.widget.LinearLayout) {
+        for (i in 0 until c.childCount) {
+            val g = c.getChildAt(i) as? android.widget.LinearLayout ?: continue
+            if (g.orientation != android.widget.LinearLayout.VERTICAL) continue
+            var rows = 0
+            for (j in 0 until g.childCount) { val r = g.getChildAt(j); if (r is android.view.ViewGroup) { (r.layoutParams as android.widget.LinearLayout.LayoutParams).weight = 1f; rows++ } }
+            (g.layoutParams as android.widget.LinearLayout.LayoutParams).weight = rows.toFloat()
+        }
+    }
+    if (ui.wide) { stretch(left); stretch(right) }
     return k.col().apply {
         addView(k.header("설정"))
-        if (ui.wide) addView(k.row(24).apply { gravity = Gravity.TOP; addView(left, k.lp(0, k.WRAP, 1f)); addView(right, k.lp(0, k.WRAP, 1f)) })
+        if (ui.wide) addView(k.row(24).apply { addView(left, k.lp(0, k.MATCH, 1f)); addView(right, k.lp(0, k.MATCH, 1f)) })
         else { addView(left); addView(right) }
-        addView(k.gap(20))
-        addView(k.text("차곡차곡 ${BuildConfig.VERSION_NAME} · 기록은 이 차 안에만 암호화해 저장돼요.\n글꼴: Pretendard, 고운바탕, Noto Sans KR (SIL Open Font License)", Type.Caption, Ink.text3).apply { setPadding(ui.dp(4), 0, 0, 0) })
     }
 }
 
@@ -309,11 +322,11 @@ internal fun MainActivity.checkScreen(): View {
     }
 }
 
-/** 시연 도구 (공모전 심사용): 위치가 움직이지 않는 에뮬레이터에서 앱의 흐름을 끝까지 보여 주려고 만든 것. 정식판에는 들어가지 않는다. */
+/** 시연 도구: 위치가 움직이지 않는 에뮬레이터에서 앱의 흐름을 끝까지 보여 준다. 마켓판에는 들어가지 않는다. */
 internal fun MainActivity.demoScreen(): View {
     val k = kit
     return k.col().apply {
-        addView(k.header("시연 도구", "공모전 심사에서 흐름을 끝까지 보여 주려고 만든 메뉴예요. 여기서 만든 기록과 신호는 화면에 모두 ‘예시’·‘시연용’으로 표시되고, 정식판에는 들어가지 않아요.", onBack = { back() }))
+        addView(k.header("시연 도구", "달리지 않고도 앱의 흐름을 끝까지 볼 수 있어요. 여기서 만든 기록과 신호는 화면에 모두 ‘예시’·‘시연용’으로 표시돼요.", onBack = { back() }))
         addView(k.gap(16))
             addView(k.groupOf(listOf(
                 k.toggleItem("아이디어 시연: 다른 차의 가족·친구와 잇기", "지금 Pleos에는 차와 차를 잇는 기능이 없어요. 그 기능이 열린다면 이렇게 쓰겠다는 생각을 가상의 친구로만 보여 줘요. 실제 기능이 아니에요.", store.demoOn, "people") { store.demoOn = it; render() },

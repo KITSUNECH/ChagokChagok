@@ -220,7 +220,7 @@ class Kit(val ctx: Context, val ui: Ui) {
             addView(row(gap).apply {
                 gravity = Gravity.TOP
                 chunk.forEach { addView(it, lp(0, MATCH, 1f)) }
-                repeat(cols - chunk.size) { addView(View(ctx), lp(0, 1, 1f)) }
+                repeat(cols - chunk.size) { addView(android.widget.Space(ctx), lp(0, MATCH, 1f)) }   // 빈 칸. 높이를 고정하면 줄 전체가 그 높이로 줄어든다
             }, lp(MATCH, WRAP))
         }
     }
