@@ -161,7 +161,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     internal fun go(name: String, arg: String? = null) {
         if (driving && name in PARKED_ONLY) { toast("달리는 중에는 열지 않아요. 주차하면 볼 수 있어요."); return }
         val r = Route(name, arg)
-        if (name == DIARY) diaryDetail = false
+        if (name == DIARY) { diaryDetail = false; DiaryPrefs.detail = null }
         if (name in TABS || name == ONBOARD || name == DRIVE) { stack.clear() }
         else if (stack.isEmpty()) stack.add(Route(TODAY))
         stack.add(r); route = r

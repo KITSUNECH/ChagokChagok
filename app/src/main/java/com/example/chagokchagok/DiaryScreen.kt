@@ -8,7 +8,9 @@ import android.widget.LinearLayout
 import java.util.Locale
 
 /** 일기 보기: 0 읽기(기본, 가독성) · 1 원고지 */
-internal object DiaryPrefs { var mode = 0 }
+internal object DiaryPrefs { var mode = 0
+    /** 넓은 화면에서 자세한 기록(지나온 길·숫자·타임라인)을 펼쳐 보고 있는 일기 */
+    var detail: String? = null }
 
 internal fun MainActivity.diaryScreen(id: String?): View {
     val k = kit
@@ -28,13 +30,19 @@ internal fun MainActivity.diaryScreen(id: String?): View {
             setOnClickListener { sheets.sheet("이 기록의 근거", "어떤 차량 신호로 적었는지") { _ -> addView(evidence(d, guide)) } }
         })
     }
+    val blocks = listOf(block("지나온 길", paper), block("오늘의 숫자", numbers(d)), block("주행 타임라인", timeline), block("다음으로", actions(d, guide)))
+    // 넓은 화면: 일기 한 장이 화면을 꽉 채우고, 자세한 기록은 단추로 넘겨 본다 (아래가 잘려 보이지 않게)
+    if (ui.wide) {
+        if (DiaryPrefs.detail != d.id) return diaryPage(d, prev) { DiaryPrefs.detail = d.id; render() }
+        return k.col().apply {
+            addView(k.header("자세한 기록", d.title + " · " + dateText(d.date), onBack = { DiaryPrefs.detail = null; render() }))
+            addView(k.grid(2, blocks, 20))
+        }
+    }
     return k.col().apply {
         addView(diaryPage(d, prev))
         addView(k.gap(8))
-        addView(k.grid(if (ui.wide) 2 else 1, listOf(
-            block("지나온 길", paper), block("오늘의 숫자", numbers(d)),
-            block("주행 타임라인", timeline), block("다음으로", actions(d, guide)),
-        ), 20))
+        addView(k.grid(1, blocks, 20))
     }
 }
 

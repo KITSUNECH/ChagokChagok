@@ -90,7 +90,7 @@ class ScreenshotTest {
                 path = SampleRoute.points.mapIndexed { i, q -> Pt(i / (SampleRoute.points.size - 1f), q.first, q.second) })
             val dd = Writer.write(again, store.diariesOf("나"), null, 0); store.addDiary(dd)
             a.go(MainActivity.DIARY, dd.id); snap("06b_diary_compare")
-            scrollDown(620); snap("06b2_diary_lower"); scrollDown(700); snap("06b3_diary_lowest")
+            if (tag == "panel") { scrollDown(620); snap("06b2_diary_lower"); scrollDown(700); snap("06b3_diary_lowest") } else { DiaryPrefs.detail = dd.id; a.render(); snap("06b2_diary_detail"); DiaryPrefs.detail = null }
             a.noteToSelf(dd); snap("06c_tip_ideas"); a.onBackPressed()
             a.go(MainActivity.ROAD, dd.id); snap("06e_road")
             scrollDown(600); snap("06e2_road_lower")

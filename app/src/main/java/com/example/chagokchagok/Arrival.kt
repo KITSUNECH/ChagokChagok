@@ -172,7 +172,7 @@ internal fun MainActivity.reviewCard(): View? {
  * 오른쪽은 나(느낌, 한 줄, 다음의 나에게 한마디). 질문은 한 번에 하나만 묻고, 답하면 다음 것이 나온다.
  * 지나온 길 그림·타임라인·근거는 "자세히 보기"에 있다.
  */
-internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
+internal fun MainActivity.diaryPage(d: Diary, prev: Diary?, onDetail: (() -> Unit)? = null): View {
     val k = kit
     val all = store.diariesOf(d.driver)
     val mine = d.driver == store.driver
@@ -240,7 +240,9 @@ internal fun MainActivity.diaryPage(d: Diary, prev: Diary?): View {
             if (open.size == 1) reviewMoment(d, open.first()) else noteToSelf(d)
         }, k.lp(k.MATCH, k.WRAP))
         if (prev != null) addView(k.button("이 길에서의 변화 보기", Kit.Btn.Secondary, "chart") { go(MainActivity.ROAD, d.id) }, k.lp(k.MATCH, k.WRAP))
-        if (mine && pending(d, prev)) addView(k.button("나중에 할게요", Kit.Btn.Plain) { go(MainActivity.TODAY) }, k.lp(k.MATCH, k.WRAP))
+        val later = if (mine && pending(d, prev)) k.button("나중에 할게요", Kit.Btn.Plain) { go(MainActivity.TODAY) } else null
+        val detail = onDetail?.let { k.button("자세한 기록 보기", Kit.Btn.Plain, "list") { it() } }
+        if (later != null || detail != null) addView(k.row(8).apply { listOfNotNull(detail, later).forEach { addView(it, k.lp(0, k.WRAP, 1f)) } }, k.lp(k.MATCH, k.WRAP))
     }
     return k.col().apply {
         addView(k.header(d.title, dateText(d.date) + (if (d.drive.sim) " · 모의 주행 (시연용)" else "") + if (store.isSample(d.id)) " · 예시 기록" else "", onBack = { back() },
