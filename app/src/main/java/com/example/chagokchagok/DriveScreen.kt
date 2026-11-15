@@ -60,7 +60,7 @@ internal fun MainActivity.driveScreen(): View {
         gravity = Gravity.CENTER; setBackgroundColor(Ink.bg); setPadding(pad, pad, pad, pad)
         addView(k.icon("steering", Ink.text2, 64))
         addView(k.text("주행 중이에요", Type.Large).apply { gravity = Gravity.CENTER })
-        addView(k.text("앞을 봐 주세요. 주차하면 다시 열려요.", Type.Body, Ink.text2).apply { gravity = Gravity.CENTER })
+        addView(k.text(if (store.onboarded) "움직이기 시작하면 기록을 시작해요." else "앞을 봐 주세요. 주차하면 첫 설정을 이어서 할 수 있어요.", Type.Body, Ink.text2).apply { gravity = Gravity.CENTER })
     }
 
     // 맨 위: 기록 중 표시

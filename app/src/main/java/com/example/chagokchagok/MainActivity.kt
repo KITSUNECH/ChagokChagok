@@ -85,7 +85,10 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         limits = Restrictions(this) { onRestricted() }
         sheets.keyboardBlocked = { limits.noKeyboard || trip.active }
         sheets.driving = { driving }   // 기록 중에는 글자 입력을 받지 않는다 (도로교통법 제49조)
-        car.onSpeed = { kmh -> val sec = System.currentTimeMillis() / 1000; if (sec != speedTick) { speedTick = sec; Telemetry.hit(Evt.SPEED, "${kmh.toInt()}km/h") }; trip.onSpeed(kmh); if (rolling != wasRolling) { wasRolling = rolling; if (route.name == DRIVE) render() } }
+        car.onSpeed = { kmh -> val sec = System.currentTimeMillis() / 1000; if (sec != speedTick) { speedTick = sec; Telemetry.hit(Evt.SPEED, "${kmh.toInt()}km/h") }; trip.onSpeed(kmh)
+            // 기록이 꺼진 채 차가 움직이기 시작했다(기록을 끝낸 뒤 다시 출발했거나 기어 신호를 놓쳤다): 잠금 화면 대신 기록을 시작한다
+            if (!trip.active && store.onboarded && kmh >= 5f && car.gear != "P" && car.gear != "R") trip.start()
+            if (rolling != wasRolling) { wasRolling = rolling; if (route.name == DRIVE) render() } }
         car.start(); voice.start(); limits.start()
         if (store.locationOn) places.start()
         // 효과음: 알림음 용도(SONIFICATION)로 만들고, 울릴 때마다 잠깐 포커스를 받아 다른 소리를 줄인다 (Pleos 오디오 가이드)
