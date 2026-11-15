@@ -309,7 +309,7 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     private fun carStatus(): View {
         val k = kit
         val vehicleOk = !Car.offline && !car.failures.containsKey("vehicle")
-        val any = vehicleOk || car.naviConnected || (store.locationOn && places.permitted()) || voice.ready
+        val any = vehicleOk || car.naviConnected || (store.locationOn && places.permitted()) || voice.ready || Car.previewConnected
         return k.col(4).apply {
             gravity = Gravity.CENTER; minimumHeight = ui.touch(56)
             addView(View(context).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (any) Ink.go else Ink.text3) } }, k.lp(ui.dp(9), ui.dp(9)))

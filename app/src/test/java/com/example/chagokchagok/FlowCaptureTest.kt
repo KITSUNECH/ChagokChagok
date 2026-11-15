@@ -16,7 +16,7 @@ import java.io.File
 import java.time.Duration
 
 /**
- * 앱을 처음부터 끝까지 한 번 써 보며 화면을 차례로 찍는다 (build/shots/flow_NN_이름.png).
+ * 앱을 처음부터 끝까지 한 번 써 보며 화면을 차례로 찍는다 (build/shots/flow_NNN_이름.png).
  * 첫 설정 → 홈 → 출근길 시연(모의 주행) → 주차 후 일기 → 이 길의 나 → 일기장.
  * docs/media 의 화면 흐름 영상은 이 그림들을 이어 붙여 만든다.
  */
@@ -26,6 +26,7 @@ import java.time.Duration
 class FlowCaptureTest {
     @Test fun flow() {
         Car.offline = true
+        Car.previewConnected = true   // 영상에서는 차에 연결된 모습으로
         val ctx = RuntimeEnvironment.getApplication()
         Store(ctx).apply { clearAll() }
         val ctrl = Robolectric.buildActivity(MainActivity::class.java).setup()
@@ -41,13 +42,14 @@ class FlowCaptureTest {
             v.layout(0, 0, w, h)
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             v.draw(Canvas(bmp))
-            File(dir, "flow_%02d_%s.png".format(n++, name)).outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            File(dir, "flow_%03d_%s.png".format(n++, name)).outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         fun wait(ms: Long) = looper.idleFor(Duration.ofMillis(ms))
 
         // 첫 설정
-        Onboard.step = 0; a.go(MainActivity.ONBOARD); wait(1800); snap("onboard")
-        repeat(3) { wait(3700); snap("onboard") }
+        // 소개 상자: 게이지가 차오르며 네 장이 넘어가는 모습을 0.2초 간격으로
+        Onboard.step = 0; a.go(MainActivity.ONBOARD)
+        repeat(72) { wait(200); snap("onboard") }
         Onboard.step = 1; a.go(MainActivity.ONBOARD); snap("name")
         Onboard.step = 2; a.go(MainActivity.ONBOARD); snap("kind")
         Onboard.step = 3; a.go(MainActivity.ONBOARD); snap("consent")
@@ -70,5 +72,6 @@ class FlowCaptureTest {
         a.go(MainActivity.TODAY); snap("home_after")
         DemoCommute.clear(a)
         ctrl.pause().stop().destroy()
+        Car.previewConnected = false
     }
 }

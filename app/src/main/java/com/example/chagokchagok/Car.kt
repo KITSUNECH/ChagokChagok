@@ -40,6 +40,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     companion object {
         /** 화면 확인 테스트처럼 차 없이 앱을 띄울 때 true. 실제 앱에서는 쓰지 않는다. */
         @JvmStatic var offline = false
+/** 화면 캡처용: 차 없이 그릴 때 연결 표시를 차에 연결된 모습으로 */
+var previewConnected = false
         const val SPEED_PERMISSION = "android.car.permission.CAR_SPEED"
     }
 
