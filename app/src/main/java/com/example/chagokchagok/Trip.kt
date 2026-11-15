@@ -62,7 +62,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
      * 깜빡이를 켜고 3초가 안 돼 넘어간 것은 칭찬하지 않는다. 신경 쓰인다고 한 날은 네 번까지, 아니면 한 번만.
      */
     private fun lanePraise(l: LaneMove) {
-        if (!l.moved || l.wait < LANE_FLOOR) return
+        // 운전대 각도로 확인하지 못한 것(깜빡이만 본 추정)은 칭찬하지 않는다
+        if (!l.moved || !l.steerKnown || l.wait < LANE_FLOOR) return
         val max = if (focus == "lane") 5 else if (support <= 2) 3 else 0
         if (lanePraised >= max) return
         lanePraised++
@@ -342,7 +343,9 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val again = guide?.takeIf { it.kind == "다시" }
         val g = guide?.takeIf { it.kind != "다시" }
         val route = Paths.of(path.toList())
-        val drive = recorder.finish(driver).let { d ->
+        val drive = recorder.finish(driver).let { d0 ->
+            val simSec = simStep / 2
+            val d = if (wasSim && simSec > d0.seconds) d0.copy(seconds = simSec, minutes = simSec / 60) else d0
             // 거리: 주행거리계 → 지나온 길 → 속도로 잰 거리 순으로, 있는 것을 쓴다
             val km = if (d.distKm >= 0.05f) d.distKm else if (route.size > 1) Paths.lengthKm(route) else speedKm
             val placed = when {
@@ -355,7 +358,9 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
                 else -> d
             }
             val far = g != null && g.drive.distKm > 0.05f && km >= g.drive.distKm * 0.9f
-            placed.copy(distKm = km, path = route, completed = g == null || arrived || far, sim = wasSim, economy = car.economy, economyUnit = car.economyUnit)
+            // 이름 없는 곳에 두 번째로 왔다: 지난번 주차한 자리와 250m 안이면 같은 곳으로 묶고 임시 이름을 붙인다
+            val again2 = if (placed.place == null && g == null && route.size > 1 && !wasSim) revisit(driver, route.last()) else null
+            (again2?.let { placed.copy(place = it, placeLat = route.last().lat, placeLng = route.last().lng) } ?: placed).copy(distKm = km, path = route, completed = g == null || arrived || far, sim = wasSim, economy = car.economy, economyUnit = car.economyUnit)
         }
         if (demoAuto) { demoAuto = false; car.simEconomy(null) }
         car.refreshNavi(); car.refreshCondition(); car.resetPassenger()
@@ -405,6 +410,17 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val la = car.lat ?: end?.lat; val ln = car.lng ?: end?.lng
         // 날씨: 위치에 동의한 운전자만, 좌표는 소수 둘째 자리(약 1km)로 줄여 보낸다
         if (store.weatherOn && store.locationConsent(driver) == true && la != null && ln != null) Weather.at(Math.round(la * 100) / 100.0, Math.round(ln * 100) / 100.0) { f -> if (f != null) { store.setWeather(d.id, "${f.sky} ${f.tempC}°"); host.diaryUpdated(d) } }
+    }
+
+    /** 이름 없이 주차했던 곳에 다시 왔으면 그 기록들에 같은 이름을 붙이고 그 이름을 돌려준다 */
+    private fun revisit(driver: String, here: Pt): String? {
+        val mine = store.diariesOf(driver)
+        val before = mine.filter { o -> !o.drive.sim && o.drive.place == null && o.drive.path.size > 1 && o.drive.path.last().let { Places.meters(here.lat, here.lng, it.lat, it.lng) <= 250 } }
+        if (before.isEmpty()) return null
+        val used = mine.mapNotNull { it.drive.place }.toSet()
+        val name = generateSequence(1) { it + 1 }.map { if (it == 1) "자주 오는 곳" else "자주 오는 곳 $it" }.first { it !in used }
+        before.forEach { o -> val end = o.drive.path.last(); store.addDiary(o.copy(drive = o.drive.copy(place = name, placeLat = end.lat, placeLng = end.lng))) }
+        return name
     }
 
     /** 다음에 타는 사람을 위해 지금 차 상태를 남긴다. */

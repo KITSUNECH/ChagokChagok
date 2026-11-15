@@ -410,7 +410,7 @@ internal fun MainActivity.readyScreen(): View {
         check(car.energy?.let { it >= 20 }, (if (car.isEv == true) "배터리 " else "연료 ") + "${car.energy}%", (if (car.isEv == true) "배터리 ${car.energy}% · 가는 길에 충전해요" else "연료 ${car.energy}% · 가는 길에 넣어요"), "", "fuel"),
         check(if (car.washerKnown) !car.washerLow else null, "워셔액 충분", "워셔액이 부족해요", "", "info"),
         check(if (car.beltKnown) car.belt else null, "안전벨트를 맸어요", "안전벨트를 매 주세요", "", "seat"),
-        check(if ("ENGINE_OIL_LEVEL" in car.lampsOn || "BRAKE_FLUID_LEVEL" in car.lampsOn) false else if (!car.failures.containsKey("oil")) true else null, "엔진오일·브레이크액 정상", "엔진오일이나 브레이크액이 적어요", "", "car"),
+        check(if ("ENGINE_OIL_LEVEL" in car.lampsOn || "BRAKE_FLUID_LEVEL" in car.lampsOn) false else if ("oil" in car.levelsRead && "brakeFluid" in car.levelsRead) true else null, "엔진오일·브레이크액 정상", "엔진오일이나 브레이크액이 적어요", "", "car"),
         store.seat(d)?.let { mine -> car.seatPos?.let { now -> check(now == mine, "의자가 지난번 내 자리 그대로예요", "의자가 지난번 내 자리와 달라요", "", "seat") } },
         Session.forecast?.let { f -> check(f.rainChance < 50, "도착지 ${f.sky} ${f.tempC}°", "도착지 ${f.sky} ${f.tempC}° · 3시간 안 비 올 확률 ${f.rainChance}%", "", "cloud") },
     ) + car.lampsOn.mapNotNull { Lamps.warn(it) }.map { check(false, "", "${it.name} 표시등이 켜져 있어요", "", "warning")!! }

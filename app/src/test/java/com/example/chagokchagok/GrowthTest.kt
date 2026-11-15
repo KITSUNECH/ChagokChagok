@@ -75,4 +75,17 @@ class GrowthTest {
         assertTrue(j.condDiffers)
         assertEquals(0f, j.changes.first { it.metric.key == "brake" }.weight, .001f)   // 브레이크 횟수는 참고만
     }
+
+    /** 이름이 같아도 멀리 떨어진 곳은 같은 곳으로 보지 않는다 */
+    @Test fun sameNameFarAwayIsNotTheSamePlace() {
+        fun at(lat: Double, lng: Double) = Drive("나", 0L, 3f, 10, 600, emptyList(), 0, 0, false, false, 0, 0, 0, place = "회사", placeLat = lat, placeLng = lng)
+        org.junit.Assert.assertTrue(samePlace(at(37.5000, 127.0000), at(37.5010, 127.0005)))
+        org.junit.Assert.assertFalse(samePlace(at(37.5000, 127.0000), at(35.1796, 129.0756)))
+    }
+
+    /** 깜빡이만 보고 추정한 차선 변경은 '3초 전 깜빡이' 판정에 넣지 않는다 */
+    @Test fun guessedLaneChangeIsNotScored() {
+        val guessed = Drive("나", 0L, 3f, 10, 600, listOf(Ev(.5f, Evt.LANE, LaneMove("RIGHT", 6f, true, false, false, false).encode())), 0, 0, false, false, 0, 0, 0)
+        org.junit.Assert.assertNull(Metrics.all.first { it.key == "lanelead" }.value(guessed))
+    }
 }

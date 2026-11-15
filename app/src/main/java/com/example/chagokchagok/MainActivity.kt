@@ -155,8 +155,8 @@ class MainActivity : Activity(), Car.Listener, TripHost {
     internal val driving get() = trip.active || limits.restricted ||
         (!Car.offline && !limits.known && (!car.gearKnown || car.gear == "D" || car.gear == "R"))
 
-    /** 차가 지금 굴러가는 중인지: 차의 주행 제한 신호, 또는 속도 시속 5km 이상. 이때는 주행 화면의 단추를 잠근다 */
-    internal val rolling get() = limits.restricted || (car.speedKmh ?: 0f) >= 5f
+    /** 차가 지금 굴러가는 중인지: 차의 주행 제한 신호, 또는 속도 시속 1km 이상. 이때는 창을 띄우지 않고 말로만 답한다. */
+    internal val rolling get() = limits.restricted || (car.speedKmh ?: 0f) >= 1f
     private var wasRolling = false
 
     internal fun go(name: String, arg: String? = null) {

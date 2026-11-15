@@ -160,6 +160,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     // 속도: Pleos 문서 안내대로 AAOS 표준 PERF_VEHICLE_SPEED (m/s). 권한 android.car.permission.CAR_SPEED 는 실행 중 허락이 필요하다.
     /** 지금 속도 (km/h). 받지 못했으면 null */
     var speedKmh: Float? = null; private set
+    /** 값을 실제로 읽은 액체 잔량 (oil, brakeFluid) */
+    val levelsRead = mutableSetOf<String>()
     /** 화면 테스트용: 속도 신호가 온 것처럼 */
     internal fun simSpeed(kmh: Float) { Telemetry.fake { speedKmh = kmh; onSpeed?.invoke(kmh) } }
     var onSpeed: ((Float) -> Unit)? = null
@@ -321,7 +323,7 @@ class Car(private val ctx: Context, private val listener: Listener) {
         // 공개 API(CAR_SAFETY)로 읽는 실제 경고: 엔진오일·브레이크액 수준. 낮으면 표시등처럼 알린다.
         fun level(key: String, lamp: String, get: ((ai.pleos.playground.vehicle.constant.control.OilLevelState?) -> Unit, (Exception) -> Unit) -> Unit) =
             attempt(key) { get({ v -> ui { val low = v == ai.pleos.playground.vehicle.constant.control.OilLevelState.LOW || v == ai.pleos.playground.vehicle.constant.control.OilLevelState.CRITICALLY_LOW
-                setLamps(if (low) lampsOn + lamp else lampsOn - lamp) } }, { e -> failures[key] = e.message ?: "실패" }) }
+                levelsRead.add(key); setLamps(if (low) lampsOn + lamp else lampsOn - lamp) } }, { e -> failures[key] = e.message ?: "실패" }) }
         level("oil", "ENGINE_OIL_LEVEL") { ok, no -> vehicle.getSafety().getEngineOilLevelState(ok, no) }
         level("brakeFluid", "BRAKE_FLUID_LEVEL") { ok, no -> vehicle.getSafety().getBrakeFluidLevelState(ok, no) }
     }

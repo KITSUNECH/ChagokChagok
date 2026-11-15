@@ -46,7 +46,7 @@ internal object Metrics {
     val all = listOf(
         Metric("signal", "돌기 전 깜빡이", "%", 3f, true, false) { d -> if (d.turns > 0) 100f * d.turnsSignaled / d.turns else null },
         // 기다린 시간 자체는 옆 차로에 차가 많으면 길어진다. 내가 정할 수 있는 것은 "깜빡이를 충분히 먼저 켰는가"다.
-        Metric("lanelead", "차선 변경 3초 전 깜빡이", "%", 3f, true, false) { d -> d.lanes().map { it.second }.filter { it.moved }.takeIf { it.isNotEmpty() }?.let { ls -> 100f * ls.count { it.wait >= LANE_FLOOR } / ls.size } },
+        Metric("lanelead", "차선 변경 3초 전 깜빡이", "%", 3f, true, false) { d -> d.lanes().map { it.second }.filter { it.moved && it.steerKnown }.takeIf { it.isNotEmpty() }?.let { ls -> 100f * ls.count { it.wait >= LANE_FLOOR } / ls.size } },   // 깜빡이만 본 추정은 넣지 않는다
         Metric("lane", "차선 변경 전 기다림", "초", 0f, false, true) { d -> d.laneWaitMedian() },
         Metric("lost", "경로 재탐색", "번", 2f, false, false) { d -> if (d.sim) null else d.lostWay.toFloat() },
         Metric("park", "주차할 때 기어 바꿈", "번", 2f, false, false) { d -> if (d.completed && !d.sim) d.parkMoves.toFloat() else null },
@@ -108,11 +108,18 @@ internal const val HARD_BRAKE = 3f
 /** 일기로 남기는 가장 짧은 주행 (km). 이보다 짧으면 자리를 옮긴 것으로 본다 */
 internal const val MIN_TRIP_KM = 0.2f
 
+/** 같은 곳인지: 이름이 같고, 두 기록에 좌표가 있으면 500m 안이어야 한다 (다른 도시의 같은 이름을 섞지 않는다) */
+internal fun samePlace(a: Drive, b: Drive): Boolean {
+    if (a.place == null || a.place != b.place) return false
+    val la = a.placeLat; val ln = a.placeLng; val lb = b.placeLat; val lm = b.placeLng
+    return la == null || ln == null || lb == null || lm == null || Places.meters(la, ln, lb, lm) <= 500
+}
+
 internal object Growth {
     /** 같은 길의 지난 기록 (오래된 것부터). 끝까지 다녀온 실제 주행만 (예시 기록 포함) */
     fun history(all: List<Diary>, d: Diary): List<Diary> = all.filter { o ->
         o.id != d.id && o.date < d.date && !o.drive.sim && o.drive.completed &&
-            ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
+            (samePlace(d.drive, o.drive) || (d.guideId != null && o.guideId == d.guideId))
     }.sortedBy { it.date }
 
     fun judge(all: List<Diary>, d: Diary): Judgement? {

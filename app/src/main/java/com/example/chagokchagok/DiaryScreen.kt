@@ -82,7 +82,7 @@ private fun MainActivity.detailPage(d: Diary, guide: Guide?, prev: Diary?): View
  */
 internal fun MainActivity.previousSame(d: Diary): Diary? = if (!d.drive.completed) null else store.diariesOf(d.driver).filter { o ->
     o.id != d.id && o.date < d.date && !o.drive.sim && o.drive.completed &&
-        ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
+        (samePlace(d.drive, o.drive) || (d.guideId != null && o.guideId == d.guideId))
 }.maxByOrNull { it.date }
 
 /**
@@ -96,7 +96,7 @@ internal fun sameRoad(a: Drive, b: Drive): Boolean {
 }
 
 private fun MainActivity.visits(d: Diary) = store.diariesOf(d.driver).count { o ->
-    !o.drive.sim && o.date <= d.date && ((d.drive.place != null && o.drive.place == d.drive.place) || (d.guideId != null && o.guideId == d.guideId))
+    !o.drive.sim && o.date <= d.date && (samePlace(d.drive, o.drive) || (d.guideId != null && o.guideId == d.guideId))
 }
 
 /** 읽기 보기: 큰 제목, 한 줄 요약(인용), 넉넉한 줄 간격의 본문. 그림 칸에는 지난번의 나도 옅게. */
