@@ -18,7 +18,7 @@ import java.time.Duration
 /**
  * 앱을 처음부터 끝까지 한 번 써 보며 화면을 차례로 찍는다 (build/shots/flow_NNN_이름.png).
  * 첫 설정 → 홈 → 출근길 시연(모의 주행) → 주차 후 일기 → 이 길의 나 → 일기장.
- * docs/media 의 화면 흐름 영상은 이 그림들을 이어 붙여 만든다.
+ * media 의 화면 흐름 영상은 이 그림들을 이어 붙여 만든다.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
