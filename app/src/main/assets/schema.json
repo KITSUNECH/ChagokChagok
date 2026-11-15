@@ -32,7 +32,7 @@
       "type": "function",
       "function": {
         "name": "ASK_MY_DRIVING",
-        "description": "Answers the driver's question about their own driving, using vehicle signals recorded by this app: turn-signal use before turns, waiting time before lane changes, parking adjustments and braking. Covers the drive in progress, or the most recent drive when parked.",
+        "description": "Answers the driver's question about their own driving, using vehicle signals recorded by this app: turn-signal use before turns, waiting time before lane changes, parking adjustments and braking. Covers the drive in progress, or the most recent drive when parked. Example requests: \"지금까지 어땠어?\", \"오늘 운전 어땠어?\", \"오늘 차선 변경 어땠어?\".",
         "parameters": {
           "type": "object",
           "properties": {

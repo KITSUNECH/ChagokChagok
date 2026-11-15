@@ -161,6 +161,8 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     private var speedMarked = false
     private var maxSpeed = 0f
     private var speedKm = 0f
+    /** 지금까지 달린 거리(km): 주행거리계가 움직이지 않으면 속도로 잰 거리 */
+    val drivenKm: Float get() = maxOf(recorder.kmNow(), speedKm)
     private var parkPending = false
     /** 방금(3초 안) 받은 속도가 시속 5km를 넘는지 */
     private fun movingNow() = lastSpeed?.let { System.currentTimeMillis() - it.first < 3000 && it.second >= 5f } == true

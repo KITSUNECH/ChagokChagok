@@ -89,14 +89,16 @@ internal fun MainActivity.focusKey(): String? = store.answer("focus_${store.driv
  * 차에게 물어보기: 글레오에게 "오늘 운전 어땠어?"라고 묻는 것과 같은 답을 버튼 한 번으로 바로 듣는다.
  * 달리는 중이면 지금까지의 기록, 아니면 그 일기(없으면 가장 최근 일기)로 답한다. 고르는 단계 없이 바로 말하고 화면에도 보여 준다.
  */
-internal fun MainActivity.askCar(about: Diary? = null) {
+/** voiceOnly: 달리는 중에는 화면에 창을 띄우지 않고 말로만 답한다 */
+internal fun MainActivity.askCar(about: Diary? = null, voiceOnly: Boolean = false) {
     val all = store.diariesOf(store.driver)
     val soFar = trip.active && about == null
     val target = about ?: all.lastOrNull()
     if (!soFar && target == null) { toast("아직 기록이 없어요. 한 번 달리고 나서 물어봐 주세요."); return }
     val drive = if (soFar) trip.recorder.summary(store.driver) else target!!.drive
     val before = if (soFar) all else all.filter { it.date < target!!.date }
-    readAloud(if (soFar) "지금까지의 운전" else dateText(drive.date, "M월 d일") + "의 운전", Coach.today(drive, before, if (soFar) trip.focus else focusKey(), soFar))
+    val answer = Coach.today(drive, before, if (soFar) trip.focus else focusKey(), soFar)
+    if (voiceOnly) speak(answer) else readAloud(if (soFar) "지금까지의 운전" else dateText(drive.date, "M월 d일") + "의 운전", answer)
 }
 
 /** 홈: 요즘 신경 쓰이는 것을 고른다. 고르면 달리는 동안과 주차 후에 그것부터 말해 준다. */

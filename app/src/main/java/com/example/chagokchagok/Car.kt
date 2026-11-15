@@ -160,6 +160,8 @@ class Car(private val ctx: Context, private val listener: Listener) {
     // 속도: Pleos 문서 안내대로 AAOS 표준 PERF_VEHICLE_SPEED (m/s). 권한 android.car.permission.CAR_SPEED 는 실행 중 허락이 필요하다.
     /** 지금 속도 (km/h). 받지 못했으면 null */
     var speedKmh: Float? = null; private set
+    /** 화면 테스트용: 속도 신호가 온 것처럼 */
+    internal fun simSpeed(kmh: Float) { Telemetry.fake { speedKmh = kmh; onSpeed?.invoke(kmh) } }
     var onSpeed: ((Float) -> Unit)? = null
     private var speedOn = false
     private val speedCb = object : android.car.hardware.property.CarPropertyManager.CarPropertyEventCallback {

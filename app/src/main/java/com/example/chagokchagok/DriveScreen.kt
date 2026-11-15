@@ -70,7 +70,7 @@ internal fun MainActivity.driveScreen(): View {
         if (trip.sim) addView(k.tag("모의 주행 · 시연용", Ink.warn))
         // Pleos 내비를 앞으로 (NaviHelper requestNavigationScreen). 분할 화면이면 옆 창에 뜬다.
         addView(k.gap(8))
-        addView(k.button("내비", Kit.Btn.Secondary, "navi", enabled = !rolling) { showNavi(null) })
+        addView(k.button("내비", Kit.Btn.Secondary, "navi") { showNavi(null) })
     }
 
     // 다음 회전 (내비)
@@ -136,21 +136,19 @@ internal fun MainActivity.driveScreen(): View {
     val statsCard = k.card(24) { addView(k.text("지금까지", Type.Caption, Ink.text2)); addView(V.stats); addView(V.statsSub) }
     V.statsCard = statsCard
     // 도로교통법 제49조 제1항 제11호의2: 운전 중 화면 조작은 정지 중에만. 차가 주행 제한을 걸면(움직이는 중) 버튼을 잠근다.
-    val moving = rolling
     // 달리는 동안은 말로: "차곡차곡, 천천히 갈래" (Gleo AI → GleoReceiver TAKE_IT_SLOW)
 
     // 기어 신호를 못 받는 차에서만 수동 종료를 보여 준다
     // 멈춰 있을 때는 언제나 "기록 끝내기"를 둔다 (기어 신호가 없거나 P로 바뀌지 않아도 빠져나올 수 있게)
-    val stop = if (!rolling) k.button("기록 끝내기", Kit.Btn.Danger, "stop") { sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() } } else null
+    // 단추는 달리는 중에도 잠그지 않는다. 대신 달리는 동안에는 창을 띄우지 않는다: 한 번 누르면 말로만 답한다.
+    // 기록은 기어를 P에 놓고 완전히 멈추면 저절로 끝난다. 달리는 중에 '기록 끝내기'를 누르면 그렇게 알려 준다.
+    val stop = k.button("기록 끝내기", Kit.Btn.Danger, "stop") {
+        if (rolling) speak("기어를 P에 놓고 멈추면 기록을 끝낼게요.")
+        else sheets.confirm("기록을 끝낼까요?", "지금까지 달린 것으로 일기를 써요.", "끝내기") { trip.end() }
+    }
 
-    // 달리는 동안(주행 제한): 지금 필요한 것 하나만. 경로 그림·제한속도·통계는 내비·계기판과 겹치니 멈췄을 때만 보여 준다.
-    val view = if (moving) {
-        if (ui.wide) k.row(20).apply {
-            gravity = Gravity.TOP
-            // 달리는 동안: 카드가 화면 높이를 나눠 채운다 (한마디가 없으면 위 카드 하나가 다 쓴다)
-            addView(k.col(18).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1.2f)); addView(tipCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1f)) }, k.lp(0, k.MATCH, 1.7f))
-        } else k.col(14).apply { addView(top); convoyCard()?.let { addView(it) }; addView(turnCard); addView(tipCard) }
-    } else if (ui.wide) k.row(20).apply {
+    // 달릴 때와 멈췄을 때 화면은 같다.
+    val view = if (ui.wide) k.row(20).apply {
         gravity = Gravity.TOP
         // 멈춰 있을 때: 두 칸이 화면 높이를 채운다. 맨 아랫줄에는 양쪽 단추가 같은 높이로 나란히 놓인다
         val tall = ui.touch(80)
@@ -159,13 +157,13 @@ internal fun MainActivity.driveScreen(): View {
             addView(turnCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1.2f))
             addView(tipCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1f))
             // 글레오에게 말로 묻는 것과 같은 답 (멈춰 있을 때만 누를 수 있다)
-            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(k.MATCH, tall))
+            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar(voiceOnly = rolling) }, k.lp(k.MATCH, tall))
         }, k.lp(0, k.MATCH, 1.5f))
         addView(k.col(18).apply {
             // 제한속도는 차의 드라이빙 뷰와 내비가 이미 보여 준다. 겹쳐 그리지 않는다
             addView(routeCard, k.lp(k.MATCH, 0, 1f))
             addView(statsCard.apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = ui.dp(180) })
-            if (stop != null) addView(stop, k.lp(k.MATCH, tall)) else addView(View(context), k.lp(1, tall))
+            addView(stop, k.lp(k.MATCH, tall))
         }, k.lp(0, k.MATCH, 1f))
     } else k.col(14).apply {
         // 내비 옆 좁은 창: 위에서부터 지금 할 일 · 한마디 · 길 그림이 높이를 나눠 채우고, 맨 아래에 단추 두 개
@@ -174,8 +172,8 @@ internal fun MainActivity.driveScreen(): View {
         addView(tipCard.apply { gravity = Gravity.CENTER_VERTICAL }, k.lp(k.MATCH, 0, 1f))
         addView(routeCard)
         addView(k.row(10).apply {
-            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar() }, k.lp(0, ui.touch(76), 1f))
-            stop?.let { addView(it, k.lp(0, ui.touch(76), 1f)) }
+            addView(k.button("지금까지 어땠어?", Kit.Btn.Tinted, "quote") { askCar(voiceOnly = rolling) }, k.lp(0, ui.touch(76), 1f))
+            addView(stop, k.lp(0, ui.touch(76), 1f))
         }, k.lp(k.MATCH, k.WRAP))
     }
     return FrameLayout(this).apply {
@@ -210,7 +208,7 @@ internal fun MainActivity.refreshDrive() {
         else -> { V.turnIcon?.set("road", Ink.text3); V.turnText?.text = "기록하고 있어요"; V.turnSub?.text = when {
             g != null && g.tips.any { it.placed } && store.locationOn && g.tips.indices.any { it !in trip.heard } -> "남긴 한마디는 그 근처에서 들려줄게요"
             car.routeStarted -> "길은 내비가 안내하고, 저는 운전을 적어요"
-            else -> "앞을 봐 주세요. 필요할 때만 말할게요" } }
+            else -> "궁금하면 “차곡차곡, 지금까지 어땠어?”라고 물어보세요" } }
     }
 
     // 회전까지 남은 거리 막대 (300m부터 줄어든다), 깜빡이 안내 중이면 신호 색
@@ -238,11 +236,12 @@ internal fun MainActivity.refreshDrive() {
     (V.tipCard?.background as? GradientDrawable)?.setColor(if (speaking) Ink.accentSoft else Ink.surface)
     V.tipNow?.visibility = if (speaking) View.VISIBLE else View.GONE
     // 달리는 동안은 한마디가 나오는 때만 한마디 카드를 보여 준다 (평소에는 위 카드 하나)
-    V.tipCard?.visibility = if (!rolling || speaking) View.VISIBLE else View.GONE
+    V.tipCard?.visibility = View.VISIBLE
 
     // 길 위의 위치
     if (g != null) {
-        val pr = if (g.drive.distKm > 0.05f && km > 0.05f) km / g.drive.distKm else null
+        val driven = trip.drivenKm
+        val pr = if (g.drive.distKm > 0.05f && driven > 0.05f) driven / g.drive.distKm else null
         V.trace?.marker = pr?.coerceIn(0f, 1f)
     }
     val left = g?.tips?.indices?.count { it !in trip.heard } ?: 0

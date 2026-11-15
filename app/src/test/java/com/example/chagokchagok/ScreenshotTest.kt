@@ -129,6 +129,9 @@ class ScreenshotTest {
         store.clearAll(); store.setDrivers(listOf("김현대")); store.driver = "김현대"; store.onboarded = true
         store.addDiary(Writer.write(Drive("김현대", System.currentTimeMillis(), 1.2f, 3, 200, emptyList(), 0, 2, false, false, 0, 0, 0), emptyList(), null, 0))
         a.go(MainActivity.JOURNAL); snap("99_journal_one")
+        // 달리는 중의 주행 화면: 누르는 것 없이 지금 할 일 · 한마디 · 길 위의 지금 위치
+        store.addSampleGuide(); a.depart(store.guide("sample")!!); a.trip.start(); a.car.simSpeed(40f)
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(60)); a.car.simSpeed(40f); a.render(); snap("98_drive_moving")
         ctrl.pause().stop().destroy()
     }
 }
