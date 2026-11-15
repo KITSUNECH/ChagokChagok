@@ -1,6 +1,6 @@
 // 차곡車곡 – 암호화 저장소
 // Pleos 보안 가이드: 민감한 데이터는 암호화해 저장하고 비밀값은 코드에 넣지 않는다.
-// 일기·지나온 길·건넨 길·AI 키를 안드로이드 키스토어 키(AES-256-GCM)로 암호화한 SharedPreferences 에 둔다.
+// 일기·지나온 길·건넨 길을 안드로이드 키스토어 키(AES-256-GCM)로 암호화한 SharedPreferences 에 둔다.
 // 예전 평문 저장소("chagok")가 있으면 처음 한 번 옮기고 비운다.
 package com.example.chagokchagok
 

@@ -140,7 +140,7 @@
 | `Car.kt` | Vehicle SDK · NaviHelper SDK · GEAR_SELECTION |
 | `Places.kt` · `Voice.kt` · `Restrictions.kt` | FusedLocation SDK(근접 알림), TextToSpeech SDK(오디오 포커스·우선순위), CarUxRestrictions |
 | `GleoReceiver.kt` · `assets/schema.json` | Gleo AI 연동 |
-| `Writer.kt` | 사실만으로 쓴 일기 (`AiDiary.kt`의 생성형 AI 다듬기는 화면에서 뺌) |
+| `Writer.kt` | 차량 기록의 사실만으로 쓰는 일기 문장 |
 | `Model.kt` · `SecurePrefs.kt` | 기록 저장 (기기 안 암호화) |
 | `*Screen.kt` · `Onboarding.kt` · `Tips.kt` | 화면, 첫 설정, 사용 팁 |
 | `Laws.kt` · `LawData.kt` · `Safety.kt` · `Shifters.kt` · `Stack.kt` · `Courses.kt` | 화면에서 덜어 낸 것(법규·안전 조작·기어 안내·성장 바·길잡이). 코드는 남겨 두었고 지금은 들어가는 길이 없습니다 |
@@ -153,7 +153,7 @@
 - 위치는 운전자마다 동의를 받고, 동의하지 않은 운전자의 위치는 쓰지도 남기지도 않습니다.
 - 길을 건넬 때는 출발한 곳 근처 500m를 빼고, 목적지와 한마디를 남긴 자리만 함께 갑니다.
 - **날씨**(켜 둔 경우): 목적지 좌표를 소수 둘째 자리로 줄여 Open-Meteo 공개 예보로 보냅니다.
-- 일기 문장을 생성형 AI로 다듬는 기능은 화면에서 뺐습니다. 키를 넣는 길이 없어 외부로 일기가 나가지 않습니다(코드 `AiDiary.kt`는 남아 있습니다).
+- 일기 문장은 정해진 규칙으로 앱 안에서 씁니다. 일기는 외부로 나가지 않습니다.
 - 차량 마이크 음성은 외부로 보내지 않습니다.
 
 ## 한계

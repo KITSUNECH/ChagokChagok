@@ -53,7 +53,6 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
     /** 이 시각까지 오는 재탐색은 앱이 요청한 것 */
     private var ownRerouteUntil = 0L
     var withPassenger = false; private set
-    var aiStatus = if (AiDiary.enabled) "대기 중" else "키 없음 (규칙으로 씀)"
 
     /** 이번 주행에서 운전자가 신경 쓰인다고 한 것 */
     var focus: String? = null; private set
@@ -404,15 +403,6 @@ class Trip(private val store: Store, private val car: Car, private val host: Tri
         val la = car.lat ?: end?.lat; val ln = car.lng ?: end?.lng
         // 날씨: 위치에 동의한 운전자만, 좌표는 소수 둘째 자리(약 1km)로 줄여 보낸다
         if (store.weatherOn && store.locationConsent(driver) == true && la != null && ln != null) Weather.at(Math.round(la * 100) / 100.0, Math.round(ln * 100) / 100.0) { f -> if (f != null) { store.setWeather(d.id, "${f.sky} ${f.tempC}°"); host.diaryUpdated(d) } }
-        // 키가 있으면 같은 사실로 문장만 다듬는다. 실패하면 규칙으로 쓴 글을 그대로 둔다.
-        if (AiDiary.enabled) AiDiary.polish(d, g, store.tone(driver), store.diariesOf(driver).dropLast(1), store.typeOf(driver)) { text, reason ->
-            aiStatus = reason
-            if (text != null) {
-                store.setOriginalText(d.id, d.text)   // 되돌리기·신고 때 쓰는 원래 문장
-                val better = d.copy(text = text, highlight = if (d.highlight.isNotEmpty() && d.highlight in text) d.highlight else "", ai = true)
-                store.addDiary(better); host.diaryUpdated(better)
-            }
-        }
     }
 
     /** 다음에 타는 사람을 위해 지금 차 상태를 남긴다. */

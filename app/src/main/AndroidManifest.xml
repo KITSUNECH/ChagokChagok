@@ -14,7 +14,7 @@
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
     <!-- 속도: AAOS 표준 PERF_VEHICLE_SPEED 속성 (Pleos 문서 안내). 급하게 선 순간을 알아보는 데만 쓴다. 실행 중 허락을 받는다. -->
     <uses-permission android:name="android.car.permission.CAR_SPEED" />
-    <!-- 일기 문장을 생성형 AI로 다듬을 때만 쓴다. 주행 요약 글만 나간다. -->
+    <!-- 도착지 날씨(Open-Meteo 공개 예보)를 받을 때만 쓴다. 줄인 좌표만 나간다. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 기록 중 알림(앞쪽 서비스): 내비 전체 화면·앱 전환 중에도 기록이 끊기지 않게 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

@@ -74,7 +74,6 @@ class MainActivity : Activity(), Car.Listener, TripHost {
         root.addView(stage, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
         sheets = Overlay(root) { kit }
-        AiDiary.key = store.aiKey
         Coach.isSample = { id -> store.isSample(id) }
         Live.activity = java.lang.ref.WeakReference(this)   // 글레오 요청을 진행 중인 주행에 전한다
         car = Car(this, this)
