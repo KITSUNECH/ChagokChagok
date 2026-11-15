@@ -197,11 +197,14 @@ internal fun MainActivity.findInNavi() {
 /**
  * 내비를 앞으로 부른다. ① 차에 깔린 지도·내비 앱을 표준 안드로이드 방식으로 실행해 앞으로 가져오고,
  * ② Pleos 내비에 화면을 요청한다 (검색어가 있으면 장소 검색 화면: NaviHelper requestNavigationScreen).
- * 화면을 좌우로 나누는 것은 차(시스템)가 정한다. 앱이 시킬 수는 없다.
+ * 내비는 "옆 창에" 띄워 달라고 부탁한다. 받아 줄지는 차(시스템)가 정한다.
  */
 internal fun MainActivity.showNavi(keyword: String?) {
     val launched = try {
-        startActivity(android.content.Intent.makeMainSelectorActivity(android.content.Intent.ACTION_MAIN, android.content.Intent.CATEGORY_APP_MAPS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); true
+        // 옆 창에 띄워 달라고 부탁한다 (안드로이드 표준 FLAG_ACTIVITY_LAUNCH_ADJACENT). 차가 받아 주면 내비와 이 앱이 나란히 보이고,
+        // 받아 주지 않으면 내비가 앱 영역을 다 쓴다. 화면을 어떻게 나눌지는 차(시스템)가 정한다.
+        startActivity(android.content.Intent.makeMainSelectorActivity(android.content.Intent.ACTION_MAIN, android.content.Intent.CATEGORY_APP_MAPS)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)); true
     } catch (_: Throwable) { false }
     window.decorView.postDelayed({
         val asked = car.openNavi(keyword)
