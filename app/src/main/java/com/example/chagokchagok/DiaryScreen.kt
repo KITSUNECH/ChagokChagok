@@ -34,15 +34,45 @@ internal fun MainActivity.diaryScreen(id: String?): View {
     // 넓은 화면: 일기 한 장이 화면을 꽉 채우고, 자세한 기록은 단추로 넘겨 본다 (아래가 잘려 보이지 않게)
     if (ui.wide) {
         if (DiaryPrefs.detail != d.id) return diaryPage(d, prev) { DiaryPrefs.detail = d.id; render() }
-        return k.col().apply {
-            addView(k.header("자세한 기록", d.title + " · " + dateText(d.date), onBack = { DiaryPrefs.detail = null; render() }))
-            addView(k.grid(2, blocks, 20))
-        }
+        // 한 화면에: 왼쪽은 지나온 길과 차가 적어 둔 글(길면 그 안에서만 넘긴다) · 다음으로, 오른쪽은 오늘의 숫자와 주행 타임라인
+        // 높이를 화면에 고정한다 (안의 칸들이 남는 높이를 나눠 갖고, 넘치는 글만 그 칸 안에서 넘긴다)
+        return android.widget.FrameLayout(this).apply { addView(detailPage(d, guide, prev), android.widget.FrameLayout.LayoutParams(-1, pageHeight())) }
     }
     return k.col().apply {
         addView(diaryPage(d, prev))
         addView(k.gap(8))
         addView(k.grid(1, blocks, 20))
+    }
+}
+
+private fun MainActivity.detailPage(d: Diary, guide: Guide?, prev: Diary?): View {
+    val k = kit
+    run {
+        return k.col().apply {
+            addView(k.header("자세한 기록", d.title + " · " + dateText(d.date), onBack = { DiaryPrefs.detail = null; render() }))
+            addView(k.gap(16))
+            addView(k.row(20).apply {
+                addView(k.col(16).apply {
+                    addView(readPage(d, guide, prev, fill = true), k.lp(k.MATCH, 0, 1f))
+                    addView(k.card(pad = 18) {
+                        addView(k.text("다음으로", Type.Sub, Ink.text2)); addView(k.gap(8))
+                        addView(actions(d, guide, compact = true))
+                    })
+                }, k.lp(0, k.MATCH, 1.1f))
+                addView(k.col(16).apply {
+                    addView(k.card(pad = 20) { addView(k.text("오늘의 숫자", Type.Sub, Ink.text2)); addView(k.gap(8)); addView(k.grid(3, numberTiles(d), 12)) })
+                    addView(k.card(pad = 22) {
+                        addView(k.text("주행 타임라인", Type.Sub, Ink.text2))
+                        addView(Timeline(context, ui, d.drive), k.lp(k.MATCH, 0, 1f).apply { topMargin = ui.dp(6) })
+                        addView(k.text(timelineSummary(d.drive), Type.Caption, Ink.text2))
+                        addView(k.text("이 기록의 근거 보기", Type.Sub, Ink.accent).apply {
+                            gravity = Gravity.CENTER_VERTICAL; minHeight = ui.touch(48)
+                            setOnClickListener { sheets.sheet("이 기록의 근거", "어떤 차량 신호로 적었는지") { _ -> addView(evidence(d, guide)) } }
+                        })
+                    }, k.lp(k.MATCH, 0, 1f))
+                }, k.lp(0, k.MATCH, 1f))
+            }, k.lp(k.MATCH, 0, 1f))
+        }
     }
 }
 
@@ -70,7 +100,7 @@ private fun MainActivity.visits(d: Diary) = store.diariesOf(d.driver).count { o 
 }
 
 /** 읽기 보기: 큰 제목, 한 줄 요약(인용), 넉넉한 줄 간격의 본문. 그림 칸에는 지난번의 나도 옅게. */
-private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
+private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?, fill: Boolean = false): View {
     val k = kit
     return k.card(pad = 30) {
         addView(k.row(10).apply {
@@ -86,26 +116,28 @@ private fun MainActivity.readPage(d: Diary, guide: Guide?, prev: Diary?): View {
             prev != null -> lanes.add(Lane("지난번의 나", prev.drive, faded = true))
         }
         lanes.add(Lane(if (lanes.isEmpty()) "" else "오늘의 나", d.drive))
-        addView(TraceView(context, ui).apply { this.lanes = lanes }, k.lp(k.MATCH, ui.dp(if (lanes.size > 1) 170 else 110)))
-        if (d.highlight.isNotEmpty()) {
+        addView(TraceView(context, ui).apply { this.lanes = lanes }, k.lp(k.MATCH, ui.dp(if (fill) (if (lanes.size > 1) 124 else 84) else if (lanes.size > 1) 170 else 110)))
+        // 한 화면에 넣을 때는 강조 문장을 따로 떼어 보이지 않는다 (아래 글에 그대로 들어 있다)
+        if (d.highlight.isNotEmpty() && !fill) {
             addView(k.gap(18))
             addView(k.row(16).apply {
                 addView(View(context).apply { background = k.rounded(Ink.accent, 2) }, k.lp(ui.dp(4), k.MATCH))
                 addView(k.text(d.highlight, Type.Title).apply { typeface = ui.batang; setLineSpacing(0f, 1.3f) }, k.lp(0, k.WRAP, 1f))
             })
         }
-        addView(k.gap(20))
+        addView(k.gap(if (fill) 10 else 20))
         addView(k.row(8).apply { addView(k.icon("car", Ink.text2, 18)); addView(k.text("차가 적어 둔 것", Type.Sub, Ink.text2)) })
         addView(k.gap(8))
-        addView(k.text(d.text, Type.Body).apply { setLineSpacing(0f, 1.6f) })
+        val body = k.text(d.text, Type.Body).apply { setLineSpacing(0f, 1.6f) }
+        if (fill) addView(k.scroll(body).apply { isFillViewport = false }, k.lp(k.MATCH, 0, 1f)) else addView(body)
     }
 }
 
 /** 오늘의 숫자: 네 칸 */
-private fun MainActivity.numbers(d: Diary): View {
+private fun MainActivity.numberTiles(d: Diary): List<View> {
     val k = kit; val v = d.drive
     val lw = v.laneWaitMedian()
-    val tiles = listOfNotNull(
+    return listOfNotNull(
         k.stat(if (v.distKm > 0.05f) String.format(java.util.Locale.KOREA, "%.1fkm", v.distKm) else "–", "거리"),
         k.stat(if (v.minutes >= 1) "${v.minutes}분" else "${v.seconds}초", "시간"),
         k.stat(if (v.turns > 0) "${v.turnsSignaled}/${v.turns}" else "${v.signals}번", if (v.turns > 0) "돌기 전 깜빡이" else "깜빡이"),
@@ -113,8 +145,8 @@ private fun MainActivity.numbers(d: Diary): View {
         v.economy?.let { k.stat(String.format(java.util.Locale.KOREA, "%.1f", it), "연비 ${v.economyUnit}") },
         lw?.let { k.stat("${it.toInt()}초", "차선 변경 전 기다림") },
     )
-    return k.card(pad = 20) { addView(k.grid(2, tiles, 14)) }
 }
+private fun MainActivity.numbers(d: Diary): View = kit.card(pad = 20) { addView(kit.grid(2, numberTiles(d), 14)) }
 
 /**
  * 지난번과 비교: 같은 곳에 다시 간 날, 무엇이 달라졌는지 막대 두 개씩.
@@ -228,13 +260,16 @@ internal fun MainActivity.askFeeling(d: Diary) {
     }
 }
 
-private fun MainActivity.actions(d: Diary, guide: Guide?): View {
+private fun MainActivity.actions(d: Diary, guide: Guide?, compact: Boolean = false): View {
     val k = kit
+    /** 한 줄 목록(기본) 또는 한 화면에 넣을 때의 작은 단추 */
+    fun entry(title: String, sub: String?, icon: String, chevron: Boolean = false, value: String? = null, onClick: () -> Unit): View =
+        if (compact) k.button(title, Kit.Btn.Secondary, icon) { onClick() } else k.item(title, sub, icon, value = value, chevron = chevron) { onClick() }
     val all = linkedMapOf<String, () -> View>()
-    all["self"] = { k.item("다음의 나에게 한마디", "같은 곳에 다시 갈 때 그 근처에서 들려줘요", "quote", chevron = true) { noteToSelf(d) } }
+    all["self"] = { entry("다음의 나에게 한마디", "같은 곳에 다시 갈 때 그 근처에서 들려줘요", "quote", chevron = true) { noteToSelf(d) } }
     if (guide != null && guide.owner != d.driver) {
         val sent = store.newsSent(d.id)
-        all["notify"] = { k.item(if (sent) "${guide.owner} 님에게 알렸어요" else "${guide.owner} 님에게 다녀왔다고 알리기", null, "flag", value = if (sent) "보냄" else null) {
+        all["notify"] = { entry(if (sent) "${guide.owner} 님에게 알렸어요" else "${guide.owner} 님에게 다녀왔다고 알리기", null, "flag", value = if (sent) "보냄" else null) {
             if (!sent) {
                 store.addNews(guide.owner, "${d.driver}\t" + when (guide.kind) {
                     "추천" -> "${Writer.subj(d.driver)} 추천해 준 곳에 직접 운전해서 다녀왔어요."
@@ -245,19 +280,20 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
             }
         } }
     }
-    all["give"] = { k.item("이 길 건네주기", "가족·친구가 같은 길을 달릴 수 있게", "gift", chevron = true) {
+    // 건넬 사람이 있을 때만 (이 차를 함께 쓰는 운전자가 둘 이상)
+    if (store.drivers.size > 1) all["give"] = { entry("이 길 건네주기", "가족·친구가 같은 길을 달릴 수 있게", "gift", chevron = true) {
         giveTitle = d.drive.place ?: ""; giveTips.clear(); giveTips.addAll(d.drive.events.filter { it.type == Evt.SAY }.map { Tip(it.p, it.value) }); giveKind = if (d.drive.place != null && guide == null) "추천" else "길"
         go(MainActivity.GIVE, d.id)
     } }
     val posted = store.posted(d.id) != null
-    all["post"] = { k.item(if (posted) "함께 차곡에 올렸어요" else "함께 차곡에 올리기", if (posted) "누르면 내릴 수 있어요" else "미리 보고 누구에게 보일지 골라요", "share", chevron = true) {
+    all["post"] = { entry(if (posted) "함께 차곡에 올렸어요" else "함께 차곡에 올리기", if (posted) "누르면 내릴 수 있어요" else "미리 보고 누구에게 보일지 골라요", "share", chevron = true) {
         if (posted) sheets.confirm("함께 차곡에서 내릴까요?", "다른 사람의 화면에서 이 일기가 사라져요.", "내리기", danger = true) { val cap = store.posted(d.id) ?: ""; store.unpost(d.id); render(); toastUndo("함께 차곡에서 내렸어요.") { store.post(d.id, cap) } }
         else postSheet(d)
     } }
-    all["feel"] = { k.item(store.feeling(d.id)?.let { "내 한 줄: $it" } ?: "오늘 한 줄 남기기", "오늘 운전이 어땠는지", "pencil", chevron = true) {
+    all["feel"] = { entry(store.feeling(d.id)?.let { "내 한 줄: $it" } ?: "오늘 한 줄 남기기", "오늘 운전이 어땠는지", "pencil", chevron = true) {
         askFeeling(d)
     } }
-    if (d.drive.passenger) all["passenger"] = { k.item("함께 탄 사람의 한마디 적기", "옆자리에서 해 준 말을 이 길에 남겨요", "people", chevron = true) {
+    if (d.drive.passenger) all["passenger"] = { entry("함께 탄 사람의 한마디 적기", "옆자리에서 해 준 말을 이 길에 남겨요", "people", chevron = true) {
         val lines = listOf("잘하고 있어.", "여기서 미리 차선 바꿔 두면 편해.", "여기는 천천히 가도 돼.", "주차장 입구 조심해.")
         sheets.choose("어디쯤에서 한 말인가요?", null, TIP_PLACES.map { it.first }) { where ->
             sheets.choose("함께 탄 사람의 한마디", null, lines + "직접 쓰기") { i ->
@@ -266,8 +302,8 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
             }
         }
     } }
-    Quizzes.pick(d.drive)?.let { q -> all["quiz"] = { k.item("오늘 길 복습", q.question, "info", chevron = true) { quiz(q) } } }
-    all["handover"] = { k.item("다음 사람에게 한마디", "다음에 이 차를 타는 사람의 홈에 보여요", "car", chevron = true) {
+    Quizzes.pick(d.drive)?.let { q -> all["quiz"] = { entry("오늘 길 복습", q.question, "info", chevron = true) { quiz(q) } } }
+    all["handover"] = { entry("다음 사람에게 한마디", "다음에 이 차를 타는 사람의 홈에 보여요", "car", chevron = true) {
         val notes = listOf("기름 넣어야 해요.", "워셔액 채워 주세요.", "뒷자리에 짐 있어요.", "주차는 평소 자리에 했어요.")
         sheets.choose("다음에 타는 사람에게", null, notes + "직접 쓰기") { i ->
             if (i == notes.size) sheets.input("한마디", "") { trip.saveHandover(store.driver, it); toast("남겼어요.") } else { trip.saveHandover(store.driver, notes[i]); toast("남겼어요.") }
@@ -276,7 +312,8 @@ private fun MainActivity.actions(d: Diary, guide: Guide?): View {
     // 받은 길이면 알리기가 먼저, 혼자 간 길이면 다음의 나에게가 먼저
     val firstKeys = (if ("notify" in all) listOf("notify", "self", "give") else listOf("self", "feel", "give")).filter { it in all }
     val rest = all.keys - firstKeys.toSet() - setOf("post", "quiz", "handover")
-    return k.groupOf((firstKeys + rest).map { all.getValue(it)() })
+    val views = (firstKeys + rest).map { all.getValue(it)() }
+    return if (compact) k.flow(10).apply { views.forEach { addView(it) } } else k.groupOf(views)
 }
 
 /** 함께 차곡에 올리기 전 미리 보기와 공개 범위 */
