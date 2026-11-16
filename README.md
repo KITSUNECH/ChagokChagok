@@ -9,7 +9,7 @@
 
 ![앱 화면 흐름](media/flow.gif)
 
-## 나의 운전과 차량 데이터를 합쳐 일기를 만듭니다.
+## 나의 운전 + 차량 데이터 = 차로 쓰는 성장일기, 차곡車곡
 
 | 언제 | 누가 | 하는 일 | 쓰는 Pleos SDK·API |
 |---|---|---|---|
@@ -97,7 +97,8 @@
 
 `./gradlew assembleContestRelease` · `./gradlew assembleMarketRelease`
 
-### 공개된 Pleos Playground 개발 문서의 SDK·API로 구현했고, 문서에 없는 기능만 시연용으로 표시했습니다.
+### 공개된 Pleos Playground 개발 문서의 SDK·API로 구현했습니다.  
+### 문서에 없는 기능만 시연용으로 표시했습니다.
 
 | 기능 | 구분 | 쓰는 SDK·API |
 |---|---|---|
