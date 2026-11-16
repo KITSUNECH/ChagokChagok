@@ -96,9 +96,9 @@
 | `market` | Pleos App Market 탑재 준비 | **없음** (시연 기능을 빼고 빌드) |
 
 `./gradlew assembleContestRelease` · `./gradlew assembleMarketRelease`
-
+  
 ### 공개된 Pleos Playground 개발 문서의 SDK·API로 구현했습니다.  
-### 문서에 없는 기능만 시연용으로 표시했습니다.
+#### 문서에 없는 기능만 시연용으로 표시했습니다.
 
 | 기능 | 구분 | 쓰는 SDK·API |
 |---|---|---|
