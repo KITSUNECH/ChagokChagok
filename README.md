@@ -97,9 +97,7 @@
 
 `./gradlew assembleContestRelease` · `./gradlew assembleMarketRelease`
 
-## 무엇이 실제이고 무엇이 시연용인가
-
-공개된 Pleos Playground 개발 문서의 SDK·API로 구현했고, 문서에 없는 기능만 시연용으로 표시했습니다.
+# 공개된 Pleos Playground 개발 문서의 SDK·API로 구현했고, 문서에 없는 기능만 시연용으로 표시했습니다.
 
 | 기능 | 구분 | 쓰는 SDK·API |
 |---|---|---|
